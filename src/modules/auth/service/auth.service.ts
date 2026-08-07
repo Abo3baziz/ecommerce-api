@@ -4,7 +4,10 @@ import { ForbiddenError } from "../../../shared/errors/ForbiddenError.js";
 import { GoneError } from "../../../shared/errors/GoneError.js";
 import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
 import { UnauthorizedError } from "../../../shared/errors/UnauthorizedError.js";
-import { PUBLIC_ID_PREFIXES } from "../../../shared/constants/index.js";
+import {
+  PUBLIC_ID_PREFIXES,
+  VERIFICATION_TOKEN_TTL_MS,
+} from "../../../shared/constants/index.js";
 import { SESSION_TTL_MS } from "../../../shared/constants/session.js";
 import { generatePublicId } from "../../../shared/utils/index.js";
 import { logger } from "../../../shared/logger/index.js";
@@ -26,7 +29,6 @@ import type { ListSessionsResult } from "../dto/session.js";
 import type { RequestContext } from "../types/context.js";
 
 const BCRYPT_ROUNDS = 12;
-const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 export async function register(
   input: RegisterInput,
@@ -57,7 +59,7 @@ export async function register(
 
   const sessionToken = await createSession(user.id, user.public_id, context);
 
-  await issueVerificationToken(user.id, user.email);
+  await issueVerificationToken(user.id, user.email, user.first_name);
 
   return {
     public_id: user.public_id,
@@ -95,7 +97,11 @@ export async function login(
   };
 }
 
-async function issueVerificationToken(users_id: number, email: string): Promise<void> {
+async function issueVerificationToken(
+  users_id: number,
+  email: string,
+  recipientName: string,
+): Promise<void> {
   const verificationToken = generateOpaqueToken();
 
   await authRepository.createVerificationToken({
@@ -107,13 +113,13 @@ async function issueVerificationToken(users_id: number, email: string): Promise<
     users_id,
   });
 
-  sendVerificationEmail(email, verificationToken).catch((error) => {
+  sendVerificationEmail(email, recipientName, verificationToken).catch((error) => {
     logger.error({ err: error, email }, "Failed to send verification email");
   });
 }
 
 export async function resendVerificationEmail(
-  user: Pick<users, "id" | "email" | "email_verified_at">,
+  user: Pick<users, "id" | "email" | "first_name" | "email_verified_at">,
 ): Promise<VerifyEmailResult> {
   if (user.email_verified_at !== null) {
     throw new ConflictError("Email is already verified");
@@ -124,7 +130,7 @@ export async function resendVerificationEmail(
     verification_type.REGISTER_EMAIL,
   );
 
-  await issueVerificationToken(user.id, user.email);
+  await issueVerificationToken(user.id, user.email, user.first_name);
 
   return { message: "Verification email sent." };
 }
