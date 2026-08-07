@@ -3,6 +3,16 @@
 ## Project Progress
 
 ### Completed
+- **Reimplemented the logger per `docs/LOGGER.md` on `feature/logger`**: replaced the custom JSON-lines logger with a **Pino**-based logger (`pino@10` + `pino-pretty`). Single shared instance writes to the terminal (pretty in dev, structured JSON in production) and to a categorized `logs/log.json`.
+- `logs/log.json` holds one top-level section per category (`success`, `info`, `warning`, `error`, `debug`); each entry gets the next sequential numeric key per category and existing records are never overwritten. Missing file is initialized with the empty category skeleton.
+- Levels map to categories: `success` (custom level 35), `warn`→`warning`, `error`/`fatal`→`error`, `trace`/`debug`→`debug`. `success` sits between info and warn so request logs aren't filtered at the default `info` level.
+- Errors are serialized as `{ code, message, details }` plus `stack` in non-production; the `err` serializer is registered with Pino.
+- Request logging middleware now logs completed requests: `success` for 2xx/3xx, `error` for 4xx/5xx, with `method`, `url`, `status`, `duration`, `requestId`, `userId`, `ip`, `userAgent`, and enriched `error` details via `errorHandler` stashing the error on `res.locals`. `errorHandler` no longer double-logs unhandled errors.
+- Added graceful-shutdown logging in `createServer()` (SIGINT/SIGTERM). `logger` API (info/warn/error/fatal/…) unchanged, so existing call sites in `src/index.ts` and feature branches keep working.
+- Verified live: /health → `success`, 404 → `error` with request context, standalone `logger.error({ err })` → `error` section with code/message/details/stack, `warn` → warning section, debug filtered at `info` level, production stdout emits structured JSON. Typecheck + build pass.
+- **Restructured git into per-module branches.** The repo had zero commits; renamed the unborn `feature/user-registration` branch to `main` and committed the shared base (config, shared, middleware, prisma, docs, app skeleton, empty v1 router) as the root commit.
+- Created one feature branch per module, each based on `main` with only its relevant files: `feature/auth` (full auth implementation + `src/middleware/authentication.ts` + v1 router wiring), and scaffolded `feature/users`, `feature/products`, `feature/categories`, `feature/inventory`, `feature/cart`, `feature/orders`, `feature/payments`, `feature/reviews` (each holds its module placeholder `index.ts`).
+- Verified `npm run typecheck` passes on both `main` (no module code) and `feature/auth` (wired). Working tree clean on `main`.
 - Synced Prisma schema via `db:pull` (imported user's fixes from `Ecommerce` schema) and regenerated the client.
 - Moved generated Prisma client to `src/generated/prisma` (was outside `rootDir`, blocking `tsc`); `.gitignore` updated.
 - Added dev `SESSION_SECRET` + `CORS_ORIGIN` to `.env`.
@@ -69,9 +79,11 @@
 - `device` in the sessions list is derived client-side from the UA via `parseDeviceName` (stored in `device_name` at creation); `current` is computed from the request's session, not the DB `is_current` column.
 - Revoking a session not owned by the caller (or already revoked/expired) returns 404 to avoid leaking which sessions exist.
 - Resend invalidates all prior unused `REGISTER_EMAIL` tokens (marking `used_at`) before issuing a new one, so old links return 410; dedicated 5/15min rate limiter per `email-verification.md` security notes.
-- Logger emits JSON when stdout is not a TTY (e.g. redirected to a file / `server.log`); `pino-pretty` is only used on an interactive terminal.
-- **Logging is custom + dependency-free**: all app logs (request logging, startup, errors, unhandled rejections) are appended as one JSON object per line to `logs/logs.json` (created on demand, `logs/` gitignored). Errors are serialized as `{ type, message, stack }`; level filtering via `LOG_LEVEL`; console mirrored.
+- Logger follows `docs/LOGGER.md`: **Pino** via `pino.multistream` (pretty terminal in dev, structured JSON on stdout in production, plus a custom categorized-file stream). File writes are serialized through a promise queue and failures are swallowed so logging never crashes the app; `logs/` is gitignored.
+- The categorized `logs/log.json` layout deviates from Pino's JSON-lines convention by design (docs require sectioned categories with sequential record keys); the file stream re-uses the same Pino entries.
 - Prisma 7 `db push` no longer supports `--skip-generate` (unknown option) and supports a `--url` flag to override the datasource URL; relevant if a dedicated test DB is ever set up.
+- `main` holds zero module code so it compiles standalone: `src/modules/**` and `src/middleware/authentication.ts` (auth-coupled middleware) live only on `feature/auth`; the v1 router on `main` is empty until a module branch wires it.
+- Because `src/modules` is not on `main`, switching directly between module branches can hit untracked-file conflicts; always switch through `main` until module dirs are merged into it.
 
 ### Pending
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
@@ -79,4 +91,4 @@
 - No test framework configured (`npm test` is a stub); the auth test suite was started and then reverted at user request.
 
 ### Next Step
-- Choose the next module: users profile/addresses, or set up the test framework (`npm test` stub) to lock in auth behavior.
+- Merge `feature/auth` and/or `feature/logger` into `main` to establish shared auth scaffolding and the Pino logger, or pick the next module (users profile/addresses) to work on its branch.

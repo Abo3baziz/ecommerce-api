@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../shared/errors/AppError.js";
-import { logger } from "../shared/logger/index.js";
 
 export function errorHandler(
   err: Error,
@@ -8,6 +7,8 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
+  res.locals.error = err;
+
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       success: false,
@@ -15,8 +16,6 @@ export function errorHandler(
     });
     return;
   }
-
-  logger.error({ err, requestId: req.headers["x-request-id"] }, "Unhandled error");
 
   res.status(500).json({
     success: false,

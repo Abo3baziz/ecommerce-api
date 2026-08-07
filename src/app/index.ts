@@ -13,16 +13,26 @@ const app = express();
 
 app.use(requestId);
 
-app.use((req, _res, next) => {
+app.use((req, res, next) => {
   const start = Date.now();
-  _res.on("finish", () => {
-    logger.info({
+  res.on("finish", () => {
+    const context = {
       method: req.method,
       url: req.originalUrl,
-      status: _res.statusCode,
+      status: res.statusCode,
       duration: Date.now() - start,
       requestId: req.headers["x-request-id"],
-    });
+      userId: req.userId,
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+      err: res.locals.error,
+    };
+
+    if (res.statusCode >= 400) {
+      logger.error(context, "Request failed");
+    } else {
+      logger.success(context, "Request completed");
+    }
   });
   next();
 });
