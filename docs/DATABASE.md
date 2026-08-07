@@ -453,16 +453,16 @@ Stores the saved addresses associated with a user account. Each record represent
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public address identifier |
-| user_id | `INTEGER` | No | Reference to the address owner |
-| label | `VARCHAR(50)` | Yes | User-defined label (e.g., Home, Work) |
 | recipient_name | `VARCHAR(100)` | No | Full name of the recipient |
 | phone_number | `VARCHAR(20)` | No | Recipient contact phone number |
+| label | `VARCHAR(50)` | Yes | User-defined label (e.g., Home, Work) |
 | country | `VARCHAR(100)` | No | Country |
-| state | `VARCHAR(100)` | Yes | State, province, or governorate |
+| state | `VARCHAR(100)` | No | State, province, or governorate |
 | city | `VARCHAR(100)` | No | City |
-| address_line_1 | `VARCHAR(255)` | No | Primary street address |
-| address_line_2 | `VARCHAR(255)` | Yes | Secondary address information (e.g., apartment, suite) |
-| postal_code | `VARCHAR(20)` | Yes | Postal or ZIP code |
+| address_1 | `TEXT` | No | Primary street address |
+| address_2 | `TEXT` | Yes | Secondary address information (e.g., apartment, suite) |
+| zip_code | `VARCHAR(20)` | Yes | Postal or ZIP code |
+| users_id | `INTEGER` | No | Reference to the address owner |
 | is_default_shipping | `BOOLEAN` | No | Indicates whether this is the user's default shipping address |
 | is_default_billing | `BOOLEAN` | No | Indicates whether this is the user's default billing address |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
