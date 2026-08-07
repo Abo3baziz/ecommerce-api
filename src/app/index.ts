@@ -57,6 +57,9 @@ app.use(express.static(PUBLIC_DIR));
 app.get("/verify-email", (_req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "verify-email.html"));
 });
+app.get("/verify-email-change", (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "verify-email-change.html"));
+});
 
 app.use(errorHandler);
 
