@@ -59,6 +59,9 @@
 - Phone change verifies the password, issues a single-use 10-min `CHANGE_PHONE_NUMBER` OTP (hash-only), and sends it via a new **SMS stub** (`src/shared/sms/index.ts`) that logs the message — no real provider yet. Verify distinguishes 404 (no pending request), 400 (invalid OTP), 410 (used/expired), then atomically updates `phone_number` + `phone_verified_at`; 200 returns the new number.
 - Email/phone change token helpers reuse `authRepository` (`createVerificationToken`, `findVerificationTokenByHash`, `invalidateUnusedVerificationTokens`, `invalidateVerificationToken`) to avoid duplicating token queries; `generateOpaqueToken`/`hashToken` reused from the auth module. `PHONE_OTP_TTL_MS` added to shared constants; `emailChangeRateLimiter`/`phoneChangeRateLimiter`/`passwordChangeRateLimiter` added via a shared limiter factory in `src/middleware/rateLimiter.ts`.
 - Verified: `npm run typecheck` + `npm run build` pass; `npm run dev` boots; live checks → `/verify-email-change` serves 200, `/api/v1/users/me` and `/api/v1/users/me/password` return 401 without a session.
+- **Merged into `main` (no-ff): `feature/users` → `docs/keep-feature-branches` → `feature/addresses`.** The users merge (`9dd3993`) brought the profile management module; the addresses merge (`95cf0e7`) resolved a one-file conflict in `src/routes/v1/index.ts` by mounting both routers at `/users` (`usersRouter` then `addressesRouter`, keeping the documented `/api/v1/users/me/addresses` paths). `docs/keep-feature-branches` (`cd1b74f`) restored the AGENTS.md rule to **"Do Not Delete the feature branch after merging (For Reference)"** per user preference. All branches kept (not deleted).
+- Sent the two new email templates (verification + email-change) to `abo3baziz@gmail.com` via the Resend mailer using a throwaway `send-templates-preview.ts` script (rendered both with placeholder data, one email, two sections); the script was deleted after a confirmed send.
+- Post-merge verification: `npm run typecheck` + `npm run build` pass on `main` with users + addresses + auth wired together.
 
 ### Deliverables
 - `src/modules/auth/{validators,repository,service,controller,routes,dto,index.ts}`
@@ -123,6 +126,8 @@
 - Verification-token CRUD for email/phone change reuses `authRepository` methods (no duplicated token queries); change tokens are additionally scoped to the authenticated user (`token.users_id` check) for defense in depth.
 - Invalid phone OTP maps to 400 (matching the project's validation convention; docs list 422); 404 is reserved for "no pending request", 410 for used/expired codes, per `change-phone.md`.
 - Phone OTP is delivered through an SMS dev stub that logs the code (`src/shared/sms/index.ts`); a real provider (Twilio, etc.) can slot in behind the same `sendSms` interface without touching business logic.
+- **Resolved**: `feature/addresses` has now been merged into `main` after the users module landed, per the deferred decision.
+- Feature branches are kept after merging (`AGENTS.md` rule restored to "Do Not Delete the feature branch after merging (For Reference)"); commit only that rule line changed on `docs/keep-feature-branches`.
 
 ### Pending
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
@@ -131,7 +136,7 @@
 - Real SMS provider integration (the current `sendSms` stub only logs the OTP).
 
 ### Next Step
-- Merge `feature/users` into `main` (after review), then merge `feature/addresses` into `main` per the deferred decision.
+- Implement the Product Catalog module (products, variants, categories, inventory) on a `feature/products` branch per `docs/api/` when the catalog API design is available.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
 - Runtime E2E verification of the users + addresses endpoints (register → login → profile/address CRUD → email/phone/password change) is pending a running local DB with the schema migrated.
