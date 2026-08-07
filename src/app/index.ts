@@ -1,4 +1,6 @@
 import express from "express";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -8,6 +10,8 @@ import { rateLimiter } from "../middleware/rateLimiter.js";
 import { errorHandler } from "../middleware/errorHandler.js";
 import { logger } from "../shared/logger/index.js";
 import { router } from "../routes/index.js";
+
+const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../public");
 
 const app = express();
 
@@ -47,6 +51,11 @@ app.use("/api", router);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+app.use(express.static(PUBLIC_DIR));
+app.get("/verify-email", (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "verify-email.html"));
 });
 
 app.use(errorHandler);
