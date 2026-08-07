@@ -50,6 +50,8 @@
 - Verified `npm run typecheck` + `npm run build` pass on `feature/addresses`.
 - Added a minimal backend-served email-verification page: clicking the email link now opens `/verify-email?token=…` on the API itself, which posts the token to `POST /api/v1/auth/email-verification/verify` and renders a "You're verified!" page (or the matching error state for 400/404/410). Served via `express.static(public/)` + a `/verify-email` route in `src/app/index.ts`; the page's fetch is same-origin so no CORS involvement. `CORS_ORIGIN=http://localhost:3000` already points at the backend, so email links hit this page. Verified live: `/verify-email` → 200 (correct title), `/verify-email.js` → 200, `/health` → 200.
 - **Built a reusable, structured email template system** (`src/shared/mailer/templates/`): a shared responsive layout (`renderEmailLayout`) with section helpers (`emailEyebrow`, `emailHeading`, `emailText`, `emailSmallText`, `emailButton`, `emailDivider`, `emailTextLink`) and a new `renderVerificationEmail` template (eyebrow + heading, personalized greeting by first name, CTA button, copy-paste fallback link, expiry note, footer). Verification emails now use it; recipient name is threaded through `issueVerificationToken` and `sendVerificationEmail(to, name, token)`, user input is HTML-escaped, and the 24h TTL moved to the shared `VERIFICATION_TOKEN_TTL_MS` constant. Typecheck + build pass; preview rendered to `preview-verification-email.html`.
+- **Merged into `main` (in dependency order): `feature/mailer-templates` → `feature/email-verification-page` → `docs/project-docs`.** Each merged with `--no-ff`; `feature/addresses` intentionally held back per user decision.
+- During the `feature/mailer-templates` merge, updated the auth call site in `src/modules/auth/service/auth.service.ts` to the new `sendVerificationEmail(to, recipientName, token)` signature: `issueVerificationToken` now threads `first_name`, `register()` and `resendVerificationEmail()` pass it through, `resendVerificationEmail`'s user pick includes `first_name`, and the local `VERIFICATION_TOKEN_TTL_MS` const was replaced by the shared constant. `npm run typecheck` + `npm run build` pass on the merged `main`.
 
 ### Deliverables
 - `src/modules/auth/{validators,repository,service,controller,routes,dto,index.ts}`
@@ -104,6 +106,7 @@
 - The new address doc uses the implemented `{ success: true, data }` envelope + `pagination` object (per the earlier ApiResponse decision) rather than the bare bodies in older docs.
 - Flagged inconsistency: `docs/DATABASE.md` Addresses section was stale vs the db-pulled schema — it documented `user_id`, `address_line_1/2`, `postal_code`, nullable `state`, while `prisma/schema.prisma` has `users_id`, `address_1/2`, `zip_code`, NOT NULL `state`. **Resolved**: DATABASE.md aligned with the schema on the docs branch and merged into `main`; the API design follows the schema.
 - Addresses routes are mounted in the v1 router at `/users` (`v1Router.use("/users", addressesRouter)`) and the module router defines `/me/addresses` and `/me/addresses/:address_public_id` behind the shared `authentication` middleware, producing the documented `/api/v1/users/me/addresses` paths.
+- **`feature/addresses` is held back and will be merged/committed only after the users module (profile management) is implemented**, per user decision — addresses live under `/api/v1/users/me/addresses` and belong to the users module scope, so it's merged after that module lands rather than standalone.
 
 ### Pending
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
@@ -111,7 +114,7 @@
 - No test framework configured (`npm test` is a stub); the auth test suite was started and then reverted at user request.
 
 ### Next Step
-- Merge `feature/addresses` into `main` (after user confirmation), then open the next module (users profile, products, categories, inventory, cart, orders, payments, reviews).
+- Implement the users module (profile management) on `feature/users`; merge `feature/addresses` into `main` after that module lands.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
 - Runtime E2E verification of the addresses endpoints (register → login → address CRUD) is pending a running local DB with the schema migrated.
