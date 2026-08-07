@@ -39,6 +39,7 @@ Detailed endpoint specifications are organized by resource under `docs/api/`.
 ## Users
 
 - docs/api/users/users.md
+- docs/api/users/addresses.md
 - docs/api/users/change-email.md
 - docs/api/users/change-phone.md
 - docs/api/users/change-password.md
