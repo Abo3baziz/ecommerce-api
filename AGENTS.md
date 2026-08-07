@@ -91,7 +91,7 @@ For every new task:
 7. Run relevant tests.
 8. Open a Pull Request.
 9. Merge into `main` only after review or verification.
-10. Delete the feature branch after merging.
+10.Do Not Delete the feature branch after merging (For Reference).
 
 ## Commit Messages
 
