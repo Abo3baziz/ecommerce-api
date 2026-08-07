@@ -43,6 +43,13 @@
 - Attempted a Vitest + supertest integration-test setup for the auth module (separate `Ecommerce_test` schema + `db push` global setup, `.env.test`, mailer mock). Per user request the whole setup was removed again: test file, `src/test/`, `vitest.config.ts`, `.env.test`, and the `vitest`/`supertest`/`@types/supertest` dev deps all reverted; `npm test` is a stub again. Leftover empty `Ecommerce_test` schema dropped from the DB; `npm run typecheck` passes.
 - Created `docs/api/users/addresses.md` — the Addresses API design: 5 customer endpoints under `/api/v1/users/me/addresses` (list, create, get, patch, delete) mapped 1:1 to the current `user_addresses` schema (`recipient_name`, `phone_number`, `label`, `country`, `state`, `city`, `address_1`, `address_2`, `zip_code`, default flags). Registered under the Users section of `docs/API_DESIGN.md`.
 - Removed the 8 empty scaffolded feature branches (`feature/users`, `feature/products`, `feature/categories`, `feature/inventory`, `feature/cart`, `feature/orders`, `feature/payments`, `feature/reviews`) — each contained only a placeholder `src/modules/<module>/index.ts` (0 lines) and no real implementation. Kept `feature/auth` and `feature/logger` (merged into `main`, contain real code).
+- Merged `refactor/database` (user_addresses PK rename `id` + schema redesign commit `455b7c6`) and `docs/addresses-api` (addresses doc + `docs/API_DESIGN.md` registration) into `main`; aligned `docs/DATABASE.md` `user_addresses` section with the db-pulled schema (resolves the previously flagged stale-docs inconsistency).
+- **Implemented the Addresses API module on `feature/addresses`**: validators, dto, repository, service, controller, routes, and module index, wired into the v1 router (`/api/v1/users/me/addresses`, plus `/{address_public_id}` for get/patch/delete). All 5 endpoints implemented per `docs/api/users/addresses.md`.
+- Default-address invariant enforced in the service inside `prisma.$transaction`: create/update with a default flag clears that flag on the user's other non-deleted addresses; first address defaults to both types when flags omitted.
+- Repository enforces ownership + non-deleted on every read (`users_id`, `deleted_at: null`) and supports optional transaction client (`Prisma.TransactionClient | typeof prisma`) on writes; no internal IDs leak to responses.
+- Verified `npm run typecheck` + `npm run build` pass on `feature/addresses`.
+- Added a minimal backend-served email-verification page: clicking the email link now opens `/verify-email?token=…` on the API itself, which posts the token to `POST /api/v1/auth/email-verification/verify` and renders a "You're verified!" page (or the matching error state for 400/404/410). Served via `express.static(public/)` + a `/verify-email` route in `src/app/index.ts`; the page's fetch is same-origin so no CORS involvement. `CORS_ORIGIN=http://localhost:3000` already points at the backend, so email links hit this page. Verified live: `/verify-email` → 200 (correct title), `/verify-email.js` → 200, `/health` → 200.
+- **Built a reusable, structured email template system** (`src/shared/mailer/templates/`): a shared responsive layout (`renderEmailLayout`) with section helpers (`emailEyebrow`, `emailHeading`, `emailText`, `emailSmallText`, `emailButton`, `emailDivider`, `emailTextLink`) and a new `renderVerificationEmail` template (eyebrow + heading, personalized greeting by first name, CTA button, copy-paste fallback link, expiry note, footer). Verification emails now use it; recipient name is threaded through `issueVerificationToken` and `sendVerificationEmail(to, name, token)`, user input is HTML-escaped, and the 24h TTL moved to the shared `VERIFICATION_TOKEN_TTL_MS` constant. Typecheck + build pass; preview rendered to `preview-verification-email.html`.
 
 ### Deliverables
 - `src/modules/auth/{validators,repository,service,controller,routes,dto,index.ts}`
@@ -63,6 +70,9 @@
 - `emailVerificationRateLimiter` (5 req / 15 min) in `src/middleware/rateLimiter.ts`
 - Custom JSON logger in `src/shared/logger/index.ts` (writes `logs/logs.json`)
 - `docs/api/users/addresses.md` (Addresses API design doc) + its registration in `docs/API_DESIGN.md`
+- `src/modules/addresses/{validators/address.ts,dto/address.ts,repository/address.repository.ts,service/address.service.ts,controller/address.controller.ts,routes/address.routes.ts,index.ts}` + v1 router wiring at `/users`
+- `public/verify-email.html` + `public/verify-email.js` (backend-served email-verification page) + `/verify-email` route in `src/app/index.ts`
+- `src/shared/mailer/templates/index.ts` (layout + section helpers + `escapeHtml`) and `src/shared/mailer/templates/verification.ts` (`renderVerificationEmail`); `VERIFICATION_TOKEN_TTL_MS` + `EMAIL_BRAND_NAME` in `src/shared/constants/index.ts`
 
 ### Decisions
 - Registration scope is minimal per user request: account creation only — email verification required for full features (docs flow partially deferred).
@@ -92,7 +102,8 @@
 - Address deletion is soft (`deleted_at`) to keep the `orders → user_addresses` foreign key valid and preserve order snapshots; deleted addresses return 404 on all reads.
 - The single-default-per-type invariant is enforced by the service inside a `$transaction` (clears the previous default when a new one is set); the schema's `@default(true)` applies per row and is not relied upon.
 - The new address doc uses the implemented `{ success: true, data }` envelope + `pagination` object (per the earlier ApiResponse decision) rather than the bare bodies in older docs.
-- Flagged inconsistency: `docs/DATABASE.md` Addresses section is stale vs the db-pulled schema — it documents `user_id`, `address_line_1/2`, `postal_code`, nullable `state`, while `prisma/schema.prisma` has `users_id`, `address_1/2`, `zip_code`, NOT NULL `state`. The API design follows the schema; DATABASE.md should be updated to match.
+- Flagged inconsistency: `docs/DATABASE.md` Addresses section was stale vs the db-pulled schema — it documented `user_id`, `address_line_1/2`, `postal_code`, nullable `state`, while `prisma/schema.prisma` has `users_id`, `address_1/2`, `zip_code`, NOT NULL `state`. **Resolved**: DATABASE.md aligned with the schema on the docs branch and merged into `main`; the API design follows the schema.
+- Addresses routes are mounted in the v1 router at `/users` (`v1Router.use("/users", addressesRouter)`) and the module router defines `/me/addresses` and `/me/addresses/:address_public_id` behind the shared `authentication` middleware, producing the documented `/api/v1/users/me/addresses` paths.
 
 ### Pending
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
@@ -100,5 +111,7 @@
 - No test framework configured (`npm test` is a stub); the auth test suite was started and then reverted at user request.
 
 ### Next Step
-- Merge `feature/auth` and/or `feature/logger` into `main` to establish shared auth scaffolding and the Pino logger, or pick the next module (users profile/addresses) to work on its branch.
-- The Addresses API doc is ready to drive implementation on `feature/users` (validators → repository → service → controllers → routes); align `docs/DATABASE.md` Addresses section with the schema first if touching the DB layer.
+- Merge `feature/addresses` into `main` (after user confirmation), then open the next module (users profile, products, categories, inventory, cart, orders, payments, reviews).
+- The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
+- Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
+- Runtime E2E verification of the addresses endpoints (register → login → address CRUD) is pending a running local DB with the schema migrated.
