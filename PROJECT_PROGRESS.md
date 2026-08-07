@@ -41,6 +41,7 @@
 - **Replaced pino with a custom JSON logger**: removed `pino`, `pino-pretty`, `pino-roll`; rewrote `src/shared/logger/index.ts` as a dependency-free logger that appends one JSON object per line to `logs/logs.json` (dir auto-created). Same `logger.info/error/warn/debug/trace/fatal` API so existing call sites (request middleware, error handler, startup, unhandled rejections, email failures) work unchanged. `LOG_LEVEL` filtering + Error serialization (`type`/`message`/`stack`); mirrors to console.
 - Verified live: every operation (startup, health, register, session, login 401, resend 202) written to `logs/logs.json` as JSON lines; error/fatal/warn serialization verified; test data + test log noise cleaned up; typecheck + build pass.
 - Attempted a Vitest + supertest integration-test setup for the auth module (separate `Ecommerce_test` schema + `db push` global setup, `.env.test`, mailer mock). Per user request the whole setup was removed again: test file, `src/test/`, `vitest.config.ts`, `.env.test`, and the `vitest`/`supertest`/`@types/supertest` dev deps all reverted; `npm test` is a stub again. Leftover empty `Ecommerce_test` schema dropped from the DB; `npm run typecheck` passes.
+- Created `docs/api/users/addresses.md` — the Addresses API design: 5 customer endpoints under `/api/v1/users/me/addresses` (list, create, get, patch, delete) mapped 1:1 to the current `user_addresses` schema (`recipient_name`, `phone_number`, `label`, `country`, `state`, `city`, `address_1`, `address_2`, `zip_code`, default flags). Registered under the Users section of `docs/API_DESIGN.md`.
 
 ### Deliverables
 - `src/modules/auth/{validators,repository,service,controller,routes,dto,index.ts}`
@@ -60,6 +61,7 @@
 - `resendVerificationEmail` service + controller; `issueVerificationToken` shared helper; `invalidateUnusedVerificationTokens` repository method
 - `emailVerificationRateLimiter` (5 req / 15 min) in `src/middleware/rateLimiter.ts`
 - Custom JSON logger in `src/shared/logger/index.ts` (writes `logs/logs.json`)
+- `docs/api/users/addresses.md` (Addresses API design doc) + its registration in `docs/API_DESIGN.md`
 
 ### Decisions
 - Registration scope is minimal per user request: account creation only — email verification required for full features (docs flow partially deferred).
@@ -84,6 +86,12 @@
 - Prisma 7 `db push` no longer supports `--skip-generate` (unknown option) and supports a `--url` flag to override the datasource URL; relevant if a dedicated test DB is ever set up.
 - `main` holds zero module code so it compiles standalone: `src/modules/**` and `src/middleware/authentication.ts` (auth-coupled middleware) live only on `feature/auth`; the v1 router on `main` is empty until a module branch wires it.
 - Because `src/modules` is not on `main`, switching directly between module branches can hit untracked-file conflicts; always switch through `main` until module dirs are merged into it.
+- Addresses API is customer-owned only (no admin endpoints): addresses are not part of the documented admin capabilities, and owner-only access matches the `users.md` profile pattern.
+- Address API fields mirror the `user_addresses` DB columns exactly (snake_case, same nullability/lengths) so the contract stays traceable to the schema; public ID prefix `adr` already exists in `PUBLIC_ID_PREFIXES`.
+- Address deletion is soft (`deleted_at`) to keep the `orders → user_addresses` foreign key valid and preserve order snapshots; deleted addresses return 404 on all reads.
+- The single-default-per-type invariant is enforced by the service inside a `$transaction` (clears the previous default when a new one is set); the schema's `@default(true)` applies per row and is not relied upon.
+- The new address doc uses the implemented `{ success: true, data }` envelope + `pagination` object (per the earlier ApiResponse decision) rather than the bare bodies in older docs.
+- Flagged inconsistency: `docs/DATABASE.md` Addresses section is stale vs the db-pulled schema — it documents `user_id`, `address_line_1/2`, `postal_code`, nullable `state`, while `prisma/schema.prisma` has `users_id`, `address_1/2`, `zip_code`, NOT NULL `state`. The API design follows the schema; DATABASE.md should be updated to match.
 
 ### Pending
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
@@ -92,3 +100,4 @@
 
 ### Next Step
 - Merge `feature/auth` and/or `feature/logger` into `main` to establish shared auth scaffolding and the Pino logger, or pick the next module (users profile/addresses) to work on its branch.
+- The Addresses API doc is ready to drive implementation on `feature/users` (validators → repository → service → controllers → routes); align `docs/DATABASE.md` Addresses section with the schema first if touching the DB layer.

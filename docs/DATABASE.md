@@ -1,9 +1,5 @@
 # Database Schema
 
-Status: Not started
-
-# Database Schema
-
 **Project:** E-Commerce Backend API
 
 **Database:** PostgreSQL
@@ -440,6 +436,58 @@ Stores one-time tokens used to securely reset a user's password. Each token is a
 #### Relationships
 
 - Many password_reset_tokens → One user
+
+---
+
+## Addresses
+
+### user_addresses
+
+#### Description
+
+Stores the saved addresses associated with a user account. Each record represents a reusable shipping and/or billing address that can be selected during checkout. Orders store a snapshot of the selected address to preserve historical accuracy, so updates to saved addresses do not affect existing orders.
+
+#### Columns
+
+| Column | Type | Nullable | Description |
+| --- | --- | --- | --- |
+| id | `INTEGER` | No | Internal primary key |
+| public_id | `VARCHAR(50)` | No | Public address identifier |
+| user_id | `INTEGER` | No | Reference to the address owner |
+| label | `VARCHAR(50)` | Yes | User-defined label (e.g., Home, Work) |
+| recipient_name | `VARCHAR(100)` | No | Full name of the recipient |
+| phone_number | `VARCHAR(20)` | No | Recipient contact phone number |
+| country | `VARCHAR(100)` | No | Country |
+| state | `VARCHAR(100)` | Yes | State, province, or governorate |
+| city | `VARCHAR(100)` | No | City |
+| address_line_1 | `VARCHAR(255)` | No | Primary street address |
+| address_line_2 | `VARCHAR(255)` | Yes | Secondary address information (e.g., apartment, suite) |
+| postal_code | `VARCHAR(20)` | Yes | Postal or ZIP code |
+| is_default_shipping | `BOOLEAN` | No | Indicates whether this is the user's default shipping address |
+| is_default_billing | `BOOLEAN` | No | Indicates whether this is the user's default billing address |
+| created_at | `TIMESTAMPTZ` | No | Creation timestamp |
+| updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
+| deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
+
+#### Constraints
+
+| Constraint | Name |
+| --- | --- |
+| Primary Key | user_addresses_pk |
+| Foreign Key | fk_user_addresses_users |
+| Unique | user_addresses_public_id_unique_key |
+
+#### Indexes
+
+- idx_user_addresses_public_id
+- idx_user_addresses_user_id
+- idx_user_addresses_default_shipping
+- idx_user_addresses_default_billing
+- idx_user_addresses_deleted_at
+
+#### Relationships
+
+- Many user_addresses → One user
 
 ---
 
