@@ -52,6 +52,13 @@
 - **Built a reusable, structured email template system** (`src/shared/mailer/templates/`): a shared responsive layout (`renderEmailLayout`) with section helpers (`emailEyebrow`, `emailHeading`, `emailText`, `emailSmallText`, `emailButton`, `emailDivider`, `emailTextLink`) and a new `renderVerificationEmail` template (eyebrow + heading, personalized greeting by first name, CTA button, copy-paste fallback link, expiry note, footer). Verification emails now use it; recipient name is threaded through `issueVerificationToken` and `sendVerificationEmail(to, name, token)`, user input is HTML-escaped, and the 24h TTL moved to the shared `VERIFICATION_TOKEN_TTL_MS` constant. Typecheck + build pass; preview rendered to `preview-verification-email.html`.
 - **Merged into `main` (in dependency order): `feature/mailer-templates` → `feature/email-verification-page` → `docs/project-docs`.** Each merged with `--no-ff`; `feature/addresses` intentionally held back per user decision.
 - During the `feature/mailer-templates` merge, updated the auth call site in `src/modules/auth/service/auth.service.ts` to the new `sendVerificationEmail(to, recipientName, token)` signature: `issueVerificationToken` now threads `first_name`, `register()` and `resendVerificationEmail()` pass it through, `resendVerificationEmail`'s user pick includes `first_name`, and the local `VERIFICATION_TOKEN_TTL_MS` const was replaced by the shared constant. `npm run typecheck` + `npm run build` pass on the merged `main`.
+- **Implemented the Users module (profile management) on `feature/users`** per `docs/api/users/*`: `GET/PATCH/DELETE /api/v1/users/me`, `PATCH /api/v1/users/me/password`, `POST /api/v1/users/me/email` + `/verify`, `POST /api/v1/users/me/phone-number` + `/verify`. All behind the shared `authentication` middleware, mounted in the v1 router at `/users`.
+- Profile read/update expose only safe fields (`public_id`, names, email, phone_number, `email_verified`, timestamps); no internal IDs leak. `DELETE /me` verifies the password, then in one `$transaction` soft-deletes (`status = DELETED` + `deleted_at`) and revokes all sessions; the session cookie is cleared.
+- Change-password verifies the current password (401), rejects new == current, re-hashes with bcrypt, and revokes all other sessions (current stays active); 204. Stricter `passwordChangeRateLimiter` (5/15min) applied.
+- Email change issues a single-use 24h `CHANGE_EMAIL` verification token (hash-only, stored in `verification_tokens` with the pending address in `target`), invalidates prior pending tokens, and emails a link to `/verify-email-change` (new stop-gap page posting to `/api/v1/users/me/email/verify`). Verify scopes the token to the authenticated user, checks availability, then atomically updates `email` + `email_verified_at` and invalidates the token; 200 returns the new email.
+- Phone change verifies the password, issues a single-use 10-min `CHANGE_PHONE_NUMBER` OTP (hash-only), and sends it via a new **SMS stub** (`src/shared/sms/index.ts`) that logs the message — no real provider yet. Verify distinguishes 404 (no pending request), 400 (invalid OTP), 410 (used/expired), then atomically updates `phone_number` + `phone_verified_at`; 200 returns the new number.
+- Email/phone change token helpers reuse `authRepository` (`createVerificationToken`, `findVerificationTokenByHash`, `invalidateUnusedVerificationTokens`, `invalidateVerificationToken`) to avoid duplicating token queries; `generateOpaqueToken`/`hashToken` reused from the auth module. `PHONE_OTP_TTL_MS` added to shared constants; `emailChangeRateLimiter`/`phoneChangeRateLimiter`/`passwordChangeRateLimiter` added via a shared limiter factory in `src/middleware/rateLimiter.ts`.
+- Verified: `npm run typecheck` + `npm run build` pass; `npm run dev` boots; live checks → `/verify-email-change` serves 200, `/api/v1/users/me` and `/api/v1/users/me/password` return 401 without a session.
 
 ### Deliverables
 - `src/modules/auth/{validators,repository,service,controller,routes,dto,index.ts}`
@@ -75,6 +82,11 @@
 - `src/modules/addresses/{validators/address.ts,dto/address.ts,repository/address.repository.ts,service/address.service.ts,controller/address.controller.ts,routes/address.routes.ts,index.ts}` + v1 router wiring at `/users`
 - `public/verify-email.html` + `public/verify-email.js` (backend-served email-verification page) + `/verify-email` route in `src/app/index.ts`
 - `src/shared/mailer/templates/index.ts` (layout + section helpers + `escapeHtml`) and `src/shared/mailer/templates/verification.ts` (`renderVerificationEmail`); `VERIFICATION_TOKEN_TTL_MS` + `EMAIL_BRAND_NAME` in `src/shared/constants/index.ts`
+- `src/modules/users/{validators,dto,repository/users.repository.ts,service/users.service.ts,controller/users.controller.ts,routes/users.routes.ts,index.ts,utils/otp.ts}` + v1 router wiring at `/users`
+- `src/shared/mailer/emailChange.ts` (`sendEmailChangeVerificationEmail` + `buildEmailChangeUrl`) + `src/shared/mailer/templates/emailChange.ts` (`renderEmailChangeVerificationEmail`)
+- `src/shared/sms/index.ts` (SMS dev stub that logs the OTP); `PHONE_OTP_TTL_MS` in `src/shared/constants/index.ts`
+- `public/verify-email-change.html` + `public/verify-email-change.js` + `/verify-email-change` route in `src/app/index.ts`
+- `emailChangeRateLimiter`, `phoneChangeRateLimiter`, `passwordChangeRateLimiter` in `src/middleware/rateLimiter.ts` (via a shared `createRateLimiter` factory)
 
 ### Decisions
 - Registration scope is minimal per user request: account creation only — email verification required for full features (docs flow partially deferred).
@@ -107,14 +119,19 @@
 - Flagged inconsistency: `docs/DATABASE.md` Addresses section was stale vs the db-pulled schema — it documented `user_id`, `address_line_1/2`, `postal_code`, nullable `state`, while `prisma/schema.prisma` has `users_id`, `address_1/2`, `zip_code`, NOT NULL `state`. **Resolved**: DATABASE.md aligned with the schema on the docs branch and merged into `main`; the API design follows the schema.
 - Addresses routes are mounted in the v1 router at `/users` (`v1Router.use("/users", addressesRouter)`) and the module router defines `/me/addresses` and `/me/addresses/:address_public_id` behind the shared `authentication` middleware, producing the documented `/api/v1/users/me/addresses` paths.
 - **`feature/addresses` is held back and will be merged/committed only after the users module (profile management) is implemented**, per user decision — addresses live under `/api/v1/users/me/addresses` and belong to the users module scope, so it's merged after that module lands rather than standalone.
+- Users module follows the documented `/api/v1/users/me*` contract exactly; profile `PATCH` only accepts `first_name`/`last_name` (email/phone/password have dedicated flows). Every users endpoint requires an authenticated session, per `users.md` notes.
+- Verification-token CRUD for email/phone change reuses `authRepository` methods (no duplicated token queries); change tokens are additionally scoped to the authenticated user (`token.users_id` check) for defense in depth.
+- Invalid phone OTP maps to 400 (matching the project's validation convention; docs list 422); 404 is reserved for "no pending request", 410 for used/expired codes, per `change-phone.md`.
+- Phone OTP is delivered through an SMS dev stub that logs the code (`src/shared/sms/index.ts`); a real provider (Twilio, etc.) can slot in behind the same `sendSms` interface without touching business logic.
 
 ### Pending
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
 - Expired-session cleanup job (reject + delete expired sessions) not yet implemented.
 - No test framework configured (`npm test` is a stub); the auth test suite was started and then reverted at user request.
+- Real SMS provider integration (the current `sendSms` stub only logs the OTP).
 
 ### Next Step
-- Implement the users module (profile management) on `feature/users`; merge `feature/addresses` into `main` after that module lands.
+- Merge `feature/users` into `main` (after review), then merge `feature/addresses` into `main` per the deferred decision.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
-- Runtime E2E verification of the addresses endpoints (register → login → address CRUD) is pending a running local DB with the schema migrated.
+- Runtime E2E verification of the users + addresses endpoints (register → login → profile/address CRUD → email/phone/password change) is pending a running local DB with the schema migrated.
