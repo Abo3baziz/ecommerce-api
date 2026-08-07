@@ -411,7 +411,7 @@ model verification_tokens {
 }
 
 model user_addresses {
-  id                  Int       @id(map: "users_addresses_pk") @default(autoincrement())
+  id                  Int       @id(map: "user_addresses_pk") @default(autoincrement())
   public_id           String    @unique(map: "user_addresses_public_id_unique_key") @db.VarChar(50)
   recipient_name      String    @db.VarChar(100)
   phone_number        String    @db.VarChar(20)
