@@ -41,3 +41,7 @@ export const PAGINATION = {
   DEFAULT_LIMIT: 20,
   MAX_LIMIT: 100,
 } as const;
+
+export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+export const EMAIL_BRAND_NAME = "Ecommerce";
