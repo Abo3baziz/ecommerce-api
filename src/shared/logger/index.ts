@@ -144,7 +144,7 @@ const terminalStream: pino.DestinationStream =
 
 export const logger = pino(
   {
-    level: env.LOG_LEVEL,
+    level: env.NODE_ENV === "test" ? "silent" : env.LOG_LEVEL,
     base: undefined,
     customLevels: { success: 35 },
     formatters: {
