@@ -62,6 +62,8 @@
 - **Merged into `main` (no-ff): `feature/users` → `docs/keep-feature-branches` → `feature/addresses`.** The users merge (`9dd3993`) brought the profile management module; the addresses merge (`95cf0e7`) resolved a one-file conflict in `src/routes/v1/index.ts` by mounting both routers at `/users` (`usersRouter` then `addressesRouter`, keeping the documented `/api/v1/users/me/addresses` paths). `docs/keep-feature-branches` (`cd1b74f`) restored the AGENTS.md rule to **"Do Not Delete the feature branch after merging (For Reference)"** per user preference. All branches kept (not deleted).
 - Sent the two new email templates (verification + email-change) to `abo3baziz@gmail.com` via the Resend mailer using a throwaway `send-templates-preview.ts` script (rendered both with placeholder data, one email, two sections); the script was deleted after a confirmed send.
 - Post-merge verification: `npm run typecheck` + `npm run build` pass on `main` with users + addresses + auth wired together.
+- **Created `.github/workflows/` CI workflows (uncommitted)**: `ci.yml` (npm ci + typecheck + build on Node 20/22 matrix for PRs to `main` and pushes to `main`), `pr-title.yml` (Conventional Commits PR-title check via `amannn/action-semantic-pull-request`, `pull_request_target`), `prisma-validate.yml` (runs `npx prisma validate` when `prisma/**` changes), `audit.yml` (`npm audit --omit=dev` + weekly schedule), and `labeler.yml` + `.github/labeler.yml` (path-based auto-labels). `ci.yml` intentionally has **no test step** because `npm test` is still a stub.
+- **Created `docs/TESTING.md`** — the source-of-truth testing strategy for agents: goals/principles, current stack (no runner installed; `npm test` stub; prior Vitest+supertest attempt reverted) with **Vitest + supertest as the clearly-marked recommended stack**, unit/integration/API test guidance, top-level `tests/` directory layout (kept outside `src/` because tsconfig `include: ["src/**/*"]` + `rootDir: ./src` would compile test files into `dist/`), naming conventions, runner-driven discovery (CI never lists files; adding a test requires no `ci.yml` change), recommended scripts, Postgres/Prisma test-schema strategy (`prisma db push --url`, UTC timezone parity, no production data), factories/nanoid test data, isolation/cleanup, session-cookie auth testing, API contract + error/validation testing, external-service mocking (Resend/SMS/payments), `.env.test` config, CI behavior, per-feature test checklist, agent rules, and a testing definition of done.
 
 ### Deliverables
 - `src/modules/auth/{validators,repository,service,controller,routes,dto,index.ts}`
@@ -90,6 +92,8 @@
 - `src/shared/sms/index.ts` (SMS dev stub that logs the OTP); `PHONE_OTP_TTL_MS` in `src/shared/constants/index.ts`
 - `public/verify-email-change.html` + `public/verify-email-change.js` + `/verify-email-change` route in `src/app/index.ts`
 - `emailChangeRateLimiter`, `phoneChangeRateLimiter`, `passwordChangeRateLimiter` in `src/middleware/rateLimiter.ts` (via a shared `createRateLimiter` factory)
+- `docs/TESTING.md` — testing strategy source-of-truth document
+- `.github/workflows/{ci,pr-title,prisma-validate,audit,labeler}.yml` + `.github/labeler.yml` (created, not yet committed)
 
 ### Decisions
 - Registration scope is minimal per user request: account creation only — email verification required for full features (docs flow partially deferred).
@@ -132,10 +136,11 @@
 ### Pending
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
 - Expired-session cleanup job (reject + delete expired sessions) not yet implemented.
-- No test framework configured (`npm test` is a stub); the auth test suite was started and then reverted at user request.
+- No test framework configured (`npm test` is a stub); the auth test suite was started and then reverted at user request. `docs/TESTING.md` names Vitest + supertest as the recommended stack and documents the full test strategy.
 - Real SMS provider integration (the current `sendSms` stub only logs the OTP).
 
 ### Next Step
+- Commit the `.github/` CI workflows (uncommitted) and consider adding the `npm test` step to `ci.yml` once a runner is installed.
 - Implement the Product Catalog module (products, variants, categories, inventory) on a `feature/products` branch per `docs/api/` when the catalog API design is available.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
