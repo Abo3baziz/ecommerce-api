@@ -45,7 +45,10 @@ app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
-app.use(rateLimiter);
+
+if (env.NODE_ENV !== "test") {
+  app.use(rateLimiter);
+}
 
 app.use("/api", router);
 
