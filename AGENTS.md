@@ -204,6 +204,12 @@ The logging document is the source of truth for:
 
 Do not change the logging behavior unless explicitly requested.
 
+### Testing
+
+Defines Testing flows, requirements and guidelines
+
+- `docs/TESTING.md`
+
 ---
 
 ## Documentation Priority
