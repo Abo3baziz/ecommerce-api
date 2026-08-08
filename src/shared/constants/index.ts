@@ -3,6 +3,8 @@ export const PUBLIC_ID_PREFIXES = {
   PRODUCT: "prd",
   CATEGORY: "cat",
   VARIANT: "var",
+  PRODUCT_IMAGE: "pimg",
+  VARIANT_IMAGE: "vimg",
   ORDER: "ord",
   ORDER_ITEM: "oit",
   CART: "crt",
