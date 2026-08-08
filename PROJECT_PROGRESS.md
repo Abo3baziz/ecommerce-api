@@ -64,6 +64,16 @@
 - Post-merge verification: `npm run typecheck` + `npm run build` pass on `main` with users + addresses + auth wired together.
 - **Created `.github/workflows/` CI workflows (uncommitted)**: `ci.yml` (npm ci + typecheck + build on Node 20/22 matrix for PRs to `main` and pushes to `main`), `pr-title.yml` (Conventional Commits PR-title check via `amannn/action-semantic-pull-request`, `pull_request_target`), `prisma-validate.yml` (runs `npx prisma validate` when `prisma/**` changes), `audit.yml` (`npm audit --omit=dev` + weekly schedule), and `labeler.yml` + `.github/labeler.yml` (path-based auto-labels). `ci.yml` intentionally has **no test step** because `npm test` is still a stub.
 - **Created `docs/TESTING.md`** — the source-of-truth testing strategy for agents: goals/principles, current stack (no runner installed; `npm test` stub; prior Vitest+supertest attempt reverted) with **Vitest + supertest as the clearly-marked recommended stack**, unit/integration/API test guidance, top-level `tests/` directory layout (kept outside `src/` because tsconfig `include: ["src/**/*"]` + `rootDir: ./src` would compile test files into `dist/`), naming conventions, runner-driven discovery (CI never lists files; adding a test requires no `ci.yml` change), recommended scripts, Postgres/Prisma test-schema strategy (`prisma db push --url`, UTC timezone parity, no production data), factories/nanoid test data, isolation/cleanup, session-cookie auth testing, API contract + error/validation testing, external-service mocking (Resend/SMS/payments), `.env.test` config, CI behavior, per-feature test checklist, agent rules, and a testing definition of done.
+- **Installed the test stack (per `docs/TESTING.md`):** `vitest@4`, `supertest@7`, `@types/supertest` as dev dependencies. `npm test` is no longer a stub — it runs `vitest run`. Added `test:watch`, `test:integration`, `test:e2e`, `test:coverage` scripts.
+- **Wired the test environment:** `vitest.config.ts` (single Vitest runner, `fileParallelism: false` because the suites share one Postgres schema, 20s/30s timeouts); `.env.test` + committed `.env.test.example` (real local DB URL, test `SESSION_SECRET`, dummy `RESEND_API_KEY`); `tests/setup/env.setup.ts` loads `.env.test` (no override). `.gitignore` now allows `.env.test.example`.
+- **Test-only app gating:** the global `rateLimiter` is skipped when `NODE_ENV === "test"` (`src/app/index.ts`); the Pino logger runs at `"silent"` in test so no `logs/` noise is written (`src/shared/logger/index.ts`). Route-level limiters (email/password/email-change/phone-change, 5/15min) intentionally remain active — e2e suites stay under their limits.
+- **Fixed a real bug in `src/shared/errors/AppError.ts`:** removed `Object.setPrototypeOf(this, AppError.prototype)`, which was rebinding every instance to the base `AppError.prototype` and silently breaking `instanceof ConflictError/NotFoundError/…` for all subclasses (caught by the integration tests; target ES2023 makes native `extends Error` safe). Verified the app's only consumers (`errorHandler`'s `instanceof AppError`, logger's `instanceof Error`) still work.
+- **Built shared test infrastructure:** `tests/helpers/db.ts` (`cleanupTestData` deletes `test-*` email users + their tokens/sessions/addresses), `tests/helpers/auth.ts` (register/login helpers + `extractSessionCookie`), `tests/helpers/random.ts` (`randomPhoneNumber` — digits-only, E.164-safe for validators), and factories for users, sessions, verification tokens, and addresses.
+- **Unit tests (15 files, 70 tests, all passing):** validators + pure utils for auth (register/login/verifyEmail/sessionParams, tokens, userAgent), users (updateProfile/deleteAccount/changePassword/changeEmail/verifyEmailChange/changePhone/verifyPhoneChange validators, otp), and addresses (create/update/params/list validators).
+- **Integration tests (3 files, 63 tests, all passing) against the real `Ecommerce_DB/Ecommerce` schema** (user decision — no provisioned test schema): `auth.service` (register/login/verify/resend/sessions — conflict/unauthorized/forbidden/not-found/gone paths), `users.service` (profile, delete account transaction + session revocation, password change keeps current session, email change + verify flows, phone OTP change + verify flows), `address.service` (first-address defaulting, default-flag clearing invariants, pagination, ownership 404s, soft-delete). External services mocked: mailer (`sendEmail`/`sendEmailChangeVerificationEmail`) and SMS (`sendSms`).
+- **E2E tests (3 files, 52 tests, all passing) via supertest against the real Express app:** `auth.api` (register 201/cookie/409/400, login 200/401, session 200/401, logout 204 + cookie cleared, sessions list/revoke/404, email verify 200/404/410/400 + resend 202), `users.api` (me get/patch/delete incl. 401s, password change + re-login verification, email change + verify, phone change + verify incl. invalid OTP 400), `addresses.api` (list/create/get/patch/delete, defaults, pagination metadata, ownership 404s).
+- **Wired tests into CI:** `ci.yml` now provisions a Postgres 16 service container, sets `DATABASE_URL`, runs `npx prisma db push --url "$DATABASE_URL" --accept-data-loss` (no migrations dir exists), then a single `- name: Test / run: npm test` step after build — per `docs/TESTING.md` §18 (runner discovers files; no file lists in CI). The CI `DATABASE_URL` wins over `.env.test` because dotenv is configured with `override: false`.
+- **Verified:** `npm test` → 21 files / 185 tests green; `npm run typecheck` and `npm run build` pass.
 
 ### Deliverables
 - `src/modules/auth/{validators,repository,service,controller,routes,dto,index.ts}`
@@ -94,6 +104,16 @@
 - `emailChangeRateLimiter`, `phoneChangeRateLimiter`, `passwordChangeRateLimiter` in `src/middleware/rateLimiter.ts` (via a shared `createRateLimiter` factory)
 - `docs/TESTING.md` — testing strategy source-of-truth document
 - `.github/workflows/{ci,pr-title,prisma-validate,audit,labeler}.yml` + `.github/labeler.yml` (created, not yet committed)
+- `vitest.config.ts`, `.env.test`, `.env.test.example` (committed); `.gitignore` updated to allow `.env.test.example`
+- `src/app/index.ts` (global rate limiter skipped in test env) and `src/shared/logger/index.ts` (silent in test env) — minimal test-driven changes
+- `src/shared/errors/AppError.ts` — removed `Object.setPrototypeOf` that broke `instanceof` for error subclasses
+- `tests/setup/env.setup.ts`, `tests/helpers/{db,auth,random}.ts`
+- `tests/factories/{user,session,verification-token,address}.factory.ts`
+- Unit tests: `tests/unit/{auth,users,addresses}/` (15 files, 70 tests)
+- Integration tests: `tests/integration/{auth,users,addresses}/` (3 files, 63 tests)
+- E2E tests: `tests/e2e/{auth,users,addresses}/` (3 files, 52 tests)
+- `package.json` test scripts (`test`, `test:watch`, `test:integration`, `test:e2e`, `test:coverage`)
+- `.github/workflows/ci.yml` — Postgres service + `prisma db push` provisioning + `npm test` step
 
 ### Decisions
 - Registration scope is minimal per user request: account creation only — email verification required for full features (docs flow partially deferred).
@@ -132,15 +152,20 @@
 - Phone OTP is delivered through an SMS dev stub that logs the code (`src/shared/sms/index.ts`); a real provider (Twilio, etc.) can slot in behind the same `sendSms` interface without touching business logic.
 - **Resolved**: `feature/addresses` has now been merged into `main` after the users module landed, per the deferred decision.
 - Feature branches are kept after merging (`AGENTS.md` rule restored to "Do Not Delete the feature branch after merging (For Reference)"); commit only that rule line changed on `docs/keep-feature-branches`.
+- Tests run against the existing `Ecommerce_DB/Ecommerce` schema directly (user decision) rather than a provisioned test schema; `cleanupTestData` removes only `test-*` email users and their rows, so no production data is touched.
+- Vitest runs with `fileParallelism: false` since integration/e2e suites share the one Postgres schema; this sacrifices some parallelism for DB safety.
+- Test data uses digits-only phone numbers (`randomPhoneNumber`, `+1…` E.164) because `nanoid` includes letters and would fail the phone validators at the API layer.
+- CI provisions its own throwaway Postgres (`ecommerce_test` DB, `public` schema) via `prisma db push --url` and the job-level `DATABASE_URL` overrides `.env.test` (dotenv `override: false`), keeping the committed test env valid for local runs.
 
 ### Pending
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
 - Expired-session cleanup job (reject + delete expired sessions) not yet implemented.
-- No test framework configured (`npm test` is a stub); the auth test suite was started and then reverted at user request. `docs/TESTING.md` names Vitest + supertest as the recommended stack and documents the full test strategy.
+- Test files are not type-checked by `npm run typecheck` (tsconfig `include` covers `src/**/*` only); a `tests/` tsconfig or a typecheck command that includes tests is a possible follow-up.
 - Real SMS provider integration (the current `sendSms` stub only logs the OTP).
+- Unit tests for the repository layer (repositories are exercised through integration tests today).
 
 ### Next Step
-- Commit the `.github/` CI workflows (uncommitted) and consider adding the `npm test` step to `ci.yml` once a runner is installed.
+- Commit the testing work (tests/ infra + suites, `vitest.config.ts`, `.env.test.example`, app gating, `AppError` fix, `ci.yml` test step, `PROJECT_PROGRESS.md`) on a feature branch (e.g. `feature/tests`), then merge into `main` and keep the branch.
 - Implement the Product Catalog module (products, variants, categories, inventory) on a `feature/products` branch per `docs/api/` when the catalog API design is available.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
