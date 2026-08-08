@@ -12,17 +12,24 @@ Detailed endpoint specifications are organized by resource under `docs/api/`.
 
 ---
 
-# API Principles
+# API Design Principles
 
+The API should:
+
+- follow REST conventions
+- use resource-based endpoints
+- support pagination
+- support filtering
+- support sorting
+- support searching where appropriate
+- version endpoints
 - RESTful resource design
-- Versioned endpoints
 - Consistent response format
 - Public identifiers
-- Pagination
-- Filtering
-- Sorting
-- Searching
 - Error handling
+
+Example:
+/api/v1/products
 
 ---
 

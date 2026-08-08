@@ -6,6 +6,24 @@
 
 ---
 
+# Architectural Principles
+
+The project follows:
+
+- Layered Architecture
+- Separation of Concerns
+- SOLID Principles
+- Dependency Injection where appropriate
+- Repository Pattern where beneficial
+- Service Layer
+- Thin Controllers
+- Centralized Error Handling
+- Consistent API Responses
+
+Business logic should never live inside controllers.
+
+---
+
 # Architecture Style
 
 The application follows a **Layered (N-Tier) Architecture** with clear separation of concerns.
@@ -379,6 +397,16 @@ Global Error Handler
       │
 HTTP Response
 ```
+
+# Error Handling
+
+The API should provide:
+
+- consistent error responses
+- meaningful validation messages
+- proper HTTP status codes
+
+Internal errors must never leak implementation details.
 
 ---
 

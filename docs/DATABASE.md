@@ -16,6 +16,39 @@ The database is normalized to reduce redundancy while maintaining query performa
 
 ---
 
+# Public vs Private IDs
+
+Entities contain two identifiers.
+
+Internal ID
+
+- Database primary key
+- Never exposed
+
+Public ID
+
+- Used in APIs
+- Stable
+- Safe to expose
+
+Business logic translates public IDs to internal IDs.
+
+---
+
+# Transactions
+
+Database transactions are required for operations including:
+
+- checkout
+- order creation
+- inventory updates
+- stock reservation
+- payment completion
+
+Transactions should preserve consistency under concurrent access.
+
+---
+
 # Naming Conventions
 
 ## Tables
