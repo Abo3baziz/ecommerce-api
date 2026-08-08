@@ -59,13 +59,17 @@ jobs:
         run: npx prisma db push --url "$DATABASE_URL" --accept-data-loss
 
       - name: Create test environment file
+        env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
         run: |
-          cat > .env.test <<'EOF'
+          cat > .env.test <<EOF
           NODE_ENV=test
-          SESSION_SECRET=ci-test-secret-please-change-me-1234
+          SESSION_SECRET=$SESSION_SECRET
           CORS_ORIGIN=http://localhost:3000
-          RESEND_API_KEY=ci_dummy_resend_key
-          RESEND_FROM_EMAIL=Ecommerce API <test@example.com>
+          RESEND_API_KEY=$RESEND_API_KEY
+          RESEND_FROM_EMAIL=$RESEND_FROM_EMAIL
           EOF
 
       - name: Test
