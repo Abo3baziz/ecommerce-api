@@ -74,6 +74,9 @@
 - **E2E tests (3 files, 52 tests, all passing) via supertest against the real Express app:** `auth.api` (register 201/cookie/409/400, login 200/401, session 200/401, logout 204 + cookie cleared, sessions list/revoke/404, email verify 200/404/410/400 + resend 202), `users.api` (me get/patch/delete incl. 401s, password change + re-login verification, email change + verify, phone change + verify incl. invalid OTP 400), `addresses.api` (list/create/get/patch/delete, defaults, pagination metadata, ownership 404s).
 - **Wired tests into CI:** `ci.yml` now provisions a Postgres 16 service container, sets `DATABASE_URL`, runs `npx prisma db push --url "$DATABASE_URL" --accept-data-loss` (no migrations dir exists), then a single `- name: Test / run: npm test` step after build — per `docs/TESTING.md` §18 (runner discovers files; no file lists in CI). The CI `DATABASE_URL` wins over `.env.test` because dotenv is configured with `override: false`.
 - **Verified:** `npm test` → 21 files / 185 tests green; `npm run typecheck` and `npm run build` pass.
+- **Deleted the merged `feature/tests` branch** (local + remote) after its PR (#1) landed.
+- **Added "Node Modules Integrity" guidelines to `AGENTS.md`** on a new `docs/agent-harness` branch (commit `docs(agents): add node modules integrity guidelines`) and merged into `main`; branch kept for reference.
+- **Rebased local `main` onto the merged `origin/main`** (which had picked up PR #1's testing work) and pushed: `origin/main` is now `d86aebe`. Resolved two conflicts during rebase — `AGENTS.md` (kept `c488fd6`'s declutter deletion of the `### Testing` doc-index entry) and `PROJECT_PROGRESS.md` (kept `origin/main`'s current version, discarding `20e672b`'s now-outdated "test stack not installed" notes). Pushed `docs/agent-harness` to remote too.
 
 ### Deliverables
 - `src/modules/auth/{validators,repository,service,controller,routes,dto,index.ts}`
