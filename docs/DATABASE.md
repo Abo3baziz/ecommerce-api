@@ -81,21 +81,21 @@ deleted_at
 public_id
 ```
 
-Foreign key columns follow:
+Foreign key columns reference the primary key of the referenced table and follow:
 
 ```
-<referenced_table_singular>_id
+<referenced_table>_id
 ```
 
 Examples
 
 ```
-user_id
-product_id
-product_variant_id
-order_id
-category_id
-coupon_id
+users_id
+products_id
+product_variants_id
+orders_id
+categories_id
+coupons_id
 ```
 
 ---
@@ -149,11 +149,10 @@ fk_{dt}_{st}
 Examples
 
 ```
-fk_orders_users
-fk_order_items_orders
-fk_order_items_product_variants
 fk_cart_items_carts
 fk_cart_items_product_variants
+fk_product_variants_products
+fk_inventory_product_variants
 ```
 
 ---
@@ -170,10 +169,12 @@ Examples
 
 ```
 users_email_unique_key
-users_phone_unique_key
-users_public_id_unique_key
+users_phone_number_unique_key
 products_slug_unique_key
+product_variants_sku_unique_key
 ```
+
+> Note: unique constraints that span a foreign-key column only (no meaningful source column) use `{dt}__unique_key` (double underscore), e.g., `coupon_usages__unique_key` (on `orders_id`), `inventory__unique_key` (on `product_variants_id`), and `shipments__unique_key` (on `orders_id`).
 
 ---
 
@@ -193,6 +194,20 @@ ck_reviews_rating_range
 ck_inventory_quantity_non_negative
 ```
 
+> Note: the following tables contain database-level check constraints (flagged in `prisma/schema.prisma` by the `/// This table contains check constraints…` comment; these require additional setup for migrations):
+>
+> - cart_items
+> - coupon_usages
+> - coupons
+> - inventory
+> - order_items
+> - orders
+> - payments
+> - product_variants
+> - reviews
+>
+> The naming convention above applies to any check constraint introduced in the future.
+
 ---
 
 ## Indexes
@@ -210,7 +225,10 @@ idx_users_email
 idx_users_public_id
 idx_products_slug
 idx_orders_user_id
+idx_product_variants_product_id
 ```
+
+> Note: several legacy index names reference the singular conceptual column rather than the actual foreign-key column (e.g., `idx_orders_user_id` indexes `users_id`, `idx_product_variants_product_id` indexes `products_id`, `idx_cart_items_cart_id` indexes `carts_id`). Index map names are authoritative.
 
 ---
 
@@ -259,29 +277,29 @@ fn_generate_public_id
 Example
 
 ```
-users (id)
+products (id)
     ▲
     │
-orders (user_id)
+product_variants (products_id)
 ```
 
 Produces
 
 ```
 Column:
-user_id
+products_id
 
 Primary Key:
-orders_pk
+product_variants_pk
 
 Foreign Key:
-fk_orders_users
+fk_product_variants_products
 
 Unique Constraint:
-orders_user_id_unique_key
+product_variants_sku_unique_key
 
 Foreign Key Index:
-idx_orders_user_id
+idx_product_variants_product_id
 ```
 
 ---
@@ -306,13 +324,13 @@ Stores customer account information.
 | public_id | `VARCHAR(32)` | No | Public identifier |
 | email | `VARCHAR(320)` | No | User email |
 | phone_number | `VARCHAR(20)` | No | Phone number in E.164 format |
-| password_hash | `VARCHAR(255)` | No | Password hash |
 | first_name | `VARCHAR(100)` | No | First name |
 | last_name | `VARCHAR(100)` | No | Last name |
-| status | `user_status` | No | Account status |
+| password_hash | `VARCHAR(255)` | No | Password hash |
+| email_verified_at | `TIMESTAMP` | Yes | Email verification timestamp |
+| phone_verified_at | `TIMESTAMP` | Yes | Phone verification timestamp |
 | role | `user_role` | No | User role |
-| email_verified_at | `TIMESTAMPTZ` | Yes | Email verification timestamp |
-| phone_verified_at | `TIMESTAMPTZ` | Yes | Phone verification timestamp |
+| status | `user_status` | No | Account status |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
 | deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
@@ -357,19 +375,18 @@ Stores authenticated user sessions and device metadata for session-based authent
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(32)` | No | Public session identifier |
-| user_id | `INTEGER` | No | Reference to the authenticated user |
 | refresh_token_hash | `VARCHAR(255)` | No | Hashed refresh token associated with the session |
+| expires_at | `TIMESTAMPTZ` | No | Session expiration timestamp |
+| revoked_at | `TIMESTAMPTZ` | Yes | Timestamp when the session was revoked |
+| created_at | `TIMESTAMPTZ` | No | Creation timestamp |
+| last_activity_at | `TIMESTAMPTZ` | Yes | Timestamp of the most recent authenticated request |
 | ip_address | `INET` | Yes | IP address used to create the session |
 | user_agent | `TEXT` | Yes | Raw User-Agent string of the client |
 | device_name | `VARCHAR(100)` | Yes | Parsed device name (e.g., Chrome on Windows) |
 | country | `VARCHAR(100)` | Yes | Country inferred from the IP address |
 | city | `VARCHAR(100)` | Yes | City inferred from the IP address |
 | is_current | `BOOLEAN` | No | Indicates whether this is the user's current active session |
-| expires_at | `TIMESTAMPTZ` | No | Session expiration timestamp |
-| last_activity_at | `TIMESTAMPTZ` | No | Timestamp of the most recent authenticated request |
-| revoked_at | `TIMESTAMPTZ` | Yes | Timestamp when the session was revoked |
-| created_at | `TIMESTAMPTZ` | No | Creation timestamp |
-| updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
+| users_id | `INTEGER` | No | Reference to the authenticated user |
 
 #### Constraints
 
@@ -396,20 +413,22 @@ Stores authenticated user sessions and device metadata for session-based authent
 
 #### Description
 
-Stores one-time verification tokens for account verification workflows, such as email and phone verification. Each token is associated with a user and a verification type.
+Stores one-time verification tokens for account verification workflows, such as email and phone verification. Each token is associated with a user and a verification purpose.
 
 #### Columns
 
 | Column | Type | Nullable | Description |
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
-| public_id | `VARCHAR(50)` | No | Public token identifier |
-| user_id | `INTEGER` | No | Reference to the user requesting the password reset |
-| token_hash | `VARCHAR(255)` | No | Hashed password reset token |
-| expires_at | `TIMESTAMPTZ` | No | Token expiration timestamp |
+| public_id | `VARCHAR(32)` | No | Public token identifier |
+| token_hash | `VARCHAR(255)` | No | Hashed verification token |
 | used_at | `TIMESTAMPTZ` | Yes | Timestamp when the token was successfully used |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
-| target | `VARCHAR(320)` | No | Targeted Email or Phone Number  |
+| expires_at | `TIMESTAMPTZ` | No | Token expiration timestamp |
+| target | `VARCHAR(100)` | No | Targeted email or phone number |
+| purpose | `verification_type` | Yes | Verification purpose |
+| verified_at | `TIMESTAMPTZ` | Yes | Timestamp when the target was verified |
+| users_id | `INTEGER` | No | Reference to the associated user |
 
 #### Constraints
 
@@ -445,11 +464,11 @@ Stores one-time tokens used to securely reset a user's password. Each token is a
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public token identifier |
-| user_id | `INTEGER` | No | Reference to the user requesting the password reset |
-| token_hash | `VARCHAR(255)` | No | Hashed password reset token |
+| token_hash | `VARCHAR(255)` | Yes | Hashed password reset token |
 | expires_at | `TIMESTAMPTZ` | No | Token expiration timestamp |
 | used_at | `TIMESTAMPTZ` | Yes | Timestamp when the token was successfully used |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
+| users_id | `INTEGER` | No | Reference to the user requesting the password reset |
 
 #### Constraints
 
@@ -521,6 +540,7 @@ Stores the saved addresses associated with a user account. Each record represent
 #### Relationships
 
 - Many user_addresses → One user
+- One user_address → Many orders
 
 ---
 
@@ -538,13 +558,13 @@ Stores the core information of a product. A product represents the parent entity
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public product identifier |
-| slug | `VARCHAR(255)` | No | SEO-friendly unique URL slug |
 | name | `VARCHAR(255)` | No | Product name |
+| slug | `VARCHAR(255)` | No | SEO-friendly unique URL slug |
 | description | `TEXT` | Yes | Detailed product description |
 | brand | `VARCHAR(255)` | Yes | Product brand or manufacturer |
-| is_active | `BOOLEAN` | No | Indicates whether the product is available for purchase |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
+| deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
 
 #### Constraints
 
@@ -565,7 +585,7 @@ Stores the core information of a product. A product represents the parent entity
 
 - One product → Many product_variants
 - One product → Many product_images
-- Many products → Many categories
+- One product → Many product_categories
 - One product → Many reviews
 
 ---
@@ -582,21 +602,22 @@ Stores purchasable variations of a product. Each variant represents a unique com
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public variant identifier |
-| product_id | `INTEGER` | No | Reference to the parent product |
-| sku | `VARCHAR(100)` | No | Stock Keeping Unit used for inventory management |
-| color | `VARCHAR(100)` | Yes | Variant color |
-| size | `VARCHAR(100)` | Yes | Variant size |
 | price | `DECIMAL(10,2)` | No | Selling price of the variant |
-| cost_price | `DECIMAL(10,2)` | Yes | Internal cost of the variant |
 | discount_percentage | `DECIMAL(5,2)` | Yes | Discount percentage applied to the variant |
-| weight | `DECIMAL(10,3)` | Yes | Weight of the variant |
-| length | `DECIMAL(10,2)` | Yes | Length of the variant |
+| color | `VARCHAR(50)` | Yes | Variant color |
+| size | `VARCHAR(50)` | Yes | Variant size |
+| status | `product_status` | Yes | Indicates whether the variant is available for purchase |
+| sku | `VARCHAR(80)` | No | Stock Keeping Unit used for inventory management |
+| barcode | `TEXT` | Yes | Barcode value of the variant |
+| cost_price | `DECIMAL(10,2)` | Yes | Internal cost of the variant |
+| weight | `DECIMAL(10,2)` | Yes | Weight of the variant |
 | width | `DECIMAL(10,2)` | Yes | Width of the variant |
 | height | `DECIMAL(10,2)` | Yes | Height of the variant |
-| status | `product_status` | No | Indicates whether the variant is available for purchase |
+| length | `DECIMAL(10,2)` | Yes | Length of the variant |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
 | deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
+| products_id | `INTEGER` | No | Reference to the parent product |
 
 #### Constraints
 
@@ -604,16 +625,8 @@ Stores purchasable variations of a product. Each variant represents a unique com
 | --- | --- |
 | Primary Key | product_variants_pk |
 | Foreign Key | fk_product_variants_products |
-| Foreign Key | fk_product_variants_inventory |
 | Unique | product_variants_public_id_unique_key |
 | Unique | product_variants_sku_unique_key |
-| Check | ck_product_variants_price_non_negative |
-| Check | ck_product_variants_cost_price_non_negative |
-| Check | ck_product_variants_discount_percentage_range |
-| Check | ck_product_variants_weight_positive |
-| Check | ck_product_variants_length_positive |
-| Check | ck_product_variants_width_positive |
-| Check | ck_product_variants_height_positive |
 
 #### Indexes
 
@@ -643,11 +656,12 @@ Stores images associated with a product. These images represent the product as a
 | Column | Type | Nullable | Description |
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
+| products_id | `INTEGER` | No | Reference to the associated product |
 | public_id | `VARCHAR(50)` | No | Public image identifier |
-| product_id | `INTEGER` | No | Reference to the associated product |
-| image_url | `TEXT` | No | URL of the stored product image |
-| alt_text | `VARCHAR(255)` | Yes | Alternative text describing the image |
+| image_url | `VARCHAR(2048)` | No | URL of the stored product image |
+| is_primary | `BOOLEAN` | No | Indicates whether this image is the primary product image |
 | display_order | `INTEGER` | No | Display order of the image within the product gallery |
+| alt_text | `TEXT` | Yes | Alternative text describing the image |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
 
@@ -683,12 +697,10 @@ Stores images specific to individual product variants. These images represent at
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public image identifier |
-| product_variant_id | `INTEGER` | No | Reference to the associated product variant |
 | image_url | `VARCHAR(2048)` | No | URL of the stored variant image |
-| alt_text | `VARCHAR(255)` | Yes | Alternative text describing the image |
+| product_variants_id | `INTEGER` | No | Reference to the associated product variant |
 | display_order | `INTEGER` | No | Display order of the image within the variant gallery |
-| created_at | `TIMESTAMPTZ` | No | Creation timestamp |
-| updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
+| alt_text | `VARCHAR(255)` | Yes | Alternative text describing the image |
 
 #### Constraints
 
@@ -722,8 +734,8 @@ Stores product category definitions used to organize and classify products. Cate
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public category identifier |
-| slug | `VARCHAR(255)` | No | SEO-friendly unique URL slug |
 | name | `VARCHAR(255)` | No | Category name |
+| slug | `VARCHAR(255)` | No | SEO-friendly unique URL slug |
 | description | `TEXT` | Yes | Description of the category |
 | is_active | `BOOLEAN` | No | Indicates whether the category is available for assignment |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
@@ -734,7 +746,7 @@ Stores product category definitions used to organize and classify products. Cate
 
 | Constraint | Name |
 | --- | --- |
-| Primary Key | categories_pk |
+| Primary Key | category_pk |
 | Unique | categories_public_id_unique_key |
 | Unique | categories_slug_unique_key |
 | Unique | categories_name_unique_key |
@@ -747,7 +759,8 @@ Stores product category definitions used to organize and classify products. Cate
 
 #### Relationships
 
-- Many categories → Many products
+- One category → Many product_categories
+- Many categories → Many products (via product_categories)
 
 ---
 
@@ -762,17 +775,17 @@ Associates products with categories, enabling a many-to-many relationship betwee
 | Column | Type | Nullable | Description |
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
-| product_id | `INTEGER` | No | Reference to the associated product |
-| category_id | `INTEGER` | No | Reference to the associated category |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
+| categories_id | `INTEGER` | No | Reference to the associated category |
+| products_id | `INTEGER` | No | Reference to the associated product |
 
 #### Constraints
 
 | Constraint | Name |
 | --- | --- |
 | Primary Key | product_categories_pk |
-| Foreign Key | fk_product_categories_products |
 | Foreign Key | fk_product_categories_categories |
+| Foreign Key | fk_product_categories_products |
 | Unique | product_categories_product_id_category_id_unique_key |
 
 #### Indexes
@@ -800,11 +813,12 @@ Stores inventory information for each product variant. Each inventory record tra
 | Column | Type | Nullable | Description |
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
-| product_variant_id | `INTEGER` | No | Reference to the associated product variant |
 | quantity_on_hand | `INTEGER` | No | Total quantity currently in stock |
-| quantity_reserved | `INTEGER` | No | Quantity reserved for pending orders |
-| reorder_level | `INTEGER` | No | Stock threshold that indicates when replenishment is recommended |
-| updated_at | `TIMESTAMPTZ` | No | Last inventory update timestamp |
+| reorder_level | `INTEGER` | Yes | Stock threshold that indicates when replenishment is recommended |
+| quantity_reserved | `INTEGER` | Yes | Quantity reserved for pending orders |
+| created_at | `TIMESTAMPTZ` | No | Creation timestamp |
+| last_stock_update | `TIMESTAMPTZ` | No | Timestamp of the most recent stock update |
+| product_variants_id | `INTEGER` | No | Reference to the associated product variant |
 
 #### Constraints
 
@@ -812,11 +826,7 @@ Stores inventory information for each product variant. Each inventory record tra
 | --- | --- |
 | Primary Key | inventory_pk |
 | Foreign Key | fk_inventory_product_variants |
-| Unique | inventory_product_variant_id_unique_key |
-| Check | ck_inventory_quantity_on_hand_non_negative |
-| Check | ck_inventory_quantity_reserved_non_negative |
-| Check | ck_inventory_reorder_level_non_negative |
-| Check | ck_inventory_reserved_not_exceed_on_hand |
+| Unique | inventory__unique_key |
 
 #### Indexes
 
@@ -842,9 +852,9 @@ Stores shopping carts for users. Each cart acts as a container for items a user 
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public cart identifier |
-| user_id | `INTEGER` | No | Reference to the cart owner |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
+| users_id | `INTEGER` | No | Reference to the cart owner |
 
 #### Constraints
 
@@ -877,11 +887,11 @@ Stores the product variants added to a shopping cart. Each cart item represents 
 | Column | Type | Nullable | Description |
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
-| cart_id | `INTEGER` | No | Reference to the associated shopping cart |
-| product_variant_id | `INTEGER` | No | Reference to the selected product variant |
 | quantity | `INTEGER` | No | Quantity of the product variant in the cart |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
+| carts_id | `INTEGER` | No | Reference to the associated shopping cart |
+| product_variants_id | `INTEGER` | No | Reference to the selected product variant |
 
 #### Constraints
 
@@ -890,8 +900,6 @@ Stores the product variants added to a shopping cart. Each cart item represents 
 | Primary Key | cart_items_pk |
 | Foreign Key | fk_cart_items_carts |
 | Foreign Key | fk_cart_items_product_variants |
-| Unique | cart_items_cart_id_product_variant_id_unique_key |
-| Check | ck_cart_items_quantity_positive |
 
 #### Indexes
 
@@ -919,20 +927,21 @@ Stores customer purchase orders. Each order represents a completed checkout and 
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public order identifier |
-| user_id | `INTEGER` | No | Reference to the customer who placed the order |
-| user_address_id | `INTEGER` | No | Reference to the shipping address used for the order |
-| coupon_id | `INTEGER` | Yes | Reference to the applied coupon, if any |
-| order_number | `VARCHAR(50)` | No | Human-readable unique order number |
 | status | `order_status` | No | Current order status |
+| shipping_cost | `DECIMAL(10,2)` | No | Shipping cost charged for the order |
 | subtotal | `DECIMAL(10,2)` | No | Total price before discounts, shipping, and taxes |
+| order_number | `VARCHAR(50)` | No | Human-readable unique order number |
 | discount_amount | `DECIMAL(10,2)` | No | Total discount applied to the order |
-| shipping_fee | `DECIMAL(10,2)` | No | Shipping cost charged for the order |
+| shipping_fee | `DECIMAL(10,2)` | No | Shipping fee charged to the customer |
 | tax_amount | `DECIMAL(10,2)` | No | Total tax charged for the order |
 | total_amount | `DECIMAL(10,2)` | No | Final amount paid by the customer |
 | notes | `TEXT` | Yes | Customer notes associated with the order |
 | placed_at | `TIMESTAMPTZ` | No | Timestamp when the order was placed |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
+| users_id | `INTEGER` | No | Reference to the customer who placed the order |
+| coupons_id | `INTEGER` | Yes | Reference to the applied coupon, if any |
+| user_addresses_id | `INTEGER` | No | Reference to the shipping address used for the order |
 
 #### Constraints
 
@@ -944,11 +953,6 @@ Stores customer purchase orders. Each order represents a completed checkout and 
 | Foreign Key | fk_orders_coupons |
 | Unique | orders_public_id_unique_key |
 | Unique | orders_order_number_unique_key |
-| Check | ck_orders_subtotal_non_negative |
-| Check | ck_orders_discount_amount_non_negative |
-| Check | ck_orders_shipping_fee_non_negative |
-| Check | ck_orders_tax_amount_non_negative |
-| Check | ck_orders_total_amount_non_negative |
 
 #### Indexes
 
@@ -966,7 +970,7 @@ Stores customer purchase orders. Each order represents a completed checkout and 
 - Many orders → One user_address
 - Many orders → One coupon
 - One order → Many order_items
-- One order → One payment
+- One order → One coupon_usage
 - One order → One shipment
 
 ---
@@ -982,12 +986,13 @@ Stores the individual products purchased within an order. Each order item repres
 | Column | Type | Nullable | Description |
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
-| order_id | `INTEGER` | No | Reference to the associated order |
-| product_variant_id | `INTEGER` | No | Reference to the purchased product variant |
 | quantity | `INTEGER` | No | Quantity purchased |
 | unit_price | `DECIMAL(10,2)` | No | Price per unit at the time of purchase |
 | total_amount | `DECIMAL(10,2)` | No | Total amount for the order item after discounts |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
+| orders_id | `INTEGER` | No | Reference to the associated order |
+| product_variants_id | `INTEGER` | No | Reference to the purchased product variant |
+| deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
 
 #### Constraints
 
@@ -996,9 +1001,6 @@ Stores the individual products purchased within an order. Each order item repres
 | Primary Key | order_items_pk |
 | Foreign Key | fk_order_items_orders |
 | Foreign Key | fk_order_items_product_variants |
-| Check | ck_order_items_quantity_positive |
-| Check | ck_order_items_unit_price_non_negative |
-| Check | ck_order_items_total_amount_non_negative |
 
 #### Indexes
 
@@ -1024,14 +1026,15 @@ Stores shipment information for customer orders. Each shipment tracks the fulfil
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public shipment identifier |
-| order_id | `INTEGER` | No | Reference to the associated order |
-| tracking_number | `VARCHAR(100)` | Yes | Carrier tracking number |
+| status | `VARCHAR(30)` | No | Current shipment status |
 | carrier | `VARCHAR(100)` | Yes | Shipping carrier name |
-| status | `shipment_status` | No | Current shipment status |
+| tracking_number | `VARCHAR(100)` | Yes | Carrier tracking number |
+| created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | shipped_at | `TIMESTAMPTZ` | Yes | Timestamp when the shipment was dispatched |
 | delivered_at | `TIMESTAMPTZ` | Yes | Timestamp when the shipment was delivered |
-| created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
+| orders_id | `INTEGER` | No | Reference to the associated order |
+| deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
 
 #### Constraints
 
@@ -1040,7 +1043,7 @@ Stores shipment information for customer orders. Each shipment tracks the fulfil
 | Primary Key | shipments_pk |
 | Foreign Key | fk_shipments_orders |
 | Unique | shipments_public_id_unique_key |
-| Unique | shipments_order_id_unique_key |
+| Unique | shipments__unique_key |
 | Unique | shipments_tracking_number_unique_key |
 
 #### Indexes
@@ -1056,52 +1059,43 @@ Stores shipment information for customer orders. Each shipment tracks the fulfil
 
 ---
 
+## Payments
+
 ### payments
 
 #### Description
 
-Stores payment information for customer orders. Each payment represents the financial transaction associated with a single order and tracks its processing status.
+Stores payment records associated with a user account. Each record represents a payment transaction and tracks its processing status.
 
 #### Columns
 
 | Column | Type | Nullable | Description |
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
-| public_id | `VARCHAR(50)` | No | Public payment identifier |
-| order_id | `INTEGER` | No | Reference to the associated order |
-| payment_method | `payment_method` | No | Payment method used by the customer |
-| status | `payment_status` | No | Current payment status |
-| transaction_reference | `VARCHAR(255)` | Yes | External payment provider transaction reference |
 | amount | `DECIMAL(10,2)` | No | Total payment amount |
-| currency | `CHAR(3)` | No | ISO 4217 currency code (e.g., USD, EUR, EGP) |
+| payment_method | `VARCHAR(50)` | No | Payment method used by the customer |
+| payment_status | `VARCHAR(30)` | No | Current payment status |
+| transaction_reference | `VARCHAR(255)` | Yes | External payment provider transaction reference |
 | paid_at | `TIMESTAMPTZ` | Yes | Timestamp when the payment was successfully completed |
-| failed_at | `TIMESTAMPTZ` | Yes | Timestamp when the payment failed |
-| refunded_at | `TIMESTAMPTZ` | Yes | Timestamp when the payment was fully refunded |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
+| users_id | `INTEGER` | No | Reference to the user associated with the payment |
+| deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
 
 #### Constraints
 
 | Constraint | Name |
 | --- | --- |
 | Primary Key | payments_pk |
-| Foreign Key | fk_payments_orders |
-| Unique | payments_public_id_unique_key |
-| Unique | payments_order_id_unique_key |
-| Unique | payments_transaction_reference_unique_key |
-| Check | ck_payments_amount_positive |
+| Foreign Key | fk_payments_users |
 
 #### Indexes
 
-- idx_payments_public_id
-- idx_payments_order_id
-- idx_payments_transaction_reference
-- idx_payments_status
-- idx_payments_paid_at
+> None.
 
 #### Relationships
 
-- One payment → One order
+- Many payments → One user
 
 ---
 
@@ -1120,14 +1114,12 @@ Stores promotional coupons that can be applied to customer orders. Coupons defin
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public coupon identifier |
 | code | `VARCHAR(50)` | No | Unique coupon code entered by the customer |
-| name | `VARCHAR(255)` | No | Internal name of the coupon |
-| description | `TEXT` | Yes | Description of the coupon |
 | discount_type | `discount_type` | No | Type of discount (e.g., `PERCENTAGE`, `FIXED_AMOUNT`) |
 | discount_value | `DECIMAL(10,2)` | No | Discount amount or percentage value |
 | minimum_order_amount | `DECIMAL(10,2)` | Yes | Minimum order subtotal required to apply the coupon |
 | maximum_discount_amount | `DECIMAL(10,2)` | Yes | Maximum discount allowed for percentage-based coupons |
 | usage_limit | `INTEGER` | No | Maximum number of times the coupon can be redeemed |
-| usage_limit_per_user | `INTEGER` | No |  |
+| usage_limit_per_user | `INTEGER` | No | Maximum number of times the coupon can be redeemed per user |
 | usage_count | `INTEGER` | No | Number of times the coupon has been redeemed |
 | starts_at | `TIMESTAMPTZ` | Yes | Timestamp when the coupon becomes valid |
 | expires_at | `TIMESTAMPTZ` | Yes | Timestamp when the coupon expires |
@@ -1143,11 +1135,6 @@ Stores promotional coupons that can be applied to customer orders. Coupons defin
 | Primary Key | coupons_pk |
 | Unique | coupons_public_id_unique_key |
 | Unique | coupons_code_unique_key |
-| Check | ck_coupons_discount_value_positive |
-| Check | ck_coupons_minimum_order_amount_non_negative |
-| Check | ck_coupons_maximum_discount_amount_non_negative |
-| Check | ck_coupons_usage_limit_positive |
-| Check | ck_coupons_usage_count_non_negative |
 
 #### Indexes
 
@@ -1175,11 +1162,11 @@ Stores the redemption history of coupons. Each record represents a successful co
 | Column | Type | Nullable | Description |
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
-| coupon_id | `INTEGER` | No | Reference to the redeemed coupon |
-| user_id | `INTEGER` | No | Reference to the user who redeemed the coupon |
-| order_id | `INTEGER` | No | Reference to the order where the coupon was applied |
 | discount_amount | `DECIMAL(10,2)` | No | Actual discount applied to the order |
 | redeemed_at | `TIMESTAMPTZ` | No | Timestamp when the coupon was redeemed |
+| users_id | `INTEGER` | No | Reference to the user who redeemed the coupon |
+| coupons_id | `INTEGER` | No | Reference to the redeemed coupon |
+| orders_id | `INTEGER` | No | Reference to the order where the coupon was applied |
 
 #### Constraints
 
@@ -1189,14 +1176,13 @@ Stores the redemption history of coupons. Each record represents a successful co
 | Foreign Key | fk_coupon_usages_coupons |
 | Foreign Key | fk_coupon_usages_users |
 | Foreign Key | fk_coupon_usages_orders |
-| Unique | coupon_usages_order_id_unique_key |
-| Check | ck_coupon_usages_discount_amount_non_negative |
+| Unique | coupon_usages__unique_key |
 
 #### Indexes
 
 - idx_coupon_usages_coupon_id
-- idx_coupon_usages_user_id
-- idx_coupon_usages_order_id
+- idx_coupon_usages_users_id
+- idx_coupon_usages_orders_id
 - idx_coupon_usages_redeemed_at
 
 #### Relationships
@@ -1221,15 +1207,15 @@ Stores customer reviews and ratings for purchased products. Reviews allow custom
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | public_id | `VARCHAR(50)` | No | Public review identifier |
-| user_id | `INTEGER` | No | Reference to the user who created the review |
-| product_id | `INTEGER` | No | Reference to the reviewed product |
-| order_item_id | `INTEGER` | No | Reference to the purchased order item |
 | rating | `SMALLINT` | No | Product rating from 1 to 5 |
-| title | `VARCHAR` | Yes | Short review title |
+| title | `VARCHAR(255)` | Yes | Short review title |
 | comment | `TEXT` | Yes | Customer review content |
-| is_approved | `BOOLEAN` | No | Indicates whether the review is publicly visible |
 | created_at | `TIMESTAMPTZ` | No | Timestamp when the review was created |
 | updated_at | `TIMESTAMPTZ` | No | Timestamp when the review was last updated |
+| deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
+| is_approved | `BOOLEAN` | No | Indicates whether the review is publicly visible |
+| users_id | `INTEGER` | No | Reference to the user who created the review |
+| products_id | `INTEGER` | No | Reference to the reviewed product |
 
 #### Constraints
 
@@ -1239,7 +1225,6 @@ Stores customer reviews and ratings for purchased products. Reviews allow custom
 | Foreign Key | fk_reviews_users |
 | Foreign Key | fk_reviews_products |
 | Unique | reviews_public_id_unique_key |
-| Check | ck_reviews_rating_range |
 
 #### Indexes
 
@@ -1253,7 +1238,6 @@ Stores customer reviews and ratings for purchased products. Reviews allow custom
 
 - Many reviews → One user
 - Many reviews → One product
-- One review → One order_item
 - One review → Many review_images
 
 ---
@@ -1269,13 +1253,13 @@ Stores images attached to customer reviews. These images provide visual evidence
 | Column | Type | Nullable | Description |
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
-| public_id | `VARCHAR(50)` | No | Public image identifier |
-| review_id | `INTEGER` | No | Reference to the associated review |
 | image_url | `TEXT` | No | URL of the stored review image |
-| alt_text | `VARCHAR` | Yes | Alternative text describing the image |
-| display_order | `INTEGER` | No | Display order of the image within the review |
+| alt_text | `VARCHAR(255)` | Yes | Alternative text describing the image |
+| display_order | `INTEGER` | Yes | Display order of the image within the review |
 | created_at | `TIMESTAMPTZ` | No | Timestamp when the image was created |
 | updated_at | `TIMESTAMPTZ` | No | Timestamp when the image was last updated |
+| reviews_id | `INTEGER` | Yes | Reference to the associated review |
+| public_id | `VARCHAR(50)` | No | Public image identifier |
 
 #### Constraints
 
@@ -1309,17 +1293,17 @@ The following columns are used consistently throughout the schema.
 | updated_at | Last modification timestamp |
 | deleted_at | Soft deletion timestamp (where applicable) |
 
+> Note: `product_variant_images` has no `created_at`/`updated_at` columns, and `payments` has no `public_id` column. These deviations are intentional in the current schema.
+
 ---
 
 # Enumerations
 
-Examples
-
 ## user_status
 
 - ACTIVE
-- DELETED
 - SUSPENDED
+- DELETED
 
 ---
 
@@ -1333,22 +1317,12 @@ Examples
 ## order_status
 
 - PENDING
-- PROCESSING
 - CONFIRMED
+- PROCESSING
 - SHIPPED
 - DELIVERED
 - CANCELLED
-- REFUNDED
 - RETURNED
-
----
-
-## payment_status
-
-- PENDING
-- AUTHORIZED
-- PAID
-- FAILED
 - REFUNDED
 
 ---
@@ -1404,15 +1378,20 @@ Additional composite indexes are introduced based on query performance requireme
 
 # Soft Delete Policy
 
-Soft deletion is supported by:
+Soft deletion (`deleted_at`) is supported by:
 
 - users
+- user_addresses
 - products
 - product_variants
 - categories
 - coupons
+- reviews
+- order_items
+- payments
+- shipments
 
-Historical business records such as orders, payments, shipments, order_items, and coupon_usages are never soft deleted.
+Historical records such as orders and coupon_usages are never soft deleted.
 
 ---
 
@@ -1439,13 +1418,3 @@ All schema changes are managed through versioned database migrations.
 Backward-incompatible changes require an explicit migration plan.
 
 Direct modification of production databases outside the migration process is prohibited.
-
-| Column | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| id | BIGINT | No | Internal primary key |
-| public_id | VARCHAR(50) | No | Public token identifier |
-| user_id | BIGINT | No | Reference to the user requesting the password reset |
-| token_hash | VARCHAR(255) | No | Hashed password reset token |
-| expires_at | TIMESTAMP WITH TIME ZONE | No | Token expiration timestamp |
-| used_at | TIMESTAMP WITH TIME ZONE | Yes | Timestamp when the token was successfully used |
-| created_at | TIMESTAMP WITH TIME ZONE | No | Creation timestamp |

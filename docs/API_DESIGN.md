@@ -54,3 +54,10 @@ Example:
 ## Administration
 
 - docs/api/admin/admin.md
+
+## Products
+
+- docs/api/products/products.md
+- docs/api/products/product-variants.md
+- docs/api/products/product-images.md
+- docs/api/products/product-variant-images.md

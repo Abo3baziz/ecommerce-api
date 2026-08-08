@@ -78,7 +78,15 @@
 - **Added "Node Modules Integrity" guidelines to `AGENTS.md`** on a new `docs/agent-harness` branch (commit `docs(agents): add node modules integrity guidelines`) and merged into `main`; branch kept for reference.
 - **Rebased local `main` onto the merged `origin/main`** (which had picked up PR #1's testing work) and pushed: `origin/main` is now `d86aebe`. Resolved two conflicts during rebase — `AGENTS.md` (kept `c488fd6`'s declutter deletion of the `### Testing` doc-index entry) and `PROJECT_PROGRESS.md` (kept `origin/main`'s current version, discarding `20e672b`'s now-outdated "test stack not installed" notes). Pushed `docs/agent-harness` to remote too.
 
+- Aligned `docs/DATABASE.md` with the current `prisma/schema.prisma` on `docs/products-api`: `products` lost `is_active` and gained `deleted_at`; `product_images` gained `is_primary`; `product_variants` gained `barcode` (sku 80, color/size 50, dimensions 10,2, nullable status); `product_variant_images` has no timestamps; `payments` moved to a users-owned domain (`users_id`, `fk_payments_users`, no `public_id`, no indexes); `reviews` no longer references `order_item`; FK naming (`{dt}_{st}_fkey` + legacy `fk_*`), double-underscore uniques, `category_pk`, `shipments.status` VARCHAR, `sessions` no `updated_at`, `verification_tokens` `purpose`/`verified_at`, `TIMESTAMP` email/phone verified columns, enum reordering, and the stale Migration Strategy fragment all corrected. Flagged schema oddity: `reviews_public_id_unique_key` maps to `rating`, not `public_id`.
+- Drafted the Product Catalog API design on `docs/products-api` (4 docs under `docs/api/products/`): `products.md` (customer list/detail + admin CRUD), `product-variants.md`, `product-images.md`, `product-variant-images.md` — **pending revision** to match the new schema (drop `is_active`, adopt `is_primary`, add `barcode`, drop variant-image timestamps).
+- **Resolved the flagged `reviews` schema oddity**: the user updated `prisma/schema.prisma` so `public_id` is `@unique(map: "reviews_public_id_unique_key")` and `rating` is no longer unique; the stale inconsistency note was removed from `docs/DATABASE.md`.
+- **Finished aligning `docs/DATABASE.md` with the current schema**: every remaining `{dt}_{st}_fkey` constraint renamed to the `fk_{dt}_{st}` convention (password_reset_tokens, product_variants, product_images, product_variant_images, product_categories, inventory, carts, cart_items, orders, shipments, coupon_usages, reviews, review_images), the Naming Placeholders FK example updated, and the Check Constraints note now lists the 9 tables carrying database-level check constraints (cart_items, coupon_usages, coupons, inventory, order_items, orders, payments, product_variants, reviews) flagged by the Prisma `/// This table contains check constraints…` comments.
+- **Revised the four Product Catalog API design docs against the current schema and registered them under a new Products section in `docs/API_DESIGN.md`**: `products.md` dropped `is_active` (visibility = non-deleted + ≥1 `ACTIVE` variant), embedded images expose `is_primary`, `weight` precision fixed to 2 places, and embedded variant images carry no timestamps; `product-variants.md` added `barcode`, marked `status` nullable, and corrected limits (sku 80, color/size 50, weight DECIMAL(10,2)); `product-images.md` replaced the cover-by-`display_order` convention with the `is_primary` flag (service-enforced exactly-one invariant); `product-variant-images.md` removed `created_at`/`updated_at` from the object and all responses.
+
 ### Deliverables
+- `docs/DATABASE.md` rewritten to match `prisma/schema.prisma` (FK `fk_{dt}_{st}` naming, check-constraint tables documented, reviews unique mapping fixed)
+- `docs/api/products/{products,product-variants,product-images,product-variant-images}.md` (schema-aligned, registered in `docs/API_DESIGN.md`)
 - `src/modules/auth/{validators,repository,service,controller,routes,dto,index.ts}`
 - `src/modules/auth/utils/tokens.ts` (generate + hash verification tokens)
 - `src/shared/errors/GoneError.ts`
@@ -119,6 +127,8 @@
 - `.github/workflows/ci.yml` — Postgres service + `prisma db push` provisioning + `npm test` step
 
 ### Decisions
+- Product catalog API design is written against the **new** schema: product visibility is governed by `deleted_at` + having at least one `ACTIVE` variant (no `is_active`); the primary product image is flagged via `product_images.is_primary` (service-enforced, one per product) instead of lowest `display_order`; variant payloads include `barcode`; product variant images carry no timestamps.
+- Schema oddity flagged (not silently fixed): `reviews_public_id_unique_key` was applied to `rating` in `prisma/schema.prisma`; `public_id` was not unique. **Resolved**: the user corrected the schema (`public_id` is unique, `rating` is not), so the reviews API can be designed against the fixed schema without further changes.
 - Registration scope is minimal per user request: account creation only — email verification required for full features (docs flow partially deferred).
 - Verification token is a 64-hex crypto random value; only its SHA-256 hash is stored (per `token_hash` column + single-use/expiry semantics). Token TTL 24h.
 - Email delivery is real (Resend) and fire-and-forget: `sendVerificationEmail(...).catch(log)` — never blocks or fails registration, per `registration.md`.
@@ -161,6 +171,8 @@
 - CI provisions its own throwaway Postgres (`ecommerce_test` DB, `public` schema) via `prisma db push --url` and the job-level `DATABASE_URL` overrides `.env.test` (dotenv `override: false`), keeping the committed test env valid for local runs.
 
 ### Pending
+- Commit the Product Catalog API design + `docs/DATABASE.md` alignment on `docs/products-api` (includes the user's `prisma/schema.prisma` fixes).
+- Design the Categories API (`categories`, `product_categories` join) — noted as out of scope for the current product docs.
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
 - Expired-session cleanup job (reject + delete expired sessions) not yet implemented.
 - Test files are not type-checked by `npm run typecheck` (tsconfig `include` covers `src/**/*` only); a `tests/` tsconfig or a typecheck command that includes tests is a possible follow-up.
@@ -168,8 +180,9 @@
 - Unit tests for the repository layer (repositories are exercised through integration tests today).
 
 ### Next Step
+- Commit the aligned `docs/DATABASE.md` + the four Product Catalog API docs + the `docs/API_DESIGN.md` Products registration on `docs/products-api` (keep the branch after commit).
+- Implement the Product Catalog module (products, variants, product images, variant images) on a `feature/products` branch per `docs/api/` once the design is committed.
 - Commit the testing work (tests/ infra + suites, `vitest.config.ts`, `.env.test.example`, app gating, `AppError` fix, `ci.yml` test step, `PROJECT_PROGRESS.md`) on a feature branch (e.g. `feature/tests`), then merge into `main` and keep the branch.
-- Implement the Product Catalog module (products, variants, categories, inventory) on a `feature/products` branch per `docs/api/` when the catalog API design is available.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
 - Runtime E2E verification of the users + addresses endpoints (register → login → profile/address CRUD → email/phone/password change) is pending a running local DB with the schema migrated.
