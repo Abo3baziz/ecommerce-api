@@ -120,6 +120,51 @@ Each Pull Request should:
 - Update `PROJECT_PROGRESS.md` if implementation status changes.
 - Ensure tests pass before merging.
 
+## Testing Branches
+
+Testing work should use dedicated feature branches when tests are added independently from the feature implementation.
+
+Use the following naming convention:
+
+```text
+feature/tests-auth
+feature/tests-users
+feature/tests-addresses
+```
+
+### Rules
+
+* Create each testing branch from the latest `main`.
+* Use `feature/tests-<domain>` where `<domain>` identifies the resource or module being tested.
+* Keep tests for a specific domain isolated in its corresponding branch.
+* Open a Pull Request from the testing branch into `main`.
+* Run all required CI checks before merging.
+* Review the changes before merging.
+* After the PR is merged, delete the testing branch.
+* Do not continue adding unrelated tests to an already-merged testing branch.
+* If additional tests are needed later, create a new branch from the latest `main`.
+
+### Examples
+
+```text
+feature/tests-auth
+    → tests authentication
+    → PR
+    → main
+
+feature/tests-users
+    → tests users
+    → PR
+    → main
+
+feature/tests-addresses
+    → tests addresses
+    → PR
+    → main
+```
+
+The initial `feature/tests` branch should be reserved for establishing the testing infrastructure, configuration, test utilities, and CI testing setup. Domain-specific tests should use dedicated `feature/tests-<domain>` branches.
+
 ## AI Agent Guidelines
 
 When implementing a new feature:
