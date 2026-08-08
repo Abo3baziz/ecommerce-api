@@ -58,5 +58,15 @@ jobs:
       - name: Prepare test database
         run: npx prisma db push --url "$DATABASE_URL" --accept-data-loss
 
+      - name: Create test environment file
+        run: |
+          cat > .env.test <<'EOF'
+          NODE_ENV=test
+          SESSION_SECRET=ci-test-secret-please-change-me-1234
+          CORS_ORIGIN=http://localhost:3000
+          RESEND_API_KEY=ci_dummy_resend_key
+          RESEND_FROM_EMAIL=Ecommerce API <test@example.com>
+          EOF
+
       - name: Test
         run: npm test
