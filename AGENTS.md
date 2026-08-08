@@ -419,6 +419,15 @@ When modifying the project:
 9. Write code that is easy to review.
 10. If uncertain, prefer consistency with the existing codebase.
 
+## Node Modules Integrity
+
+- Never directly edit, modify, or delete files inside `node_modules/`.
+- Treat `node_modules/` as generated dependency files managed by the package manager.
+- Never rely on manual changes inside `node_modules/` for implementation, testing, or debugging.
+- If a dependency needs to be modified, use the package manager's supported patch mechanism or make the appropriate change to `package.json` and the lockfile.
+- Do not commit or attempt to commit `node_modules/`.
+- Ensure all required changes are reproducible from the repository after a clean dependency installation.
+
 ## Do Not Do 
 Never:
 
