@@ -185,7 +185,7 @@
 - Invalid phone OTP maps to 400 (matching the project's validation convention; docs list 422); 404 is reserved for "no pending request", 410 for used/expired codes, per `change-phone.md`.
 - Phone OTP is delivered through an SMS dev stub that logs the code (`src/shared/sms/index.ts`); a real provider (Twilio, etc.) can slot in behind the same `sendSms` interface without touching business logic.
 - **Resolved**: `feature/addresses` has now been merged into `main` after the users module landed, per the deferred decision.
-- Feature branches are kept after merging (`AGENTS.md` rule restored to "Do Not Delete the feature branch after merging (For Reference)"); commit only that rule line changed on `docs/keep-feature-branches`.
+- Feature branches are kept after merging (`AGENTS.md` rule restored to "Do Not Delete the feature branch after merging (For Reference)"); commit only that rule line changed on `docs/keep-feature-branches`. **Superseded**: commits `bd2be4d`/`0be00eb` (`docs(agents): delete feature branches after merging`) reverted `AGENTS.md` back to **step 10 = delete the feature branch after merging**, which is the current rule.
 - Tests run against the existing `Ecommerce_DB/Ecommerce` schema directly (user decision) rather than a provisioned test schema; `cleanupTestData` removes only `test-*` email users and their rows, so no production data is touched.
 - Vitest runs with `fileParallelism: false` since integration/e2e suites share the one Postgres schema; this sacrifices some parallelism for DB safety.
 - Test data uses digits-only phone numbers (`randomPhoneNumber`, `+1…` E.164) because `nanoid` includes letters and would fail the phone validators at the API layer.
@@ -197,7 +197,7 @@
 - `imageUrlField` validation is unchanged (any absolute http/https URL) to preserve existing behavior and tests; restricting `image_url` to the ImageKit host remains a possible future hardening step.
 
 ### Pending
-- Commit the Product Catalog implementation (module + routes + tests + helpers/factories + constants) on `feature/products` and merge into `main` (per user decision; branch kept for reference).
+- Commit the Product Catalog implementation (module + routes + tests + helpers/factories + constants) on `feature/products` and merge into `main` (per user decision), then delete the branch per `AGENTS.md`.
 - Design the Categories API (`categories`, `product_categories` join) — noted as out of scope for the current product docs.
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
 - Expired-session cleanup job (reject + delete expired sessions) not yet implemented.
@@ -205,12 +205,12 @@
 - Real SMS provider integration (the current `sendSms` stub only logs the OTP).
 - Unit tests for the repository layer (repositories are exercised through integration tests today).
 - Live client-side upload verification to ImageKit (upload a file with the issued auth params and confirm it lands in the media library + a product image row is created) is a manual step pending a client; the server-side auth-params endpoint was verified live with the real keys.
-- Commit the ImageKit integration (module, controller, route, docs, e2e test, env) on `feature/image-upload` and merge into `main` (branch kept for reference).
+- Merge PR #4 (`feature/image-upload`, ImageKit integration) into `main` after review, then delete the branch (local + remote) per `AGENTS.md` step 10.
 
 ### Next Step
-- Commit the ImageKit image-upload integration on `feature/image-upload` (module + controller + route + docs + e2e test + env changes) and merge into `main`, keeping the branch for reference.
-- Commit the Product Catalog module on `feature/products` (module + routes + tests + helpers/factories + constants), then merge into `main` and keep the branch for reference.
-- Commit the testing work (tests/ infra + suites, `vitest.config.ts`, `.env.test.example`, app gating, `AppError` fix, `ci.yml` test step, `PROJECT_PROGRESS.md`) on a feature branch (e.g. `feature/tests`), then merge into `main` and keep the branch.
+- Merge PR #4 (`feature/image-upload`) into `main` after verification, then delete the branch (local + remote) per `AGENTS.md` step 10.
+- Commit the Product Catalog module on `feature/products` (module + routes + tests + helpers/factories + constants), then merge into `main` and delete the branch per `AGENTS.md`.
+- Commit the testing work (tests/ infra + suites, `vitest.config.ts`, `.env.test.example`, app gating, `AppError` fix, `ci.yml` test step, `PROJECT_PROGRESS.md`) on a feature branch (e.g. `feature/tests`), then merge into `main` and delete the branch per `AGENTS.md`.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
 - Runtime E2E verification of the users + addresses endpoints (register → login → profile/address CRUD → email/phone/password change) is pending a running local DB with the schema migrated.
