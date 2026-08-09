@@ -10,6 +10,8 @@ Images are managed exclusively by administrators through endpoints nested under 
 
 Product-level (shared) images are a separate resource and are documented in the Product Images API: `docs/api/products/product-images.md`.
 
+Variant image files are uploaded to ImageKit using the same client-side signed upload flow as product images (see the **Image Upload (ImageKit)** section of `docs/api/products/product-images.md`); the resulting URL is then submitted as `image_url` to the endpoints below.
+
 ---
 
 # Product Variant Image Object
@@ -315,7 +317,7 @@ Authenticated user with role `admin`. Non-admin sessions receive **403 Forbidden
 
 ## Notes
 
-- The API stores image URLs; uploading binary image files is out of scope.
+- The API stores image URLs; uploading binary image files is out of scope (see the ImageKit upload flow in `docs/api/products/product-images.md`).
 
 ---
 
@@ -740,5 +742,5 @@ Error responses use the shared format:
 - **Hard delete** — The `product_variant_images` table has no `deleted_at` column, and images are not referenced by historical business records, so deletion is permanent. This matches the schema and differs from products/variants, which are soft-deleted.
 - **No timestamps** — The `product_variant_images` table has no `created_at`/`updated_at` columns in the schema, so the object and responses carry no timestamps (unlike product images). This is an intentional deviation from the Common Columns convention and is reflected in `docs/DATABASE.md`.
 - **`display_order` uniqueness within the parent variant** — Enforced by the service to guarantee a total ordering of the variant gallery; conflicts return 409. When omitted, the order is computed as the current max + 1.
-- **URL-only storage** — The API stores and returns image URLs; binary uploads are delegated to a storage service (out of scope).
+- **URL-only storage** — The API stores and returns image URLs; binary uploads are delegated to ImageKit via the client-side signed upload flow (see `docs/api/products/product-images.md`). The API never receives image file bytes.
 - **Response envelope** — All responses use the shared `{ success: true, data }` wrapper with the standard `pagination` object on list endpoints.

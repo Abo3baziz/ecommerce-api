@@ -40,6 +40,134 @@ The primary image is the default/hero image of the product and is the first imag
 
 ---
 
+# Image Upload (ImageKit)
+
+The API does **not** accept binary image files directly. Images are uploaded to **ImageKit** using the client-side signed upload flow, and the resulting URL is then stored through the image endpoints below.
+
+## Upload Flow
+
+1. The client (admin UI) requests short-lived upload authentication parameters.
+2. The client uploads the image file directly to ImageKit's upload API (`https://upload.imagekit.io/api/v1/files/upload`), passing `publicKey`, `urlEndpoint`, `token`, `expire`, and `signature` alongside the file.
+3. The client submits the `url` returned by ImageKit as the `image_url` field of the image endpoints below.
+
+## Get ImageKit Upload Authentication Parameters
+
+Returns a short-lived signed set of parameters that authorizes a client-side upload to ImageKit without exposing the private key.
+
+## Endpoint
+
+```http
+GET /api/v1/admin/products/uploads/imagekit-auth
+```
+
+---
+
+## Authentication
+
+| Requirement | Value |
+|-------------|-------|
+| Authentication | Required |
+
+---
+
+## Authorization
+
+Authenticated user with role `admin`. Non-admin sessions receive **403 Forbidden**.
+
+---
+
+## Request Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| Cookie | Yes | Session cookie (`session=…`) issued at login |
+
+---
+
+## Query Parameters
+
+> None.
+
+---
+
+## Request Body
+
+> None.
+
+---
+
+## Successful Response
+
+**200 OK**
+
+### Response Body
+
+```json
+{
+  "success": true,
+  "data": {
+    "token": "03b057f3-7dd9-4689-b16a-bcd0176bfc65",
+    "expire": 1786240129,
+    "signature": "c593fd35ccb285b290b4f838d6f51053a3426cf2",
+    "publicKey": "public_JP5I0TzT4ZAdJMgOCbgY9Ogv6Kk=",
+    "urlEndpoint": "https://ik.imagekit.io/ecommerceImages"
+  }
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| token | string | Unique identifier for the upload session |
+| expire | number | Unix timestamp (seconds) when the parameters expire |
+| signature | string | HMAC-SHA1 signature authenticating the upload |
+| publicKey | string | ImageKit public API key (safe to expose to the client) |
+| urlEndpoint | string | ImageKit URL endpoint the client should upload against |
+
+---
+
+## Processing Flow
+
+1. Client sends the request with the session cookie.
+2. API authenticates the session and authorizes the `admin` role.
+3. API generates signed upload parameters (`token`, `expire`, `signature`) from the ImageKit private key and returns them with the public key and URL endpoint.
+4. API returns **200 OK**.
+
+---
+
+## Business Rules
+
+- The returned parameters are time-limited (`expire`); uploads must be completed before they expire.
+- The private key is never exposed; only the derived signature and the public key are returned.
+- The signature is a pure HMAC computation over the token and expiry — no network call to ImageKit is made.
+
+---
+
+## Error Responses
+
+| Status | Reason |
+|--------|--------|
+| 401 Unauthorized | Missing or invalid session |
+| 403 Forbidden | Authenticated user is not an admin |
+| 500 Internal Server Error | Unexpected server error |
+
+---
+
+## Security Considerations
+
+- Requires a valid authenticated session and the `admin` role.
+- Uploads are authorized for the ImageKit media library but are not scoped to a specific folder by the signature; the client only persists image URLs that it then submits to the create/update image endpoints, which validate the URL shape.
+
+---
+
+## Notes
+
+- This endpoint is shared by product and variant image uploads (mounted under the admin products router).
+- Once uploaded, the ImageKit `url` is submitted as `image_url` to the Create/Update image endpoints below.
+
+---
+
 # Admin Image Management
 
 All endpoints require an authenticated session with the `admin` role.
@@ -326,7 +454,7 @@ Authenticated user with role `admin`. Non-admin sessions receive **403 Forbidden
 
 ## Notes
 
-- The API stores image URLs; uploading binary image files is out of scope (use a dedicated storage service and store the resulting URL).
+- The API stores image URLs; uploading binary image files is out of scope (use a dedicated storage service and store the resulting URL). See the ImageKit upload flow above.
 
 ---
 
@@ -758,5 +886,5 @@ Error responses use the shared format:
 - **Hard delete** — The `product_images` table has no `deleted_at` column, and images are not referenced by historical business records, so deletion is permanent. This matches the schema and differs from products/variants, which are soft-deleted.
 - **`display_order` uniqueness within the parent** — Enforced by the service to guarantee a total ordering of the gallery; conflicts return 409. When omitted, the order is computed as the current max + 1.
 - **Primary image via `is_primary` flag** — The primary (hero) image is flagged by the `product_images.is_primary` column rather than derived from `display_order`. The service enforces the "exactly one primary per product" invariant in a transaction: creating/updating with `is_primary = true` demotes the previous primary, the first image added becomes primary automatically, and deleting the primary promotes the remaining image with the lowest `display_order`. This matches the schema and gives the storefront an explicit hero image.
-- **URL-only storage** — The API stores and returns image URLs; binary uploads are delegated to a storage service (out of scope).
+- **URL-only storage** — The API stores and returns image URLs; binary uploads are delegated to ImageKit via the client-side signed upload flow (see Image Upload above). The API never receives image file bytes.
 - **Response envelope** — All responses use the shared `{ success: true, data }` wrapper with the standard `pagination` object on list endpoints.

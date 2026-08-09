@@ -12,6 +12,7 @@ import { NotFoundError } from "../../../src/shared/errors/NotFoundError.js";
 import { prisma } from "../../../src/config/database.js";
 import { createProduct } from "../../factories/product.factory.js";
 import { createProductImage } from "../../factories/product-image.factory.js";
+import { imageKitImageUrl } from "../../helpers/image-url.js";
 import { cleanupTestData } from "../../helpers/db.js";
 
 describe("productImage.service", () => {
@@ -44,7 +45,7 @@ describe("productImage.service", () => {
       const product = await createProduct();
 
       const result = await createProductImageService(product.public_id, {
-        image_url: "https://cdn.test.example/hero.jpg",
+        image_url: imageKitImageUrl("hero.jpg"),
       });
 
       expect(result.public_id).toMatch(/^pimg_/);
@@ -57,7 +58,7 @@ describe("productImage.service", () => {
       await createProductImage(product.id, { display_order: 0 });
 
       const result = await createProductImageService(product.public_id, {
-        image_url: "https://cdn.test.example/second.jpg",
+        image_url: imageKitImageUrl("second.jpg"),
       });
 
       expect(result.display_order).toBe(1);
@@ -68,7 +69,7 @@ describe("productImage.service", () => {
       const first = await createProductImage(product.id, { is_primary: true });
 
       const result = await createProductImageService(product.public_id, {
-        image_url: "https://cdn.test.example/second.jpg",
+        image_url: imageKitImageUrl("second.jpg"),
         is_primary: true,
       });
 
@@ -85,7 +86,7 @@ describe("productImage.service", () => {
 
       await expect(
         createProductImageService(product.public_id, {
-          image_url: "https://cdn.test.example/dup.jpg",
+          image_url: imageKitImageUrl("dup.jpg"),
           display_order: 3,
         }),
       ).rejects.toThrow(ConflictError);
