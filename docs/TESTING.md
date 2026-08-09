@@ -16,30 +16,24 @@ The purpose of testing here is to give confidence that the API behaves as docume
 - **External services are mocked/stubbed.** Email, payments, storage, and third-party APIs are replaced unless a test intentionally exercises a real integration.
 - **Tests are part of the feature.** A change is not complete until its tests are added or updated (see AGENTS.md Definition of Done).
 - **Never weaken, delete, skip, or disable a test just to make CI pass.** If a test is wrong, fix the test or the code — do not `skip`/`only`/`todo` it into silence.
-- **Never touch `.github/workflows/` with test logic.** CI runs tests; the test runner discovers them. See section 19.
+- **Never touch `.github/workflows/` with test logic.** CI runs tests; the test runner discovers them. See section 18.
 
 ---
 
 # 2. Current Testing Stack
 
-**Current state (as of this writing):**
+The suite is fully installed and running. Use exactly one runner so the whole suite runs from one command — do not introduce a second one (e.g., no Jest alongside Vitest):
 
-- No test runner or framework is installed.
-- `npm test` is a placeholder stub (`echo "Error: no test specified" && exit 1`).
-- There are no test files and no coverage tooling.
-- `ci.yml` currently runs `npm ci`, `npm run typecheck`, and `npm run build` only. It has **no test step** because the stub would always fail.
-- A Vitest + supertest integration-test setup for the auth module was attempted previously and fully reverted (test file, `src/test/`, `vitest.config.ts`, `.env.test`, and the `vitest`/`supertest`/`@types/supertest` dev dependencies were removed). `npm test` remains a stub.
-- Existing runtime smoke-verification has been done manually via `curl` and live `npm run dev` checks; these were not committed as automated tests.
-
-**Recommended stack (RECOMMENDED — not yet installed):**
-
-When tests are introduced, use exactly one framework so the whole suite runs from one command:
-
-- **Vitest** as the test runner (native TypeScript/ESM support; `"type": "module"` in `package.json` requires a runner that handles ESM natively).
+- **Vitest 4** as the test runner (native TypeScript/ESM support; `"type": "module"` in `package.json` requires a runner that handles ESM natively).
 - **supertest** against the Express `app` for HTTP-level integration/API tests (works with the exported `app` from `src/app/index.ts`; no server port needed).
-- Dev dependencies to add: `vitest`, `supertest`, `@types/supertest`.
+- **@vitest/coverage-v8** for the `test:coverage` script.
+- **dotenv** loads `.env.test` before the suite starts (`vitest.config.ts` + `tests/setup/env.setup.ts`).
 
-Do not introduce a second runner (e.g., do not add Jest alongside Vitest). The project has `tsx` already; if a standalone script or a specific test needs `tsx`, that is fine, but the suite runs through the single chosen runner.
+Current state (as of this writing):
+
+- 35 test files across `tests/unit`, `tests/integration`, and `tests/e2e`; the full suite (396 tests) passes via `npm test`.
+- `ci.yml` runs `npm test` after typecheck, build, and test-database setup (see section 18).
+- The project has `tsx` already; if a standalone script or a specific test needs `tsx`, that is fine, but the suite runs through Vitest.
 
 ---
 
@@ -85,22 +79,25 @@ Recommended layout (mirrors `src/` so test ↔ source correspondence is obvious)
 
 ```
 tests/
-├── unit/
-│   └── modules/
-│       ├── auth/            # validators, utils, pure service rules
-│       ├── users/
-│       └── shared/          # errors, logger, mailer template rendering
-├── integration/
-│   ├── modules/
-│   │   ├── auth/            # repository + service against test DB
-│   │   ├── users/
-│   │   └── addresses/
-│   └── app/
-│       └── api/             # supertest endpoint suites
+├── unit/                    # validators, utils, pure service rules
+│   ├── auth/
+│   ├── users/
+│   ├── addresses/
+│   └── products/
+├── integration/             # repository + service against the test DB
+│   ├── auth/
+│   ├── users/
+│   ├── addresses/
+│   └── products/
+├── e2e/                     # supertest endpoint suites
+│   ├── auth/
+│   ├── users/
+│   ├── addresses/
+│   └── products/
 ├── factories/               # row factories (section 11)
-├── helpers/                 # setup/teardown, auth cookie helpers, DB utils
+├── helpers/                 # auth cookie helpers, DB cleanup, random, image URLs
 └── setup/
-    └── global.setup.ts      # one-time test-schema migration (section 11/12)
+    └── env.setup.ts         # loads .env.test and forces NODE_ENV=test
 ```
 
 This is a recommendation; if a module co-locates unit tests inside its folder, keep them clearly named and ensure the Vitest include glob (section 9) picks them up and `tsconfig` excludes them.
@@ -111,7 +108,7 @@ This is a recommendation; if a module co-locates unit tests inside its folder, k
 
 - Unit tests: `<subject>.test.ts` — e.g. `login.validator.test.ts`, `tokens.test.ts`.
 - Integration tests: `<subject>.integration.test.ts` — e.g. `auth.service.integration.test.ts`.
-- API/E2E tests: `<endpoint>.api.test.ts` or `<resource>.integration.test.ts` — e.g. `users.me.api.test.ts`.
+- API/E2E tests: `<endpoint>.api.test.ts` — e.g. `users.me.api.test.ts`, `image-upload.api.test.ts`.
 
 The `.integration.` and `.api.` suffixes let Vitest include globs target them separately from unit tests (section 9).
 
@@ -119,11 +116,11 @@ The `.integration.` and `.api.` suffixes let Vitest include globs target them se
 
 # 8. Test Discovery
 
-- **The test runner discovers test files.** Vitest discovers files matching its `include` globs recursively — no central registry of test files exists.
-- Recommended Vitest `include` patterns:
+- **The test runner discovers test files.** Vitest discovers files matching its `include` globs recursively — no central registry of test files exists. Current `include` globs (`vitest.config.ts`):
   - unit: `tests/unit/**/*.test.ts`
-  - integration: `tests/integration/**/*.integration.test.ts`, `tests/integration/**/*.api.test.ts`
-- `npm test` runs the whole suite through the runner. **CI must not list individual test files** (section 19).
+  - integration: `tests/integration/**/*.integration.test.ts`
+  - e2e/API: `tests/e2e/**/*.api.test.ts`
+- `npm test` runs the whole suite through the runner. **CI must not list individual test files** (section 18).
 - **Adding a new test normally requires no modification to `ci.yml`.** Just create the file under `tests/` with a matching name; the runner and CI pick it up automatically.
 
 ---
@@ -132,29 +129,26 @@ The `.integration.` and `.api.` suffixes let Vitest include globs target them se
 
 Current scripts (from `package.json`):
 
-- `npm run test` — placeholder stub that exits 1. Replaces its body once a runner is installed.
+- `npm test` → `vitest run` — the full suite; the single command CI invokes.
+- `npm run test:watch` → `vitest` — watch mode during development.
+- `npm run test:integration` → `vitest run tests/integration` — integration tests only.
+- `npm run test:e2e` → `vitest run tests/e2e` — API/e2e tests only.
+- `npm run test:coverage` → `vitest run --coverage` — full suite with coverage (uses `@vitest/coverage-v8`).
 
-Recommended scripts (RECOMMENDED, to be added to `package.json` when the runner is introduced):
-
-- `npm test` → `vitest run`
-- `npm run test:watch` → `vitest`
-- `npm run test:integration` → `vitest run tests/integration`
-- `npm run test:coverage` → `vitest run --coverage`
-
-`npm test` must remain the single command CI invokes (section 19).
+`npm test` must remain the single command CI invokes (section 18).
 
 ---
 
 # 10. Database Testing with PostgreSQL/Prisma
 
-- **Never run integration tests against the production/dev database.** Use a dedicated test schema (e.g. `Ecommerce_test`).
+- **Never run integration tests against the production/dev database.** Tests use the `Ecommerce_DB` database's `Ecommerce` schema locally and a dedicated Postgres database in CI (`ecommerce_test`).
 - The project uses Prisma 7 with `@prisma/adapter-pg`. Notes that affect testing:
-  - `prisma db push` supports a `--url` flag to override the datasource URL — use it to point at the test schema. (`--skip-generate` is **not** supported in Prisma 7; `prisma generate` runs separately if needed.)
+  - `prisma db push` supports a `--url` flag to override the datasource URL — CI uses it to prepare the test database. (`--skip-generate` is **not** supported in Prisma 7; `prisma generate` runs separately.)
   - Both Prisma clients force the pg session timezone to UTC (`options: "-c timezone=UTC"`). Any test-created Prisma client must do the same so timestamptz comparisons (token expiry, session TTL) behave identically in tests.
-- **Schema setup:** one-time global setup (e.g. `tests/setup/global.setup.ts`) that connects to the test database and runs `prisma db push --url <test-db-url>` before the suite starts.
+- **Schema setup:** prepared before the suite runs via `prisma db push` (CI does this in the "Prepare test database" step). There is no in-suite migration step.
 - **Time-dependent logic:** token/OTP expiry, session TTL, and idle-timeout are expressed in milliseconds from constants (`VERIFICATION_TOKEN_TTL_MS`, `PHONE_OTP_TTL_MS`, `SESSION_TTL_MS`). Where a test needs an "expired" row, insert/update rows with past timestamps directly rather than mocking `Date.now()` unless the mock is unavoidable.
 - **Transactions:** services own `prisma.$transaction`. Integration tests must verify both the commit path (all writes persist) and the rollback path (a failing step leaves no partial rows) for flows like checkout and delete-account.
-- The Prisma client used by tests must be the same client the app configures (`src/config/database.ts`); reuse it or construct an equivalent test client with the same timezone options.
+- The Prisma client used by tests is the same client the app configures (`src/config/database.ts`); reuse it rather than constructing a separate test client.
 
 ---
 
@@ -170,10 +164,9 @@ Recommended scripts (RECOMMENDED, to be added to `package.json` when the runner 
 
 # 12. Test Isolation and Cleanup
 
-- **Truncate between tests.** After each integration/API test (or each file), truncate the tables touched by that suite so no state leaks across tests. A shared `truncateTables(...)` helper in `tests/helpers/` is recommended.
-- **Clean up sessions and tokens** as well as users/addresses — every integration test that registers/logs in leaves a `sessions` and `verification_tokens` row behind.
+- **Clean between tests.** `tests/helpers/db.ts` exports `cleanupTestData()`, which deletes every row whose user email starts with `test-` (users, plus their verification tokens, sessions, and addresses) and all product rows (`product_variant_images`, `product_variants`, `product_images`, `products`). Integration/e2e suites call it in `beforeEach`/`afterAll` so no state leaks across tests.
+- **Unique emails/phones guarantee safe cleanup:** factories generate emails prefixed with `test-` (see section 11), so any leftover rows from a failed run are caught by `cleanupTestData()`.
 - Tests must not depend on insertion order or on rows created by an earlier test.
-- `tests/setup/global.setup.ts` resets the test schema once per run; individual tests handle their own in-test data.
 - Logs: tests must not write into the project's `logs/` directory; silence the logger in the test env (`NODE_ENV=test`) or point it at a no-op.
 
 ---
@@ -233,6 +226,7 @@ For each business-rule error path: assert the exact documented status — e.g. c
 
 - **Email (Resend):** the mailer module (`src/shared/mailer/index.ts`) constructs its client at import time from `env.RESEND_API_KEY`. Tests must either mock the module (`vi.mock`) at the boundary or provide a valid-looking dummy key in `.env.test`. Services send email fire-and-forget (`sendEmail(...).catch(log)`); never assert that a real email was delivered — assert the side effects (token row, response status) instead, and where relevant that the mailer was called with the right recipient/subject.
 - **SMS:** the project ships an SMS dev stub (`src/shared/sms/index.ts`) that logs the OTP instead of sending. Use it in tests; swap in the mocked interface when the stub is replaced by a real provider.
+- **ImageKit:** the SDK client (`src/shared/imagekit/client.ts`) is constructed from `IMAGEKIT_*` env vars. Auth-params generation is pure HMAC (no network); tests assert the endpoint returns `{ token, expire, signature, publicKey, urlEndpoint }` without calling ImageKit. Never upload or hit the real ImageKit service in tests — the dummy keys in `.env.test` fail any real request, which is intentional.
 - **Payments:** the payment module uses a mock provider. Mock the provider boundary; test the business flow (order state transitions, payment completion transaction) without a real gateway.
 - **Other third parties:** mock at the module/interface boundary using the runner's mocking (e.g. `vi.mock`), never by pointing tests at a live service.
 - Only an explicitly intentional integration test (clearly marked, e.g. tagged and excluded from the default `npm test` run) may hit a real external service.
@@ -243,19 +237,20 @@ For each business-rule error path: assert the exact documented status — e.g. c
 
 The env schema (`src/config/env.ts`) is validated by zod and calls `process.exit(1)` on failure. Any test run must satisfy:
 
-- `DATABASE_URL` (pointing at the test schema)
+- `DATABASE_URL` (local: the `Ecommerce_DB` database's `Ecommerce` schema)
 - `SESSION_SECRET` (≥16 chars)
 - `CORS_ORIGIN`
 - `RESEND_API_KEY` (non-empty; use a dummy value)
 - `RESEND_FROM_EMAIL` (optional, defaults to `onboarding@resend.dev`)
+- `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT` (dummy values; real requests must fail in tests)
 - `PORT`, `NODE_ENV`
 
-Recommended setup:
+Current setup:
 
-- `.env.test` with `NODE_ENV=test`, the test `DATABASE_URL`, a dummy `RESEND_API_KEY`, a test `SESSION_SECRET`, and `CORS_ORIGIN` for the test client.
-- Load `.env.test` in the Vitest config/global setup (the runner or `dotenv` with the `NODE_ENV`-aware path).
-- `.env.*` is gitignored except `.env.example`; commit a `.env.test.example` documenting every test variable so CI and new developers can reproduce the test env.
-- `NODE_ENV=test` must drive test-only behavior (e.g. silent logger, disabled external calls) — prefer gating on `env.NODE_ENV === "test"` over ad-hoc flags.
+- `.env.test` holds the test env (gitignored): `NODE_ENV=test`, the local `DATABASE_URL`, dummy `RESEND_API_KEY`/`IMAGEKIT_*` keys, a test `SESSION_SECRET`, and `CORS_ORIGIN` for the test client.
+- `vitest.config.ts` runs `dotenv.config({ path: ".env.test" })` and `tests/setup/env.setup.ts` forces `NODE_ENV=test`.
+- `.env.test.example` is committed and documents every test variable so CI and new developers can reproduce the test env.
+- `NODE_ENV=test` drives test-only behavior (e.g. silent logger, disabled external calls) — prefer gating on `env.NODE_ENV === "test"` over ad-hoc flags.
 
 ---
 
@@ -263,12 +258,39 @@ Recommended setup:
 
 `.github/workflows/ci.yml` is the single CI entry point. Its contract:
 
-- It **runs** the suite by invoking a single command: `npm test` (which the runner turns into the full test run).
+- It **runs** the suite by invoking a single command: `npm test` (which runs the full Vitest suite).
 - The **test runner discovers** the test files (section 8). `ci.yml` must never enumerate or glob individual test files, and no test file ever lives under `.github/workflows/`.
 - **Adding a new test normally requires no change to `ci.yml`** — create the file under `tests/` with a proper name and it is discovered automatically.
 - **Adding a new dev/test dependency** (e.g. `vitest`, `supertest`) is the only situation that legitimately touches CI: the `npm ci` step in `ci.yml` must run after the dependency lands, and only `package.json`/`package-lock.json` changes are expected — never test-file lists.
 
-**Current CI gap (to fix when the runner is installed):** `ci.yml` has no test step today because `npm test` is a stub. Once Vitest is configured, add a single `- name: Test / run: npm test` step after `npm run build` (and before any coverage gate if coverage is introduced). Do not gate the run on specific files.
+Current CI pipeline (in order): checkout → setup Node (matrix: 20, 22) → `npm ci` → `npx prisma generate` → `npm run typecheck` → `npm run build` → **"Prepare test database"** (`npx prisma db push --url "$DATABASE_URL" --accept-data-loss` against the `postgres:16` service) → **"Create test environment file"** (writes `.env.test` from GitHub secrets; see below) → **"Test"** (`npm test`).
+
+CI uses a dedicated Postgres database (`ecommerce_test`) provisioned as a GitHub Actions service container; it never touches a shared or production database.
+
+---
+
+# 18.1 CI Secrets and Environment Variables
+
+Never commit real secrets. Use the committed `.env.test.example` to document which variables exist and what they are for — the values themselves stay in the developer's local `.env.test` (gitignored) and in GitHub.
+
+When a secret is required in GitHub Actions, it must be configured as a **GitHub Repository Secret** under **Settings → Secrets and variables → Actions**. The CI workflow (`ci.yml`) maps those secrets into the test environment file; if a secret is missing, the workflow fails.
+
+**GitHub Repository Secrets required by `ci.yml`:**
+
+- `SESSION_SECRET` — ≥16 chars; used to sign session cookies in tests.
+- `RESEND_API_KEY` — dummy/throwaway key; must be non-empty (the mailer client is built at import time).
+- `RESEND_FROM_EMAIL` — the "from" address used in test emails.
+- `IMAGEKIT_PUBLIC_KEY` — ImageKit public key (needed for the auth-params endpoint contract).
+- `IMAGEKIT_PRIVATE_KEY` — ImageKit private key. **Never log or expose it**; it is only used to build HMAC signatures.
+- `IMAGEKIT_URL_ENDPOINT` — the ImageKit delivery endpoint.
+
+**Environment variables that are NOT secrets** and may stay inline in `ci.yml`:
+
+- `DATABASE_URL` — set inline to the CI Postgres service connection string (a throwaway DB created per run; no secret).
+- `CORS_ORIGIN` — inline (`http://localhost:3000`).
+- `NODE_ENV` — set to `test` in the generated `.env.test`.
+
+CI writes these into a generated `.env.test` file (never committed) before running `npm test`. Local developers reproduce the same environment by copying `.env.test.example` to `.env.test` and filling in values. Reporting requirement: if you change which secrets CI needs, update the lists above and the `Create test environment file` step together — and tell the maintainer which GitHub secrets must be configured.
 
 ---
 
@@ -322,4 +344,4 @@ A feature is testing-complete only when:
 
 # Summary
 
-The API is currently at a testing baseline with no runner installed. When the runner is introduced, adopt **Vitest + supertest** as the single stack, keep tests in a top-level `tests/` directory discovered by the runner, point integration tests at a dedicated Postgres schema via `prisma db push --url`, mock external services, and wire a single `npm test` step into `ci.yml`. Tests are the executable contract for `docs/api/*` and must never be weakened to satisfy CI.
+The API is tested with **Vitest 4 + supertest** as a single stack: unit tests for pure logic, integration tests against the real Postgres schema (reusing the app's Prisma client), and e2e/API tests through `supertest(app)`. Tests live in a top-level `tests/` directory discovered by the runner, external services (Resend, SMS, ImageKit, payments) are mocked or use dummy keys, and `cleanupTestData()` isolates the test schema between runs. The `ci.yml` pipeline prepares a dedicated Postgres database, writes `.env.test` from GitHub secrets (see section 18.1), and runs the full suite via `npm test`. Tests are the executable contract for `docs/api/*` and must never be weakened to satisfy CI.
