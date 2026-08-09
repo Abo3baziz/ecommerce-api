@@ -290,6 +290,7 @@ Do not change the logging behavior unless explicitly requested.
 Defines Testing flows, requirements and guidelines
 
 - `docs/TESTING.md`
+- `docs/ENDPOINT_TESTING.md`
 
 ### Operations
 

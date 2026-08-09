@@ -4,14 +4,17 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { prisma } from "../src/config/database.js";
 import { user_role } from "../src/generated/prisma/enums.js";
+import { usersRepository } from "../src/modules/users/repository/users.repository.js";
 import { logger } from "../src/shared/logger/index.js";
 
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 
 export type PromoteToAdminResult =
   | { status: "not_found" }
+  | { status: "already_super_admin"; role: user_role }
   | { status: "already_admin"; role: user_role }
-  | { status: "promoted"; previousRole: user_role };
+  | { status: "promoted_to_super_admin"; previousRole: user_role }
+  | { status: "promoted_to_admin"; previousRole: user_role };
 
 export interface AdminCreateOutcome {
   exitCode: number;
@@ -30,17 +33,28 @@ export async function promoteUserToAdmin(
     return { status: "not_found" };
   }
 
+  if (user.role === user_role.SUPER_ADMIN) {
+    return { status: "already_super_admin", role: user.role };
+  }
+
   if (user.role === user_role.ADMIN) {
     return { status: "already_admin", role: user.role };
   }
 
+  const targetRole =
+    (await usersRepository.countSuperAdmins()) === 0
+      ? user_role.SUPER_ADMIN
+      : user_role.ADMIN;
+
   await prisma.users.update({
     where: { id: user.id },
-    data: { role: user_role.ADMIN, updated_at: new Date() },
+    data: { role: targetRole, updated_at: new Date() },
     select: { id: true },
   });
 
-  return { status: "promoted", previousRole: user.role };
+  return targetRole === user_role.SUPER_ADMIN
+    ? { status: "promoted_to_super_admin", previousRole: user.role }
+    : { status: "promoted_to_admin", previousRole: user.role };
 }
 
 export async function runAdminCreate(email: string): Promise<AdminCreateOutcome> {
@@ -69,12 +83,30 @@ export async function runAdminCreate(email: string): Promise<AdminCreateOutcome>
             "No changes were made.",
           ],
         };
+      case "already_super_admin":
+        return {
+          exitCode: 0,
+          messages: ["User is already a SUPER_ADMIN.", "No changes were made."],
+        };
       case "already_admin":
         return {
           exitCode: 0,
           messages: ["User is already an ADMIN.", "No changes were made."],
         };
-      case "promoted":
+      case "promoted_to_super_admin":
+        return {
+          exitCode: 0,
+          messages: [
+            "User found.",
+            `Current role: ${result.previousRole}`,
+            "",
+            "No SUPER_ADMIN exists yet.",
+            "Promoting user to SUPER_ADMIN...",
+            "",
+            "User successfully promoted to SUPER_ADMIN.",
+          ],
+        };
+      case "promoted_to_admin":
         return {
           exitCode: 0,
           messages: [

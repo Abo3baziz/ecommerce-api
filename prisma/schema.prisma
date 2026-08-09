@@ -484,6 +484,7 @@ enum session_status {
 enum user_role {
   CUSTOMER
   ADMIN
+  SUPER_ADMIN
 }
 
 enum user_status {

@@ -6,6 +6,7 @@ import {
 } from "../../../scripts/create-admin.js";
 import { prisma } from "../../../src/config/database.js";
 import { user_role } from "../../../src/generated/prisma/enums.js";
+import { usersRepository } from "../../../src/modules/users/repository/users.repository.js";
 import { createUser, TEST_PASSWORD } from "../../factories/user.factory.js";
 import { cleanupTestData } from "../../helpers/db.js";
 
@@ -23,7 +24,8 @@ describe("admin bootstrap CLI", () => {
   });
 
   describe("runAdminCreate", () => {
-    it("promotes an existing non-admin user and reports success", async () => {
+    it("promotes the first admin to SUPER_ADMIN when no super admin exists", async () => {
+      vi.spyOn(usersRepository, "countSuperAdmins").mockResolvedValue(0);
       const user = await createUser({ role: user_role.CUSTOMER });
 
       const outcome = await runAdminCreate(user.email);
@@ -31,6 +33,23 @@ describe("admin bootstrap CLI", () => {
       expect(outcome.exitCode).toBe(0);
       expect(outcome.messages).toContain("User found.");
       expect(outcome.messages).toContain("Current role: CUSTOMER");
+      expect(outcome.messages).toContain("No SUPER_ADMIN exists yet.");
+      expect(outcome.messages).toContain("User successfully promoted to SUPER_ADMIN.");
+
+      const updated = await prisma.users.findUnique({
+        where: { id: user.id },
+        select: { role: true },
+      });
+      expect(updated?.role).toBe(user_role.SUPER_ADMIN);
+    });
+
+    it("promotes subsequent users to ADMIN when a super admin exists", async () => {
+      vi.spyOn(usersRepository, "countSuperAdmins").mockResolvedValue(1);
+      const user = await createUser({ role: user_role.CUSTOMER });
+
+      const outcome = await runAdminCreate(user.email);
+
+      expect(outcome.exitCode).toBe(0);
       expect(outcome.messages).toContain("User successfully promoted to ADMIN.");
 
       const updated = await prisma.users.findUnique({
@@ -38,6 +57,22 @@ describe("admin bootstrap CLI", () => {
         select: { role: true },
       });
       expect(updated?.role).toBe(user_role.ADMIN);
+    });
+
+    it("reports no change when the user is already a super admin", async () => {
+      const user = await createUser({ role: user_role.SUPER_ADMIN });
+
+      const outcome = await runAdminCreate(user.email);
+
+      expect(outcome.exitCode).toBe(0);
+      expect(outcome.messages).toContain("User is already a SUPER_ADMIN.");
+      expect(outcome.messages).toContain("No changes were made.");
+
+      const updated = await prisma.users.findUnique({
+        where: { id: user.id },
+        select: { role: true },
+      });
+      expect(updated?.role).toBe(user_role.SUPER_ADMIN);
     });
 
     it("reports no change when the user is already an admin", async () => {
@@ -101,12 +136,47 @@ describe("admin bootstrap CLI", () => {
   });
 
   describe("promoteUserToAdmin", () => {
+    it("returns already_super_admin without updating for a super admin user", async () => {
+      const user = await createUser({ role: user_role.SUPER_ADMIN });
+
+      const result = await promoteUserToAdmin(user.email);
+
+      expect(result).toEqual({
+        status: "already_super_admin",
+        role: user_role.SUPER_ADMIN,
+      });
+    });
+
     it("returns already_admin without updating for an admin user", async () => {
       const user = await createUser({ role: user_role.ADMIN });
 
       const result = await promoteUserToAdmin(user.email);
 
       expect(result).toEqual({ status: "already_admin", role: user_role.ADMIN });
+    });
+
+    it("returns promoted_to_super_admin when no super admin exists", async () => {
+      vi.spyOn(usersRepository, "countSuperAdmins").mockResolvedValue(0);
+      const user = await createUser({ role: user_role.CUSTOMER });
+
+      const result = await promoteUserToAdmin(user.email);
+
+      expect(result).toEqual({
+        status: "promoted_to_super_admin",
+        previousRole: user_role.CUSTOMER,
+      });
+    });
+
+    it("returns promoted_to_admin when a super admin exists", async () => {
+      vi.spyOn(usersRepository, "countSuperAdmins").mockResolvedValue(1);
+      const user = await createUser({ role: user_role.CUSTOMER });
+
+      const result = await promoteUserToAdmin(user.email);
+
+      expect(result).toEqual({
+        status: "promoted_to_admin",
+        previousRole: user_role.CUSTOMER,
+      });
     });
 
     it("returns not_found for an unknown user", async () => {

@@ -61,7 +61,7 @@ import {
 const adminProductsRouter = Router();
 
 adminProductsRouter.use(authentication);
-adminProductsRouter.use(authorization(user_role.ADMIN));
+adminProductsRouter.use(authorization(user_role.ADMIN, user_role.SUPER_ADMIN));
 
 adminProductsRouter.get("/uploads/imagekit-auth", getImageKitAuthParamsController);
 

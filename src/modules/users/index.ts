@@ -1,4 +1,5 @@
 export { usersRouter } from "./routes/users.routes.js";
+export { adminUsersRouter } from "./routes/admin.routes.js";
 export {
   changeEmail,
   changePassword,
