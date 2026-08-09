@@ -23,8 +23,10 @@ export async function cleanupTestData(): Promise<void> {
     });
   }
 
+  await prisma.product_categories.deleteMany({});
   await prisma.product_variant_images.deleteMany({});
   await prisma.product_variants.deleteMany({});
   await prisma.product_images.deleteMany({});
   await prisma.products.deleteMany({});
+  await prisma.categories.deleteMany({});
 }
