@@ -95,6 +95,7 @@
 - New e2e suite `tests/e2e/products/image-upload.api.test.ts` (401 no session, 403 non-admin, 200 admin with token/expire/signature/publicKey/urlEndpoint shape). **Verified:** `npm test` → 35 files / 396 tests green; typecheck + build pass on `feature/image-upload`.
 - **Replaced placeholder image URLs in the product tests with ImageKit URLs**: added `tests/helpers/image-url.ts` (`imageKitImageUrl()` derives a URL from `env.IMAGEKIT_URL_ENDPOINT`) and wired it into the `product-image`/`variant-image` factories, the e2e `imagePayload`/`variantImagePayload` helpers, and the integration service tests (hardcoded `cdn.test.example` links). Unit validator tests now use ImageKit literals (`https://ik.imagekit.io/ecommerceImages/…`); the only remaining `cdn.test.example` reference was replaced. Full suite stays green: **35 files / 396 tests**; typecheck + build pass.
 - **Updated `.github/workflows/ci.yml`** to write `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, and `IMAGEKIT_URL_ENDPOINT` into the generated `.env.test` from GitHub secrets (env validation would otherwise exit during `npm test` in CI). Committed `71feab8`; requires the three repo secrets to be configured.
+- **Merged PR #4 (`feature/image-upload` → `main`)** via GitHub merge commit `518768f` after CI went green (secrets configured) and verification; deleted the feature branch locally and remotely per `AGENTS.md` step 10.
 
 ### Deliverables
 - `docs/DATABASE.md` rewritten to match `prisma/schema.prisma` (FK `fk_{dt}_{st}` naming, check-constraint tables documented, reviews unique mapping fixed)
@@ -207,10 +208,8 @@
 - Real SMS provider integration (the current `sendSms` stub only logs the OTP).
 - Unit tests for the repository layer (repositories are exercised through integration tests today).
 - Live client-side upload verification to ImageKit (upload a file with the issued auth params and confirm it lands in the media library + a product image row is created) is a manual step pending a client; the server-side auth-params endpoint was verified live with the real keys.
-- Merge PR #4 (`feature/image-upload`, ImageKit integration) into `main` after review, then delete the branch (local + remote) per `AGENTS.md` step 10.
 
 ### Next Step
-- Merge PR #4 (`feature/image-upload`) into `main` after verification, then delete the branch (local + remote) per `AGENTS.md` step 10.
 - Commit the Product Catalog module on `feature/products` (module + routes + tests + helpers/factories + constants), then merge into `main` and delete the branch per `AGENTS.md`.
 - Commit the testing work (tests/ infra + suites, `vitest.config.ts`, `.env.test.example`, app gating, `AppError` fix, `ci.yml` test step, `PROJECT_PROGRESS.md`) on a feature branch (e.g. `feature/tests`), then merge into `main` and delete the branch per `AGENTS.md`.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
