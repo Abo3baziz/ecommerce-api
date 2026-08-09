@@ -1,7 +1,8 @@
 import { nanoid } from "nanoid";
 import type { Express } from "express";
 import request from "supertest";
-import { TEST_PASSWORD } from "../factories/user.factory.js";
+import { TEST_PASSWORD, createUser } from "../factories/user.factory.js";
+import { user_role } from "../../src/generated/prisma/enums.js";
 import { randomPhoneNumber } from "./random.js";
 
 export function validRegisterPayload(overrides: Record<string, unknown> = {}) {
@@ -46,4 +47,10 @@ export async function loginUser(app: Express, email: string, password: string) {
     response,
     cookie: extractSessionCookie(response.headers["set-cookie"]),
   };
+}
+
+export async function createAdminUser(app: Express) {
+  const user = await createUser({ role: user_role.ADMIN });
+  const { cookie } = await loginUser(app, user.email, TEST_PASSWORD);
+  return { user, cookie };
 }
