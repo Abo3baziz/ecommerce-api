@@ -94,6 +94,7 @@
 - Docs updated: `docs/api/products/product-images.md` gained a full **Image Upload (ImageKit)** section (3-step client-side signed flow + endpoint contract); the two "binary upload out of scope" notes in `product-images.md`/`product-variant-images.md` now point to ImageKit; `docs/API_DESIGN.md` registers the endpoint.
 - New e2e suite `tests/e2e/products/image-upload.api.test.ts` (401 no session, 403 non-admin, 200 admin with token/expire/signature/publicKey/urlEndpoint shape). **Verified:** `npm test` → 35 files / 396 tests green; typecheck + build pass on `feature/image-upload`.
 - **Replaced placeholder image URLs in the product tests with ImageKit URLs**: added `tests/helpers/image-url.ts` (`imageKitImageUrl()` derives a URL from `env.IMAGEKIT_URL_ENDPOINT`) and wired it into the `product-image`/`variant-image` factories, the e2e `imagePayload`/`variantImagePayload` helpers, and the integration service tests (hardcoded `cdn.test.example` links). Unit validator tests now use ImageKit literals (`https://ik.imagekit.io/ecommerceImages/…`); the only remaining `cdn.test.example` reference was replaced. Full suite stays green: **35 files / 396 tests**; typecheck + build pass.
+- **Updated `.github/workflows/ci.yml`** to write `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, and `IMAGEKIT_URL_ENDPOINT` into the generated `.env.test` from GitHub secrets (env validation would otherwise exit during `npm test` in CI). Committed `71feab8`; requires the three repo secrets to be configured.
 
 ### Deliverables
 - `docs/DATABASE.md` rewritten to match `prisma/schema.prisma` (FK `fk_{dt}_{st}` naming, check-constraint tables documented, reviews unique mapping fixed)
@@ -146,6 +147,7 @@
 - `tests/e2e/products/image-upload.api.test.ts` (3 tests); `@imagekit/nodejs` dependency
 - Docs: Image Upload (ImageKit) section in `docs/api/products/product-images.md`, upload references in `product-variant-images.md`, endpoint registered in `docs/API_DESIGN.md`
 - `tests/helpers/image-url.ts` (`imageKitImageUrl`); product-image/variant-image factories, product e2e payload helpers, and product image integration tests now use ImageKit URLs instead of `cdn.test.example`/`cdn.example.com` placeholders
+- `.github/workflows/ci.yml` — `IMAGEKIT_PUBLIC_KEY`/`IMAGEKIT_PRIVATE_KEY`/`IMAGEKIT_URL_ENDPOINT` added to the generated test `.env.test` from GitHub secrets
 
 ### Decisions
 - Product catalog API design is written against the **new** schema: product visibility is governed by `deleted_at` + having at least one `ACTIVE` variant (no `is_active`); the primary product image is flagged via `product_images.is_primary` (service-enforced, one per product) instead of lowest `display_order`; variant payloads include `barcode`; product variant images carry no timestamps.
