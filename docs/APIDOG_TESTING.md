@@ -4,7 +4,7 @@
 
 This document describes the complete workflow for testing this REST API with **Apidog** (an OpenAPI-first API testing tool, Postman-compatible scripting). It covers environment setup, session-cookie authentication, the request tree for every implemented endpoint, end-to-end test flows, assertions, and troubleshooting.
 
-Scope: only **implemented** modules are documented — authentication, users, addresses, products (catalog + admin), and categories (catalog + admin). Cart, orders, inventory, payments, and reviews are not implemented yet, so their endpoints are out of scope.
+Scope: only **implemented** modules are documented — authentication, users (profile + admin customer management), addresses, products (catalog + admin), and categories (catalog + admin). Cart, orders, inventory, payments, and reviews are not implemented yet, so their endpoints are out of scope.
 
 The API contract is defined in `docs/API_DESIGN.md` and the per-module design docs under `docs/api/**`; those documents remain the source of truth. This guide only explains how to exercise that contract from Apidog.
 
@@ -38,6 +38,7 @@ Apidog → **Environments** → create environment **Local** and add the followi
 | `address_public_id` | *(empty)* | Captured from create/list responses |
 | `session_public_id` | *(empty)* | Captured from the sessions list |
 | `verification_token` | *(empty)* | From the verification email / DB (dev only) |
+| `user_public_id` | *(empty)* | Captured from admin customer list/detail responses |
 
 All paths below use `{{base_url}}` as a prefix, e.g. `{{base_url}}/products`.
 
@@ -89,15 +90,17 @@ Alternatively Apidog's built-in **cookie jar** can store cookies automatically (
 
 ### 5.3 Admin access
 
-Admin endpoints require an authenticated session whose user has the `admin` role:
+Admin endpoints require an authenticated session whose user has the `admin` or `super_admin` role:
 
 1. Register a user through the API (or reuse an existing account).
 2. Promote it from the terminal:
    ```bash
    npm run admin:create
    ```
-   Enter the user's email; the script reports `Current role: admin`.
-3. Log in as that user in Apidog (cookie script from §5.1) — the session now has `admin` rights.
+   Enter the user's email; the **first promoted user** becomes `SUPER_ADMIN` (the script reports `Current role: SUPER_ADMIN`), and every later promotion becomes `ADMIN`.
+3. Log in as that user in Apidog (cookie script from §5.1) — the session now has admin rights.
+
+Only `SUPER_ADMIN` sessions can call the role endpoint (`PATCH /admin/users/{user_public_id}/role`); regular `ADMIN` sessions get **403** on it but can use the rest of the Admin folder.
 
 ---
 
@@ -170,6 +173,12 @@ All requests carry the `Cookie: {{session_cookie}}` header **and** require the `
 | DELETE | `{{base_url}}/admin/categories/{category_public_id}` | 204 | Soft-delete + removes `product_categories` links in one transaction |
 | PUT | `{{base_url}}/admin/categories/{category_public_id}/products/{product_public_id}` | 204 | Idempotent assign (no-op if already linked) |
 | DELETE | `{{base_url}}/admin/categories/{category_public_id}/products/{product_public_id}` | 204 | Idempotent unassign (no-op if not linked) |
+| GET | `{{base_url}}/admin/users` | 200 | Customers only (`role` `CUSTOMER`); query `page`, `limit`, `search`, `status`, `include_deleted`, `sort` (`name`/`email`/`created_at`, `-` prefix; default `-created_at`) |
+| GET | `{{base_url}}/admin/users/{user_public_id}` | 200 | Single customer; 404 for admins/unknown/deleted |
+| PATCH | `{{base_url}}/admin/users/{user_public_id}` | 200 | Body: `first_name`?, `last_name`?, `email`?, `phone_number`? (E.164); 409 on email/phone already used |
+| PATCH | `{{base_url}}/admin/users/{user_public_id}/suspend` | 200 | Suspends + revokes all sessions; 400 if already suspended |
+| PATCH | `{{base_url}}/admin/users/{user_public_id}/activate` | 200 | 400 if already active |
+| PATCH | `{{base_url}}/admin/users/{user_public_id}/role` | 200 | Body: `role` `ADMIN`/`CUSTOMER` (not `SUPER_ADMIN`). **Super admin only** — regular admins get 403. 400 self-role-change; 404 unknown user; 409 demoting the last admin-privileged user; no-op → 200 idempotent |
 
 ---
 
@@ -275,9 +284,9 @@ Configure the **collection runner**: select the collection → **Run** → drag 
 |---------|-------------|
 | 400 with `errors` | Validation failed. Check the message details: E.164 phone (`+1…`), password policy, slug regex `^[a-z0-9]+(?:-[a-z0-9]+)*$`, name/limit constraints |
 | 401 | No session cookie, expired/revoked session, or deactivated account → run Login again (or Register) to refresh `session_cookie` |
-| 403 | Authenticated but not `admin` → promote via `npm run admin:create` |
+| 403 | Authenticated but not `admin`/`super_admin` → promote via `npm run admin:create` (first promotion → `SUPER_ADMIN`). On the role endpoint, `403` also means the session is a regular `ADMIN` (super admin required) |
 | 404 | Unknown public ID, **or** an intentionally hidden resource (inactive/soft-deleted category or a product without an `ACTIVE` variant) — the API does not reveal existence |
-| 409 | Duplicate `name`/`slug` (categories), `slug`/SKU (products), or email/phone (auth/users) |
+| 409 | Duplicate `name`/`slug` (categories), `slug`/SKU (products), email/phone (auth/users, incl. admin user updates), or **demoting the last admin** (role change) |
 | 429 | Route rate limiter exceeded → wait 15 min or use a fresh account |
 | 500 | Server error — check `logs/log.json`; do not rely on the response body for internals |
 | Cookie not sent | Confirm the request actually carries `Cookie: {{session_cookie}}` (or the cookie jar is enabled); the value must be `session=<token>` |
@@ -290,6 +299,7 @@ Configure the **collection runner**: select the collection → **Run** → drag 
 - **CSRF:** `csrf-csrf` is installed but **not yet wired** into the request pipeline, so no CSRF token header is required today. If CSRF middleware is added, cookie-authenticated writes will need the documented fetch/validate token flow; revisit this guide then.
 - **Email/OTP tokens in dev:** verification links and the SMS OTP are delivered by real services (Resend) or the SMS stub (logs only). For local testing, read the pending token from the `verification_tokens` table or use the backend-served verify pages (`/verify-email?token=…`, `/verify-email-change?token=…`).
 - **Email verification is not required** for the flows in this guide: customer browsing and admin operations work with a fresh unverified account.
+- **Role changes are logged, not audited:** `PATCH /admin/users/{user_public_id}/role` records `actorId`, `targetUserId`, `previousRole`, `newRole` in the structured logger; a dedicated audit-log table is a documented future enhancement (see `docs/ENDPOINT_TESTING.md` for hand-run role-endpoint cases).
 - **ImageKit:** image URLs in product/variant image payloads must be absolute http/https URLs (validated). The API never receives file bytes — clients upload to ImageKit using the signed params from `GET /admin/products/uploads/imagekit-auth` and then store the returned URL.
 - **OpenAPI import (follow-up):** generating an OpenAPI 3.1 specification from `docs/api/**` would make Apidog setup one-click (Import → OpenAPI/Swagger). The design docs are written to be directly convertible, per `docs/API_DESIGN.md`.
 - The API contract (endpoints, fields, error semantics) is defined in `docs/API_DESIGN.md` and the per-module docs under `docs/api/**` — when in doubt, those are the source of truth.

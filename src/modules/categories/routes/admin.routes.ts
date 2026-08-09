@@ -23,7 +23,7 @@ import {
 const adminCategoriesRouter = Router();
 
 adminCategoriesRouter.use(authentication);
-adminCategoriesRouter.use(authorization(user_role.ADMIN));
+adminCategoriesRouter.use(authorization(user_role.ADMIN, user_role.SUPER_ADMIN));
 
 adminCategoriesRouter.get(
   "/",

@@ -54,3 +54,9 @@ export async function createAdminUser(app: Express) {
   const { cookie } = await loginUser(app, user.email, TEST_PASSWORD);
   return { user, cookie };
 }
+
+export async function createSuperAdminUser(app: Express) {
+  const user = await createUser({ role: user_role.SUPER_ADMIN });
+  const { cookie } = await loginUser(app, user.email, TEST_PASSWORD);
+  return { user, cookie };
+}

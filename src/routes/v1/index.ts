@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authRouter } from "../../modules/auth/index.js";
 import { addressesRouter } from "../../modules/addresses/index.js";
-import { usersRouter } from "../../modules/users/index.js";
+import { adminUsersRouter, usersRouter } from "../../modules/users/index.js";
 import {
   adminProductsRouter,
   productsRouter,
@@ -20,5 +20,6 @@ v1Router.use("/products", productsRouter);
 v1Router.use("/admin/products", adminProductsRouter);
 v1Router.use("/categories", categoriesRouter);
 v1Router.use("/admin/categories", adminCategoriesRouter);
+v1Router.use("/admin/users", adminUsersRouter);
 
 export { v1Router };
