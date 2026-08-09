@@ -113,20 +113,29 @@ chore(deps): update express
 
 Each Pull Request should:
 
+- Be opened **only for a completed feature** unless explicitly instructed otherwise.
 - Focus on a single feature or concern.
 - Include a clear description of the changes.
 - Reference related documentation if applicable.
 - Update OpenAPI documentation when endpoints change.
-- Update `PROJECT_PROGRESS.md` if implementation status changes.
+- Update `PROJECT_PROGRESS.md` when implementation status changes, but **do not open a Pull Request solely for `PROJECT_PROGRESS.md` changes**.
 - Ensure tests pass before merging.
+- Target the `main` branch.
+- Do not merge the Pull Request unless explicitly instructed by the user.
+- Delete the feature branch after the Pull Request has been merged.
 
 ## Testing Branches
 
 Testing work should use dedicated feature branches when tests are added independently from the feature implementation.
 
+The initial `feature/tests` branch is reserved for establishing the testing infrastructure, configuration, test utilities, and CI testing setup. Domain-specific tests should use dedicated `feature/tests-<domain>` branches.
+
+### Naming Convention
+
 Use the following naming convention:
 
 ```text
+feature/tests
 feature/tests-auth
 feature/tests-users
 feature/tests-addresses
@@ -134,36 +143,36 @@ feature/tests-addresses
 
 ### Rules
 
-* Create each testing branch from the latest `main`.
-* Use `feature/tests-<domain>` where `<domain>` identifies the resource or module being tested.
-* Keep tests for a specific domain isolated in its corresponding branch.
-* Open a Pull Request from the testing branch into `main`.
-* Run all required CI checks before merging.
-* Review the changes before merging.
-* After the PR is merged, delete the testing branch.
-* Do not continue adding unrelated tests to an already-merged testing branch.
-* If additional tests are needed later, create a new branch from the latest `main`.
+- Create each testing branch from the latest `main`.
+- Use `feature/tests-<domain>` where `<domain>` identifies the resource or module being tested.
+- Keep tests for a specific domain isolated in its corresponding branch.
+- **Do not open Pull Requests for testing branches.**
+- Testing branches are used for developing and validating tests independently.
+- Run all required CI checks for testing work.
+- Do not merge testing branches unless explicitly instructed by the user.
+- After testing work is complete and the changes are no longer needed, the branch may be deleted.
+- Do not continue adding unrelated tests to an already-completed testing branch.
+- If additional tests are needed later, create a new branch from the latest `main`.
 
 ### Examples
 
 ```text
+feature/tests
+    → testing infrastructure + configuration + CI
+    → no PR
+
 feature/tests-auth
-    → tests authentication
-    → PR
-    → main
+    → authentication tests
+    → no PR
 
 feature/tests-users
-    → tests users
-    → PR
-    → main
+    → user tests
+    → no PR
 
 feature/tests-addresses
-    → tests addresses
-    → PR
-    → main
+    → address tests
+    → no PR
 ```
-
-The initial `feature/tests` branch should be reserved for establishing the testing infrastructure, configuration, test utilities, and CI testing setup. Domain-specific tests should use dedicated `feature/tests-<domain>` branches.
 
 ## AI Agent Guidelines
 
