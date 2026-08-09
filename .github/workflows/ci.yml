@@ -63,6 +63,9 @@ jobs:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          IMAGEKIT_PUBLIC_KEY: ${{ secrets.IMAGEKIT_PUBLIC_KEY }}
+          IMAGEKIT_PRIVATE_KEY: ${{ secrets.IMAGEKIT_PRIVATE_KEY }}
+          IMAGEKIT_URL_ENDPOINT: ${{ secrets.IMAGEKIT_URL_ENDPOINT }}
         run: |
           cat > .env.test <<EOF
           NODE_ENV=test
@@ -70,6 +73,9 @@ jobs:
           CORS_ORIGIN=http://localhost:3000
           RESEND_API_KEY=$RESEND_API_KEY
           RESEND_FROM_EMAIL=$RESEND_FROM_EMAIL
+          IMAGEKIT_PUBLIC_KEY=$IMAGEKIT_PUBLIC_KEY
+          IMAGEKIT_PRIVATE_KEY=$IMAGEKIT_PRIVATE_KEY
+          IMAGEKIT_URL_ENDPOINT=$IMAGEKIT_URL_ENDPOINT
           EOF
 
       - name: Test
