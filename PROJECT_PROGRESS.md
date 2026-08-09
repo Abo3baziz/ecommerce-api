@@ -83,6 +83,11 @@
 - **Resolved the flagged `reviews` schema oddity**: the user updated `prisma/schema.prisma` so `public_id` is `@unique(map: "reviews_public_id_unique_key")` and `rating` is no longer unique; the stale inconsistency note was removed from `docs/DATABASE.md`.
 - **Finished aligning `docs/DATABASE.md` with the current schema**: every remaining `{dt}_{st}_fkey` constraint renamed to the `fk_{dt}_{st}` convention (password_reset_tokens, product_variants, product_images, product_variant_images, product_categories, inventory, carts, cart_items, orders, shipments, coupon_usages, reviews, review_images), the Naming Placeholders FK example updated, and the Check Constraints note now lists the 9 tables carrying database-level check constraints (cart_items, coupon_usages, coupons, inventory, order_items, orders, payments, product_variants, reviews) flagged by the Prisma `/// This table contains check constraints…` comments.
 - **Revised the four Product Catalog API design docs against the current schema and registered them under a new Products section in `docs/API_DESIGN.md`**: `products.md` dropped `is_active` (visibility = non-deleted + ≥1 `ACTIVE` variant), embedded images expose `is_primary`, `weight` precision fixed to 2 places, and embedded variant images carry no timestamps; `product-variants.md` added `barcode`, marked `status` nullable, and corrected limits (sku 80, color/size 50, weight DECIMAL(10,2)); `product-images.md` replaced the cover-by-`display_order` convention with the `is_primary` flag (service-enforced exactly-one invariant); `product-variant-images.md` removed `created_at`/`updated_at` from the object and all responses.
+- **Implemented the full Product Catalog module on `feature/products`** per `docs/api/products/*`: customer catalog (`GET /api/v1/products` paginated with search/brand/sort, `GET /api/v1/products/{product_public_id}` with `final_price = price * (1 - discount/100)` rounded to 2 dp) and admin CRUD for products, variants, product images, and variant images nested under `/api/v1/admin/products`. Mounted both routers in the v1 router; every admin endpoint sits behind `authentication` + `authorization(user_role.ADMIN)`. Public IDs use the `prd_`/`var_`/`pimg_`/`vimg_` prefixes; no internal IDs are exposed; `deleted_at` is never returned.
+- Products: auto-slug with `-2`/`-3`… suffixing on conflict, explicit duplicate slug → 409, soft-delete cascades to all non-deleted variants in one `$transaction`; variants: globally-unique SKU (409), nullable fields incl. `status` accept `null` to clear, soft-delete; product images: hard delete, first image auto-primary, `display_order` auto max+1, 409 on duplicate order, setting `is_primary: true` demotes the previous primary, clearing the sole image's primary flag → 400, deleting the primary promotes the lowest `display_order` image; variant images: hard delete, no timestamps, same `display_order` rules. Customer visibility = product non-deleted + ≥1 non-deleted `ACTIVE` variant.
+- Added `PRODUCT_IMAGE` (`pimg`) and `VARIANT_IMAGE` (`vimg`) prefixes to `PUBLIC_ID_PREFIXES`; fixed `imageUrlField` to return `false` instead of throwing `TypeError` on malformed URLs.
+- **Product Catalog tests (all passing):** unit tests (`tests/unit/products/` — validators + slug/sort/decimal utils, 74 tests), integration tests (`tests/integration/products/` — service flows for products/variants/product images/variant images against the real schema, 69 tests), and e2e API tests (`tests/e2e/products/` — products, variants, product images, variant images over supertest incl. 401/403 auth, 69 tests). Test infra extended: `cleanupTestData` now clears all four product tables unconditionally, `createAdminUser` helper, `role` override on the user factory, and new product/variant/product-image/variant-image factories.
+- **Verified:** full suite `npm test` → 34 files / 393 tests green; `npm run typecheck` + `npm run build` pass on `feature/products`.
 
 ### Deliverables
 - `docs/DATABASE.md` rewritten to match `prisma/schema.prisma` (FK `fk_{dt}_{st}` naming, check-constraint tables documented, reviews unique mapping fixed)
@@ -125,6 +130,10 @@
 - E2E tests: `tests/e2e/{auth,users,addresses}/` (3 files, 52 tests)
 - `package.json` test scripts (`test`, `test:watch`, `test:integration`, `test:e2e`, `test:coverage`)
 - `.github/workflows/ci.yml` — Postgres service + `prisma db push` provisioning + `npm test` step
+- `src/modules/products/{validators,dto,utils/slug.ts,utils/sort.ts,utils/format.ts,repository,service,controller,routes,index.ts}` + v1 router wiring at `/products` and `/admin/products`
+- `PUBLIC_ID_PREFIXES.PRODUCT_IMAGE` (`pimg`) and `VARIANT_IMAGE` (`vimg`) added
+- `tests/factories/{product,variant,product-image,variant-image}.factory.ts`; `createAdminUser` in `tests/helpers/auth.ts`; `role` override in `tests/factories/user.factory.ts`; `cleanupTestData` product-table cleanup
+- Unit tests: `tests/unit/products/` (5 files, 74 tests); integration: `tests/integration/products/` (4 files, 69 tests); e2e: `tests/e2e/products/` (4 files, 69 tests)
 
 ### Decisions
 - Product catalog API design is written against the **new** schema: product visibility is governed by `deleted_at` + having at least one `ACTIVE` variant (no `is_active`); the primary product image is flagged via `product_images.is_primary` (service-enforced, one per product) instead of lowest `display_order`; variant payloads include `barcode`; product variant images carry no timestamps.
@@ -171,7 +180,7 @@
 - CI provisions its own throwaway Postgres (`ecommerce_test` DB, `public` schema) via `prisma db push --url` and the job-level `DATABASE_URL` overrides `.env.test` (dotenv `override: false`), keeping the committed test env valid for local runs.
 
 ### Pending
-- Commit the Product Catalog API design + `docs/DATABASE.md` alignment on `docs/products-api` (includes the user's `prisma/schema.prisma` fixes).
+- Commit the Product Catalog implementation (module + routes + tests + helpers/factories + constants) on `feature/products` and merge into `main` (per user decision; branch kept for reference).
 - Design the Categories API (`categories`, `product_categories` join) — noted as out of scope for the current product docs.
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
 - Expired-session cleanup job (reject + delete expired sessions) not yet implemented.
@@ -180,8 +189,7 @@
 - Unit tests for the repository layer (repositories are exercised through integration tests today).
 
 ### Next Step
-- Commit the aligned `docs/DATABASE.md` + the four Product Catalog API docs + the `docs/API_DESIGN.md` Products registration on `docs/products-api` (keep the branch after commit).
-- Implement the Product Catalog module (products, variants, product images, variant images) on a `feature/products` branch per `docs/api/` once the design is committed.
+- Commit the Product Catalog module on `feature/products` (module + routes + tests + helpers/factories + constants), then merge into `main` and keep the branch for reference.
 - Commit the testing work (tests/ infra + suites, `vitest.config.ts`, `.env.test.example`, app gating, `AppError` fix, `ci.yml` test step, `PROJECT_PROGRESS.md`) on a feature branch (e.g. `feature/tests`), then merge into `main` and keep the branch.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
