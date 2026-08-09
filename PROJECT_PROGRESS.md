@@ -88,6 +88,12 @@
 - Added `PRODUCT_IMAGE` (`pimg`) and `VARIANT_IMAGE` (`vimg`) prefixes to `PUBLIC_ID_PREFIXES`; fixed `imageUrlField` to return `false` instead of throwing `TypeError` on malformed URLs.
 - **Product Catalog tests (all passing):** unit tests (`tests/unit/products/` — validators + slug/sort/decimal utils, 74 tests), integration tests (`tests/integration/products/` — service flows for products/variants/product images/variant images against the real schema, 69 tests), and e2e API tests (`tests/e2e/products/` — products, variants, product images, variant images over supertest incl. 401/403 auth, 69 tests). Test infra extended: `cleanupTestData` now clears all four product tables unconditionally, `createAdminUser` helper, `role` override on the user factory, and new product/variant/product-image/variant-image factories.
 - **Verified:** full suite `npm test` → 34 files / 393 tests green; `npm run typecheck` + `npm run build` pass on `feature/products`.
+- **Implemented ImageKit image-upload integration on `feature/image-upload`** (client-side signed upload per user choices: no schema change, shared `imagekit` module, covers product + variant images). Installed `@imagekit/nodejs@7.10.0`; added `IMAGEKIT_PUBLIC_KEY`/`IMAGEKIT_PRIVATE_KEY`/`IMAGEKIT_URL_ENDPOINT` to the env schema, `.env` (real keys), `.env.test`, and `.env.test.example`.
+- Created `src/shared/imagekit/` (`client.ts` → `new ImageKit({ privateKey })`, `auth.ts` → `getUploadAuthenticationParameters()` wrapping `client.helper.getAuthenticationParameters()` → `{ token, expire, signature }`, `index.ts`). The SDK v7 constructor takes only `privateKey`; `publicKey`/`urlEndpoint` are served to clients from env.
+- New admin endpoint `GET /api/v1/admin/products/uploads/imagekit-auth` (behind `authentication` + `authorization(ADMIN)` in `admin.routes.ts`): thin `getImageKitAuthParamsController` returns `{ token, expire, signature, publicKey, urlEndpoint }`. Verified live with the real keys — signature is pure HMAC, no network call.
+- Docs updated: `docs/api/products/product-images.md` gained a full **Image Upload (ImageKit)** section (3-step client-side signed flow + endpoint contract); the two "binary upload out of scope" notes in `product-images.md`/`product-variant-images.md` now point to ImageKit; `docs/API_DESIGN.md` registers the endpoint.
+- New e2e suite `tests/e2e/products/image-upload.api.test.ts` (401 no session, 403 non-admin, 200 admin with token/expire/signature/publicKey/urlEndpoint shape). **Verified:** `npm test` → 35 files / 396 tests green; typecheck + build pass on `feature/image-upload`.
+- **Replaced placeholder image URLs in the product tests with ImageKit URLs**: added `tests/helpers/image-url.ts` (`imageKitImageUrl()` derives a URL from `env.IMAGEKIT_URL_ENDPOINT`) and wired it into the `product-image`/`variant-image` factories, the e2e `imagePayload`/`variantImagePayload` helpers, and the integration service tests (hardcoded `cdn.test.example` links). Unit validator tests now use ImageKit literals (`https://ik.imagekit.io/ecommerceImages/…`); the only remaining `cdn.test.example` reference was replaced. Full suite stays green: **35 files / 396 tests**; typecheck + build pass.
 
 ### Deliverables
 - `docs/DATABASE.md` rewritten to match `prisma/schema.prisma` (FK `fk_{dt}_{st}` naming, check-constraint tables documented, reviews unique mapping fixed)
@@ -134,6 +140,12 @@
 - `PUBLIC_ID_PREFIXES.PRODUCT_IMAGE` (`pimg`) and `VARIANT_IMAGE` (`vimg`) added
 - `tests/factories/{product,variant,product-image,variant-image}.factory.ts`; `createAdminUser` in `tests/helpers/auth.ts`; `role` override in `tests/factories/user.factory.ts`; `cleanupTestData` product-table cleanup
 - Unit tests: `tests/unit/products/` (5 files, 74 tests); integration: `tests/integration/products/` (4 files, 69 tests); e2e: `tests/e2e/products/` (4 files, 69 tests)
+- `src/shared/imagekit/{client,auth,index}.ts` (ImageKit client + `getUploadAuthenticationParameters`)
+- `src/modules/products/controller/upload.controller.ts` + `GET /uploads/imagekit-auth` route in `admin.routes.ts`
+- `IMAGEKIT_*` env vars in `src/config/env.ts`, `.env`, `.env.test`, `.env.test.example`
+- `tests/e2e/products/image-upload.api.test.ts` (3 tests); `@imagekit/nodejs` dependency
+- Docs: Image Upload (ImageKit) section in `docs/api/products/product-images.md`, upload references in `product-variant-images.md`, endpoint registered in `docs/API_DESIGN.md`
+- `tests/helpers/image-url.ts` (`imageKitImageUrl`); product-image/variant-image factories, product e2e payload helpers, and product image integration tests now use ImageKit URLs instead of `cdn.test.example`/`cdn.example.com` placeholders
 
 ### Decisions
 - Product catalog API design is written against the **new** schema: product visibility is governed by `deleted_at` + having at least one `ACTIVE` variant (no `is_active`); the primary product image is flagged via `product_images.is_primary` (service-enforced, one per product) instead of lowest `display_order`; variant payloads include `barcode`; product variant images carry no timestamps.
@@ -178,6 +190,11 @@
 - Vitest runs with `fileParallelism: false` since integration/e2e suites share the one Postgres schema; this sacrifices some parallelism for DB safety.
 - Test data uses digits-only phone numbers (`randomPhoneNumber`, `+1…` E.164) because `nanoid` includes letters and would fail the phone validators at the API layer.
 - CI provisions its own throwaway Postgres (`ecommerce_test` DB, `public` schema) via `prisma db push --url` and the job-level `DATABASE_URL` overrides `.env.test` (dotenv `override: false`), keeping the committed test env valid for local runs.
+- ImageKit integration uses the **client-side signed upload** pattern (per user choice): the API never receives image file bytes; it only issues short-lived upload auth params and stores the resulting URL. This keeps the API JSON-only — no `multer`/multipart needed.
+- **No schema change** (per user choice): `image_url` stays the source of truth and the ImageKit file ID is not tracked, so image delete removes only the DB row and the file remains in the media library (matches existing docs).
+- The ImageKit endpoint is mounted under the existing admin products router (`/api/v1/admin/products/uploads/imagekit-auth`) rather than a new module, since it is only used for product/variant images today; `src/shared/imagekit` stays generic for future consumers (review images, avatars, etc.).
+- `@imagekit/nodejs@7.10.0` (the new SDK) initializes with only `privateKey`; `getAuthenticationParameters()` lives on `client.helper` and is a pure HMAC computation (default 30-min expiry). `publicKey` and `urlEndpoint` are returned to clients from env, not the client object.
+- `imageUrlField` validation is unchanged (any absolute http/https URL) to preserve existing behavior and tests; restricting `image_url` to the ImageKit host remains a possible future hardening step.
 
 ### Pending
 - Commit the Product Catalog implementation (module + routes + tests + helpers/factories + constants) on `feature/products` and merge into `main` (per user decision; branch kept for reference).
@@ -187,8 +204,11 @@
 - Test files are not type-checked by `npm run typecheck` (tsconfig `include` covers `src/**/*` only); a `tests/` tsconfig or a typecheck command that includes tests is a possible follow-up.
 - Real SMS provider integration (the current `sendSms` stub only logs the OTP).
 - Unit tests for the repository layer (repositories are exercised through integration tests today).
+- Live client-side upload verification to ImageKit (upload a file with the issued auth params and confirm it lands in the media library + a product image row is created) is a manual step pending a client; the server-side auth-params endpoint was verified live with the real keys.
+- Commit the ImageKit integration (module, controller, route, docs, e2e test, env) on `feature/image-upload` and merge into `main` (branch kept for reference).
 
 ### Next Step
+- Commit the ImageKit image-upload integration on `feature/image-upload` (module + controller + route + docs + e2e test + env changes) and merge into `main`, keeping the branch for reference.
 - Commit the Product Catalog module on `feature/products` (module + routes + tests + helpers/factories + constants), then merge into `main` and keep the branch for reference.
 - Commit the testing work (tests/ infra + suites, `vitest.config.ts`, `.env.test.example`, app gating, `AppError` fix, `ci.yml` test step, `PROJECT_PROGRESS.md`) on a feature branch (e.g. `feature/tests`), then merge into `main` and keep the branch.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.

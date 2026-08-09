@@ -11,6 +11,9 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().url(),
   RESEND_API_KEY: z.string().min(1),
   RESEND_FROM_EMAIL: z.string().default("onboarding@resend.dev"),
+  IMAGEKIT_PUBLIC_KEY: z.string().min(1),
+  IMAGEKIT_PRIVATE_KEY: z.string().min(1),
+  IMAGEKIT_URL_ENDPOINT: z.string().url(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
 });
 

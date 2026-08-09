@@ -8,8 +8,10 @@ import {
 
 const validParams = { product_public_id: "prd_abc" };
 
+const IMAGEKIT_URL = "https://ik.imagekit.io/ecommerceImages";
+
 const validBody = {
-  image_url: "https://cdn.test.example/hero.jpg",
+  image_url: `${IMAGEKIT_URL}/hero.jpg`,
   alt_text: "Wireless headphones in black",
   display_order: 1,
   is_primary: true,
@@ -27,7 +29,7 @@ describe("createProductImageSchema", () => {
   it("accepts a minimal payload with only image_url", () => {
     const result = createProductImageSchema.safeParse({
       params: validParams,
-      body: { image_url: "https://cdn.test.example/hero.jpg" },
+      body: { image_url: `${IMAGEKIT_URL}/hero.jpg` },
     });
     expect(result.success).toBe(true);
   });
@@ -44,7 +46,7 @@ describe("createProductImageSchema", () => {
   it("rejects a non-http(s) URL", () => {
     const result = createProductImageSchema.safeParse({
       params: validParams,
-      body: { image_url: "ftp://cdn.test.example/hero.jpg" },
+      body: { image_url: "ftp://ik.imagekit.io/hero.jpg" },
     });
     expect(result.success).toBe(false);
   });

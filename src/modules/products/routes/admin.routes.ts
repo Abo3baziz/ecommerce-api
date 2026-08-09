@@ -35,6 +35,7 @@ import {
   listAdminProductsController,
   updateProductController,
 } from "../controller/product.controller.js";
+import { getImageKitAuthParamsController } from "../controller/upload.controller.js";
 import {
   createVariantController,
   deleteVariantController,
@@ -61,6 +62,8 @@ const adminProductsRouter = Router();
 
 adminProductsRouter.use(authentication);
 adminProductsRouter.use(authorization(user_role.ADMIN));
+
+adminProductsRouter.get("/uploads/imagekit-auth", getImageKitAuthParamsController);
 
 adminProductsRouter.get("/", validate(listAdminProductsSchema), listAdminProductsController);
 adminProductsRouter.post("/", validate(createProductSchema), createProductController);

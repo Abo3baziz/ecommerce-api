@@ -4,12 +4,13 @@ import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
 import { createAdminUser, registerUser } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
+import { imageKitImageUrl } from "../../helpers/image-url.js";
 import { createProduct } from "../../factories/product.factory.js";
 import { createProductImage } from "../../factories/product-image.factory.js";
 
 function imagePayload(overrides: Record<string, unknown> = {}) {
   return {
-    image_url: `https://cdn.example.com/${nanoid(6)}.jpg`,
+    image_url: imageKitImageUrl(),
     alt_text: "Hero image",
     ...overrides,
   };

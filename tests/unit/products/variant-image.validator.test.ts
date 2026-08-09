@@ -11,8 +11,10 @@ const validParams = {
   variant_public_id: "var_abc",
 };
 
+const IMAGEKIT_URL = "https://ik.imagekit.io/ecommerceImages";
+
 const validBody = {
-  image_url: "https://cdn.test.example/black-side.jpg",
+  image_url: `${IMAGEKIT_URL}/black-side.jpg`,
   alt_text: "Wireless headphones in black, side view",
   display_order: 1,
 };
@@ -29,7 +31,7 @@ describe("createVariantImageSchema", () => {
   it("accepts a minimal payload with only image_url", () => {
     const result = createVariantImageSchema.safeParse({
       params: validParams,
-      body: { image_url: "https://cdn.test.example/black-side.jpg" },
+      body: { image_url: `${IMAGEKIT_URL}/black-side.jpg` },
     });
     expect(result.success).toBe(true);
   });

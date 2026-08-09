@@ -12,6 +12,7 @@ import { prisma } from "../../../src/config/database.js";
 import { createProduct } from "../../factories/product.factory.js";
 import { createVariant } from "../../factories/variant.factory.js";
 import { createVariantImage } from "../../factories/variant-image.factory.js";
+import { imageKitImageUrl } from "../../helpers/image-url.js";
 import { cleanupTestData } from "../../helpers/db.js";
 
 describe("variantImage.service", () => {
@@ -53,7 +54,7 @@ describe("variantImage.service", () => {
       const variant = await createVariant(product.id);
 
       const result = await createVariantImageService(product.public_id, variant.public_id, {
-        image_url: "https://cdn.test.example/front.jpg",
+        image_url: imageKitImageUrl("front.jpg"),
       });
 
       expect(result.public_id).toMatch(/^vimg_/);
@@ -67,7 +68,7 @@ describe("variantImage.service", () => {
 
       await expect(
         createVariantImageService(product.public_id, variant.public_id, {
-          image_url: "https://cdn.test.example/dup.jpg",
+          image_url: imageKitImageUrl("dup.jpg"),
           display_order: 0,
         }),
       ).rejects.toThrow(ConflictError);

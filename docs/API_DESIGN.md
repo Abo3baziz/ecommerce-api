@@ -61,3 +61,4 @@ Example:
 - docs/api/products/product-variants.md
 - docs/api/products/product-images.md
 - docs/api/products/product-variant-images.md
+- Image upload auth (ImageKit): `GET /api/v1/admin/products/uploads/imagekit-auth` — see the **Image Upload (ImageKit)** section of `docs/api/products/product-images.md`

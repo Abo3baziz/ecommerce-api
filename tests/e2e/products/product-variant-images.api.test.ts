@@ -4,13 +4,14 @@ import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
 import { createAdminUser, registerUser } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
+import { imageKitImageUrl } from "../../helpers/image-url.js";
 import { createProduct } from "../../factories/product.factory.js";
 import { createVariant } from "../../factories/variant.factory.js";
 import { createVariantImage } from "../../factories/variant-image.factory.js";
 
 function variantImagePayload(overrides: Record<string, unknown> = {}) {
   return {
-    image_url: `https://cdn.example.com/${nanoid(6)}.jpg`,
+    image_url: imageKitImageUrl(),
     alt_text: "Variant side view",
     ...overrides,
   };
