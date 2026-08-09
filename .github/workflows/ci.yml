@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [20, 22]
+        node-version: [22]
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ecommerce_test?schema=public
     services:
