@@ -118,6 +118,7 @@
 - `cleanupTestData` now deletes `product_categories` before `products` (FK ordering) and clears `categories`; new factories `category.factory.ts` and `category-product.factory.ts`.
 - **Tests (all passing):** unit (`tests/unit/categories/` — slug/sort utils + validators), integration (`tests/integration/categories/category.service.integration.test.ts`, 45 tests covering visibility/count semantics, slug suffixing, name/slug 409s, transactional delete, idempotent assign/unassign), e2e (`tests/e2e/categories/categories.api.test.ts`, 29 tests incl. 401/403 auth and payload hygiene — no `id`/`deleted_at`, no `is_active` on customer payloads). **Verified:** full suite `npm test` → 40 files / 508 tests green (was 36/404); `npm run typecheck` + `npm run build` pass on `feature/categories`.
 - **Merged PR #7 (`feature/categories` → `main`)** via GitHub merge commit `3aeb85b`; deleted the feature branch locally and remotely per `AGENTS.md`. Local `main` fast-forwarded to `3aeb85b`.
+- **Created `docs/APIDOG_TESTING.md`** — the Apidog (Postman-compatible) testing guide for the implemented API surface: environment setup (`base_url`, `session_cookie`, captured public-ID variables), manual request-tree import today with OpenAPI 3.1 generation listed as a follow-up, session-cookie auth via a login post-response script (plus the cookie-jar alternative), admin promotion via `npm run admin:create`, the full request tree (Auth / Customer Catalog / Account / Admin folders), response-envelope + assertion scripts, three end-to-end flows (customer journey, admin content management incl. category assign/`is_active` toggling, account security), rate-limit notes, a troubleshooting table, and notes (CSRF not yet wired; email verification not required for these flows; ImageKit client-side upload).
 
 ### Deliverables
 - `docs/DATABASE.md` rewritten to match `prisma/schema.prisma` (FK `fk_{dt}_{st}` naming, check-constraint tables documented, reviews unique mapping fixed)
@@ -174,6 +175,7 @@
 - `src/modules/categories/{validators/category.ts,validators/common.ts,dto/category.ts,dto/common.ts,repository/category.repository.ts,service/category.service.ts,controller/category.controller.ts,routes/category.routes.ts,routes/admin.routes.ts,utils/slug.ts,utils/sort.ts,index.ts}` + v1 router wiring at `/categories` and `/admin/categories`
 - `tests/factories/{category,category-product}.factory.ts`; `cleanupTestData` `product_categories`/`categories` cleanup
 - Unit tests: `tests/unit/categories/` (2 files); integration: `tests/integration/categories/category.service.integration.test.ts` (45 tests); e2e: `tests/e2e/categories/categories.api.test.ts` (29 tests)
+- `docs/APIDOG_TESTING.md` (Apidog testing workflow guide)
 
 ### Decisions
 - Product catalog API design is written against the **new** schema: product visibility is governed by `deleted_at` + having at least one `ACTIVE` variant (no `is_active`); the primary product image is flagged via `product_images.is_primary` (service-enforced, one per product) instead of lowest `display_order`; variant payloads include `barcode`; product variant images carry no timestamps.
@@ -237,7 +239,7 @@
 - Live client-side upload verification to ImageKit (upload a file with the issued auth params and confirm it lands in the media library + a product image row is created) is a manual step pending a client; the server-side auth-params endpoint was verified live with the real keys.
 
 ### Next Step
-- Commit the Apidog testing guide `docs/APIDOG_TESTING.md` (created earlier, still uncommitted) — non-feature docs work on a `docs/…` branch (no PR) once the user instructs; `feature/categories` is fully merged into `main` via PR #7.
+- Generate an OpenAPI 3.1 specification from `docs/api/**` so the Apidog guide's Import step becomes one-click (listed as a follow-up in `docs/APIDOG_TESTING.md`); `feature/categories` is fully merged into `main` via PR #7 and the Apidog guide is committed.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
 - Runtime E2E verification of the users + addresses endpoints (register → login → profile/address CRUD → email/phone/password change) is pending a running local DB with the schema migrated.
