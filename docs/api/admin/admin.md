@@ -255,10 +255,14 @@ DELETE /api/v1/admin/categories/{category_public_id}
 
 # Inventory Management
 
-```
-GET   /api/v1/admin/inventory
+Inventory is a 1:1 child of a product variant. The `inventory` table has no public ID of its own, so inventory records are keyed by the owning variant's public ID (`variant_public_id`). Full contract: `docs/api/inventory/inventory.md`.
 
-PATCH /api/v1/admin/inventory/{inventory_public_id}
+```
+GET    /api/v1/admin/inventory
+POST   /api/v1/admin/inventory
+
+GET    /api/v1/admin/inventory/{variant_public_id}
+PATCH  /api/v1/admin/inventory/{variant_public_id}
 ```
 
 ---
