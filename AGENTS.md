@@ -264,6 +264,12 @@ Defines Testing flows, requirements and guidelines
 
 - `docs/TESTING.md`
 
+### Operations
+
+Defines operator-facing tooling and maintenance procedures
+
+- `docs/OPERATIONS.md`
+
 ---
 
 ## Documentation Priority
