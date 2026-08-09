@@ -3,6 +3,7 @@
 ## Project Progress
 
 ### Completed
+- **Verified the Product Catalog is already on `main`**: `feature/products` (PR #3 `feat(products)`) and `feature/tests-products` (PR #2 `test(products)`) were merged earlier via `2ac71ff`/`4e2a686`; the stale "Pending — commit Product Catalog" and "Next Step — commit Product Catalog" items were removed.
 - **Reimplemented the logger per `docs/LOGGER.md` on `feature/logger`**: replaced the custom JSON-lines logger with a **Pino**-based logger (`pino@10` + `pino-pretty`). Single shared instance writes to the terminal (pretty in dev, structured JSON in production) and to a categorized `logs/log.json`.
 - `logs/log.json` holds one top-level section per category (`success`, `info`, `warning`, `error`, `debug`); each entry gets the next sequential numeric key per category and existing records are never overwritten. Missing file is initialized with the empty category skeleton.
 - Levels map to categories: `success` (custom level 35), `warn`→`warning`, `error`/`fatal`→`error`, `trace`/`debug`→`debug`. `success` sits between info and warn so request logs aren't filtered at the default `info` level.
@@ -202,7 +203,6 @@
 - `docs(progress)` updates to `PROJECT_PROGRESS.md` are committed **directly** (per user preference) — no feature/docs branch or PR is created for progress bookkeeping. Feature code still follows the full branch → PR → merge → delete workflow.
 
 ### Pending
-- Commit the Product Catalog implementation (module + routes + tests + helpers/factories + constants) on `feature/products` and merge into `main` (per user decision), then delete the branch per `AGENTS.md`.
 - Design the Categories API (`categories`, `product_categories` join) — noted as out of scope for the current product docs.
 - Idle-timeout enforcement via `last_activity_at` (e.g. auto-revoke after 30 days idle) not yet wired.
 - Expired-session cleanup job (reject + delete expired sessions) not yet implemented.
@@ -212,7 +212,6 @@
 - Live client-side upload verification to ImageKit (upload a file with the issued auth params and confirm it lands in the media library + a product image row is created) is a manual step pending a client; the server-side auth-params endpoint was verified live with the real keys.
 
 ### Next Step
-- Commit the Product Catalog module on `feature/products` (module + routes + tests + helpers/factories + constants), then merge into `main` and delete the branch per `AGENTS.md`.
 - Commit the testing work (tests/ infra + suites, `vitest.config.ts`, `.env.test.example`, app gating, `AppError` fix, `ci.yml` test step, `PROJECT_PROGRESS.md`) on a feature branch (e.g. `feature/tests`), then merge into `main` and delete the branch per `AGENTS.md`.
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
