@@ -43,7 +43,7 @@ The primary goals are:
 
 # Git Workflow
 
-This project follows **GitHub Flow** with short-lived feature branches.
+This project follows **GitHub Flow** with short-lived branches.
 
 The `main` branch must always remain stable and deployable.
 
@@ -51,11 +51,11 @@ The `main` branch must always remain stable and deployable.
 
 Never commit directly to `main`.
 
-Create a new branch for every feature, bug fix, refactor, documentation update, or chore.
+Create a new branch for **every piece of work**, including features, bug fixes, refactors, documentation updates, testing work, and chores.
 
 Branch naming conventions:
 
-```
+```text
 feature/<feature-name>
 bugfix/<issue-name>
 refactor/<module-name>
@@ -67,10 +67,9 @@ hotfix/<issue-name>
 
 Examples:
 
-```
+```text
 feature/user-registration
 feature/product-catalog
-feature/session-authentication
 bugfix/cart-total-calculation
 refactor/user-service
 docs/api-authentication
@@ -78,20 +77,22 @@ test/order-service
 chore/update-dependencies
 ```
 
-## Working on a Feature
+## Working on a Task
 
 For every new task:
 
 1. Ensure `main` is up to date.
-2. Create a new branch from `main`.
-3. Implement the requested changes.
+2. Create a new branch from the latest `main`.
+3. Implement only the requested changes.
 4. Keep commits small and focused.
 5. Update documentation if necessary.
-6. Update `PROJECT_PROGRESS.md`.
+6. Update `PROJECT_PROGRESS.md` when implementation status changes.
 7. Run relevant tests.
-8. Open a Pull Request.
-9. Merge into `main` only after review or verification.
-10. Delete the feature branch after merging.
+8. If the branch contains a **feature**, open a Pull Request when the feature is complete.
+9. Do **not** open a Pull Request for non-feature work unless explicitly instructed by the user.
+10. Do not merge any branch unless explicitly instructed by the user.
+11. After a feature PR is merged, delete the feature branch.
+12. After non-feature work is complete, do not create a PR; the branch may be deleted when no longer needed.
 
 ## Commit Messages
 
@@ -99,7 +100,7 @@ Follow Conventional Commits.
 
 Examples:
 
-```
+```text
 feat(auth): implement session login
 feat(products): add product filtering
 fix(cart): prevent negative quantity
@@ -111,85 +112,82 @@ chore(deps): update express
 
 ## Pull Requests
 
-Each Pull Request should:
+Pull Requests are **only for completed features**.
 
-- Be opened **only for a completed feature** unless explicitly instructed otherwise.
-- Focus on a single feature or concern.
-- Include a clear description of the changes.
+Each feature Pull Request should:
+
+- Focus on a single feature.
+- Include a clear description of the feature and changes.
 - Reference related documentation if applicable.
 - Update OpenAPI documentation when endpoints change.
-- Update `PROJECT_PROGRESS.md` when implementation status changes, but **do not open a Pull Request solely for `PROJECT_PROGRESS.md` changes**.
-- Ensure tests pass before merging.
+- Update `PROJECT_PROGRESS.md` when implementation status changes, but **never open a Pull Request solely for `PROJECT_PROGRESS.md` changes**.
+- Ensure relevant tests pass before opening the PR.
 - Target the `main` branch.
 - Do not merge the Pull Request unless explicitly instructed by the user.
 - Delete the feature branch after the Pull Request has been merged.
 
+### Non-Feature Work
+
+Do **not** open Pull Requests for:
+
+- Bug fixes
+- Refactors
+- Documentation changes
+- Testing work
+- CI changes
+- Chores
+- Dependency updates
+- `PROJECT_PROGRESS.md` updates
+
+Unless the user explicitly instructs otherwise.
+
 ## Testing Branches
 
-Testing work should use dedicated feature branches when tests are added independently from the feature implementation.
+Testing work should use dedicated branches.
 
-The initial `feature/tests` branch is reserved for establishing the testing infrastructure, configuration, test utilities, and CI testing setup. Domain-specific tests should use dedicated `feature/tests-<domain>` branches.
+The initial `feature/tests` branch is reserved for establishing testing infrastructure, configuration, test utilities, and CI testing setup.
 
-### Naming Convention
-
-Use the following naming convention:
+Domain-specific testing work should use:
 
 ```text
-feature/tests
-feature/tests-auth
-feature/tests-users
-feature/tests-addresses
+test/<module>
 ```
 
-### Rules
+Examples:
+
+```text
+test/auth
+test/users
+test/addresses
+```
+
+Rules:
 
 - Create each testing branch from the latest `main`.
-- Use `feature/tests-<domain>` where `<domain>` identifies the resource or module being tested.
-- Keep tests for a specific domain isolated in its corresponding branch.
+- Keep testing work isolated in its corresponding branch.
 - **Do not open Pull Requests for testing branches.**
-- Testing branches are used for developing and validating tests independently.
-- Run all required CI checks for testing work.
 - Do not merge testing branches unless explicitly instructed by the user.
-- After testing work is complete and the changes are no longer needed, the branch may be deleted.
-- Do not continue adding unrelated tests to an already-completed testing branch.
-- If additional tests are needed later, create a new branch from the latest `main`.
-
-### Examples
-
-```text
-feature/tests
-    → testing infrastructure + configuration + CI
-    → no PR
-
-feature/tests-auth
-    → authentication tests
-    → no PR
-
-feature/tests-users
-    → user tests
-    → no PR
-
-feature/tests-addresses
-    → address tests
-    → no PR
-```
+- Run all relevant tests and CI checks.
+- If additional testing work is needed later, create a new branch from the latest `main`.
 
 ## AI Agent Guidelines
 
-When implementing a new feature:
+When implementing any task:
 
-1. Assume work is being done on a feature branch unless instructed otherwise.
-2. Never modify unrelated code.
-3. Keep commits logically grouped.
-4. Avoid mixing refactoring with feature implementation.
-5. Preserve a clean Git history.
-6. Recommend creating separate Pull Requests for unrelated changes.
+1. Create a new branch from the latest `main`.
+2. Use the appropriate branch prefix for the type of work.
+3. Never modify unrelated code.
+4. Keep commits logically grouped.
+5. Avoid mixing unrelated changes.
+6. Do not open a Pull Request unless the work is a completed feature.
 7. Never rewrite Git history unless explicitly requested.
 8. Do not squash unrelated work into a single commit.
+9. Do not merge branches unless explicitly instructed by the user.
+10. Delete feature branches after their PR has been merged.
 
 ## Definition of Done
 
-A feature is considered complete only when:
+A **feature** is considered complete only when:
 
 - Implementation is complete.
 - Code follows the project architecture.
@@ -197,10 +195,12 @@ A feature is considered complete only when:
 - Error handling is complete.
 - Security considerations are addressed.
 - Documentation is updated.
-- OpenAPI specification is updated (if applicable).
+- OpenAPI specification is updated if applicable.
 - Tests are added or updated.
 - `PROJECT_PROGRESS.md` is updated.
-- The feature is ready to merge into `main`.
+- The feature is ready for a Pull Request.
+
+For **non-feature work**, completion means the requested changes are implemented, relevant tests/checks pass, and required documentation is updated. No Pull Request is required.
 
 ---
 # Project Documentation
