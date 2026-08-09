@@ -198,6 +198,7 @@
 - The ImageKit endpoint is mounted under the existing admin products router (`/api/v1/admin/products/uploads/imagekit-auth`) rather than a new module, since it is only used for product/variant images today; `src/shared/imagekit` stays generic for future consumers (review images, avatars, etc.).
 - `@imagekit/nodejs@7.10.0` (the new SDK) initializes with only `privateKey`; `getAuthenticationParameters()` lives on `client.helper` and is a pure HMAC computation (default 30-min expiry). `publicKey` and `urlEndpoint` are returned to clients from env, not the client object.
 - `imageUrlField` validation is unchanged (any absolute http/https URL) to preserve existing behavior and tests; restricting `image_url` to the ImageKit host remains a possible future hardening step.
+- `docs(progress)` updates to `PROJECT_PROGRESS.md` are committed **directly** (per user preference) — no feature/docs branch or PR is created for progress bookkeeping. Feature code still follows the full branch → PR → merge → delete workflow.
 
 ### Pending
 - Commit the Product Catalog implementation (module + routes + tests + helpers/factories + constants) on `feature/products` and merge into `main` (per user decision), then delete the branch per `AGENTS.md`.
