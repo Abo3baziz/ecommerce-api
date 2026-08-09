@@ -96,7 +96,7 @@ For every new task:
 
 ## Commit Messages
 
-Follow Conventional Commits.
+Follow **Conventional Commits**.
 
 Examples:
 
@@ -109,6 +109,33 @@ docs(api): update authentication endpoints
 test(orders): add checkout integration tests
 chore(deps): update express
 ```
+
+When preparing a commit message:
+
+- Use the appropriate Conventional Commit `type` and `scope`.
+- Keep the subject concise and describe the primary purpose of the change.
+- Include a commit body when the change contains multiple meaningful modifications.
+- The commit body must **list the important changes actually made**, using concise bullet points.
+- Do not list planned changes, unrelated changes, or changes that were not implemented.
+- Mention important files, modules, behavior changes, tests, documentation, migrations, or configuration changes when relevant.
+- Keep each bullet concise and focused on what changed.
+- Do not include unnecessary implementation details.
+
+Example:
+
+```text
+feat(admin): add admin bootstrap CLI
+
+- add create-admin CLI script for promoting existing users
+- reuse the existing UserRole enum
+- add admin:create package script
+- handle missing users and existing admins
+- add database error handling and cleanup
+- document admin bootstrap usage
+```
+
+**Do not create or modify a commit unless explicitly instructed to commit.** When asked to commit, first review the changes and generate the commit message based on the actual diff.
+
 
 ## Pull Requests
 
