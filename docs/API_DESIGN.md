@@ -66,3 +66,7 @@ Example:
 ## Categories
 
 - docs/api/categories/categories.md
+
+## Inventory
+
+- docs/api/inventory/inventory.md
