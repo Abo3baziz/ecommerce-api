@@ -4,6 +4,7 @@
 
 ### Completed
 - **Verified the Product Catalog is already on `main`**: `feature/products` (PR #3 `feat(products)`) and `feature/tests-products` (PR #2 `test(products)`) were merged earlier via `2ac71ff`/`4e2a686`; the stale "Pending — commit Product Catalog" and "Next Step — commit Product Catalog" items were removed.
+- **Committed the Git Workflow rewrite to AGENTS.md on `docs/agent-workflow`** (`c2fdba1`, `docs(agents): rewrite git workflow section`): the workflow now covers non-feature work (bugfix/refactor/docs/test/chore branches), PRs are only for completed features, testing branches use `test/<module>` naming, and every task starts from the latest `main`.
 - **Reimplemented the logger per `docs/LOGGER.md` on `feature/logger`**: replaced the custom JSON-lines logger with a **Pino**-based logger (`pino@10` + `pino-pretty`). Single shared instance writes to the terminal (pretty in dev, structured JSON in production) and to a categorized `logs/log.json`.
 - `logs/log.json` holds one top-level section per category (`success`, `info`, `warning`, `error`, `debug`); each entry gets the next sequential numeric key per category and existing records are never overwritten. Missing file is initialized with the empty category skeleton.
 - Levels map to categories: `success` (custom level 35), `warn`→`warning`, `error`/`fatal`→`error`, `trace`/`debug`→`debug`. `success` sits between info and warn so request logs aren't filtered at the default `info` level.

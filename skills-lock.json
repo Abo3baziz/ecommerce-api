@@ -1,6 +1,30 @@
 {
   "version": 1,
   "skills": {
+    "ai-tasks": {
+      "source": "imagekit-developer/skills",
+      "sourceType": "github",
+      "skillPath": "skills/ai-tasks/SKILL.md",
+      "computedHash": "6f6c97ea2473173847ce9ea3666a5d1ebdb0b96f4350cede27d39e6c7e445ff2"
+    },
+    "imagekit-integrations": {
+      "source": "imagekit-developer/skills",
+      "sourceType": "github",
+      "skillPath": "skills/imagekit-integrations/SKILL.md",
+      "computedHash": "6b098f9a32af26c27bf088d5bdeba77ba83f91eb6b9047e1f355e36088716cfb"
+    },
+    "imagekit-sdk-reference": {
+      "source": "imagekit-developer/skills",
+      "sourceType": "github",
+      "skillPath": "skills/imagekit-sdk-reference/SKILL.md",
+      "computedHash": "0b847620b024152ae42594981f62dd789f08a9abaf98f0e321ee0a2a8774a757"
+    },
+    "mcp-preflight": {
+      "source": "imagekit-developer/skills",
+      "sourceType": "github",
+      "skillPath": "skills/mcp-preflight/SKILL.md",
+      "computedHash": "4e3e1dbe05615aa3ae42d0fe694da8695fb0b3efa6829c50ecf66dc743aa5b42"
+    },
     "prisma-cli": {
       "source": "prisma/skills",
       "sourceType": "github",
@@ -54,6 +78,30 @@
       "sourceType": "github",
       "skillPath": "prisma-upgrade-v7/SKILL.md",
       "computedHash": "dcc6c71adca6b22f37c5bda5ac7fd63c3bb59495596a22e06a29c7c85371558f"
+    },
+    "search-assets": {
+      "source": "imagekit-developer/skills",
+      "sourceType": "github",
+      "skillPath": "skills/search-assets/SKILL.md",
+      "computedHash": "4fb42ac0205d5f6ec1747a99ce3a2e08ec04dd4c86d9fc0315f862439bacfd5e"
+    },
+    "search-docs": {
+      "source": "imagekit-developer/skills",
+      "sourceType": "github",
+      "skillPath": "skills/search-docs/SKILL.md",
+      "computedHash": "ed26b13c55a8995419748c9b10e19f03abd2ddb807714662f2019ea8d1aa7aa3"
+    },
+    "transformation-builder": {
+      "source": "imagekit-developer/skills",
+      "sourceType": "github",
+      "skillPath": "skills/transformation-builder/SKILL.md",
+      "computedHash": "e0e140ef59697b2c3fa49b1b8aba6cd706d1ef294c3a1fcffb22a88f3e3adc76"
+    },
+    "upload-files": {
+      "source": "imagekit-developer/skills",
+      "sourceType": "github",
+      "skillPath": "skills/upload-files/SKILL.md",
+      "computedHash": "4fdc5b531a79e7cb27ba95e21624b9e0167280d7ba851b12090e487e2d75fd19"
     }
   }
 }
