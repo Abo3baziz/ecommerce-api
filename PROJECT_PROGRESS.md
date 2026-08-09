@@ -109,6 +109,7 @@
 - **Opened PR #6** (`feat(admin): add admin bootstrap CLI`, `feature/admin-bootstrap-cli` → `main`) referencing `docs/CUSTOM_TASK.md` and `docs/OPERATIONS.md`; branch is pushed and up to date. Awaiting merge instruction.
 - **Moved the leftover uncommitted AGENTS.md commit-message guidance** (adds "When preparing a commit message" bullets + explicit "do not commit unless instructed" rule) onto a new `docs/commit-message-guidance` branch off `main` (commit `3f8658f`, pushed, tracking set). No PR — non-feature (docs) work per `AGENTS.md`.
 - **Merged `docs/commit-message-guidance` into `main`** (`874df09`, `--no-ff`): AGENTS.md now includes the "When preparing a commit message" guidance (Conventional Commit type/scope, body-bullet rules, the explicit **"Do not create or modify a commit unless explicitly instructed to commit"** rule). Branch deleted locally + remotely. No PR (docs work).
+- **Merged PR #6 (`feature/admin-bootstrap-cli` → `main`)** via merge commit `33be0d1` (resolved a `PROJECT_PROGRESS.md` conflict by keeping both the admin-CLI entries and the docs-merge entry); deleted the feature branch locally + remotely per `AGENTS.md`. Post-merge `npm run typecheck` passes on `main`.
 
 ### Deliverables
 - `docs/DATABASE.md` rewritten to match `prisma/schema.prisma` (FK `fk_{dt}_{st}` naming, check-constraint tables documented, reviews unique mapping fixed)
