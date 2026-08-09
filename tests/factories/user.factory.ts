@@ -15,6 +15,7 @@ export interface CreateUserOverrides {
   last_name?: string;
   password?: string;
   email_verified_at?: Date | null;
+  role?: user_role;
   status?: user_status;
   deleted_at?: Date | null;
 }
@@ -30,7 +31,7 @@ export async function createUser(overrides: CreateUserOverrides = {}) {
       first_name: overrides.first_name ?? "Test",
       last_name: overrides.last_name ?? "User",
       password_hash: await hash(overrides.password ?? TEST_PASSWORD, 12),
-      role: user_role.CUSTOMER,
+      role: overrides.role ?? user_role.CUSTOMER,
       status: overrides.status ?? user_status.ACTIVE,
       email_verified_at: overrides.email_verified_at ?? null,
       deleted_at: overrides.deleted_at ?? null,
