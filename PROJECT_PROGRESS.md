@@ -106,6 +106,8 @@
 - **Docs**: new `docs/OPERATIONS.md` (purpose, `npm run admin:create`, when to use, behavior/exit codes, security, why no public endpoint) registered under a new **Operations** section in `AGENTS.md`'s Documentation Index.
 - **Tests**: `tests/integration/admin/create-admin.integration.test.ts` — 8 tests covering promote (DB role verified), already-admin no-op, not-found, empty email, invalid format, DB-error handling + no sensitive leakage (`supersecret` connection-string + `TEST_PASSWORD` absent from output), plus `promoteUserToAdmin` unit flows.
 - **Verified**: targeted `tsc` on the script (outside tsconfig `include`) passes; `npm run typecheck` + `npm run build` pass; full suite **36 files / 404 tests** green (was 35/396). Live CLI verification on dev DB: promote → exit 0 (role confirmed ADMIN), already-admin → exit 0, unknown email → exit 1; test user + temp scripts cleaned up.
+- **Opened PR #6** (`feat(admin): add admin bootstrap CLI`, `feature/admin-bootstrap-cli` → `main`) referencing `docs/CUSTOM_TASK.md` and `docs/OPERATIONS.md`; branch is pushed and up to date. Awaiting merge instruction.
+- **Moved the leftover uncommitted AGENTS.md commit-message guidance** (adds "When preparing a commit message" bullets + explicit "do not commit unless instructed" rule) onto a new `docs/commit-message-guidance` branch off `main` (commit `3f8658f`, pushed, tracking set). No PR — non-feature (docs) work per `AGENTS.md`.
 
 ### Deliverables
 - `docs/DATABASE.md` rewritten to match `prisma/schema.prisma` (FK `fk_{dt}_{st}` naming, check-constraint tables documented, reviews unique mapping fixed)
