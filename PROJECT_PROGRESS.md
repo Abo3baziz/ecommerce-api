@@ -110,6 +110,7 @@
 - **Moved the leftover uncommitted AGENTS.md commit-message guidance** (adds "When preparing a commit message" bullets + explicit "do not commit unless instructed" rule) onto a new `docs/commit-message-guidance` branch off `main` (commit `3f8658f`, pushed, tracking set). No PR — non-feature (docs) work per `AGENTS.md`.
 - **Merged `docs/commit-message-guidance` into `main`** (`874df09`, `--no-ff`): AGENTS.md now includes the "When preparing a commit message" guidance (Conventional Commit type/scope, body-bullet rules, the explicit **"Do not create or modify a commit unless explicitly instructed to commit"** rule). Branch deleted locally + remotely. No PR (docs work).
 - **Merged PR #6 (`feature/admin-bootstrap-cli` → `main`)** via merge commit `33be0d1` (resolved a `PROJECT_PROGRESS.md` conflict by keeping both the admin-CLI entries and the docs-merge entry); deleted the feature branch locally + remotely per `AGENTS.md`. Post-merge `npm run typecheck` passes on `main`.
+- **Merged `chore/ci-actions-node24` → `main`** (`cd3c033`, `--no-ff`): `actions/checkout` and `actions/setup-node` upgraded `@v4` → `@v5` (Node 24 action runtime — fixes the "Node.js 20 is deprecated" CI warning, build #22) and the build matrix dropped Node 20, now testing Node 22 only (Node 20 is EOL since April 2026; local dev uses Node 22). Branch deleted locally + remotely.
 
 ### Deliverables
 - `docs/DATABASE.md` rewritten to match `prisma/schema.prisma` (FK `fk_{dt}_{st}` naming, check-constraint tables documented, reviews unique mapping fixed)
