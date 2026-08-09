@@ -70,3 +70,7 @@ Example:
 ## Inventory
 
 - docs/api/inventory/inventory.md
+
+## Cart
+
+- docs/api/cart/cart.md
