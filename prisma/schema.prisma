@@ -122,6 +122,16 @@ model order_items {
   orders_id           Int
   product_variants_id Int
   deleted_at          DateTime?        @db.Timestamptz(6)
+  product_name        String           @db.VarChar(255)
+  product_slug        String           @db.VarChar(255)
+  sku                 String           @db.VarChar(100)
+  variant_color       String?          @db.VarChar(100)
+  variant_size        String?          @db.VarChar(100)
+  variant_weight      Decimal?         @db.Decimal(10, 2)
+  variant_width       Decimal?         @db.Decimal(10, 2)
+  variant_length      Decimal?         @db.Decimal(10, 2)
+  variant_height      Decimal?         @db.Decimal(10, 2)
+  discount_percentage Decimal?         @db.Decimal(5, 2)
   orders              orders           @relation(fields: [orders_id], references: [id], map: "fk_order_items_orders")
   product_variants    product_variants @relation(fields: [product_variants_id], references: [id], map: "fk_order_items_product_variants")
 
@@ -153,6 +163,7 @@ model orders {
   coupons           coupons?       @relation(fields: [coupons_id], references: [id], map: "fk_orders_coupons")
   user_addresses    user_addresses @relation(fields: [user_addresses_id], references: [id], map: "fk_orders_user_addresses")
   users             users          @relation(fields: [users_id], references: [id], map: "fk_orders_users")
+  payments          payments?
   shipments         shipments?
 
   @@index([coupons_id], map: "idx_orders_coupon_id")
@@ -182,17 +193,28 @@ model password_reset_tokens {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model payments {
-  id                    Int       @id(map: "payments_pk") @default(autoincrement())
-  amount                Decimal   @db.Decimal(10, 2)
-  payment_method        String    @db.VarChar(50)
-  payment_status        String    @db.VarChar(30)
-  transaction_reference String?   @db.VarChar(255)
-  paid_at               DateTime? @db.Timestamptz(6)
-  created_at            DateTime  @db.Timestamptz(6)
-  updated_at            DateTime  @db.Timestamptz(6)
+  id                    Int            @id(map: "payments_pk") @default(autoincrement())
+  public_id             String         @unique(map: "payments_public_id_unique_key") @db.VarChar(50)
+  amount                Decimal        @db.Decimal(10, 2)
+  payment_method        String         @db.VarChar(50)
+  status                payment_status
+  transaction_reference String?        @unique(map: "payments_transaction_reference_unique_key") @db.VarChar(255)
+  paid_at               DateTime?      @db.Timestamptz(6)
+  created_at            DateTime       @db.Timestamptz(6)
+  updated_at            DateTime       @db.Timestamptz(6)
   users_id              Int
-  deleted_at            DateTime? @db.Timestamptz(6)
-  users                 users     @relation(fields: [users_id], references: [id], map: "fk_payments_users")
+  deleted_at            DateTime?      @db.Timestamptz(6)
+  failed_at             DateTime?      @db.Timestamptz(6)
+  refunded_at           DateTime?      @db.Timestamptz(6)
+  orders_id             Int            @unique(map: "payments__unique_key")
+  orders                orders         @relation(fields: [orders_id], references: [id], map: "fk_payments_orders")
+  users                 users          @relation(fields: [users_id], references: [id], map: "fk_payments_users")
+
+  @@index([orders_id], map: "idx_payments_order_id")
+  @@index([paid_at], map: "idx_payments_paid_at")
+  @@index([public_id], map: "idx_payments_public_id")
+  @@index([status], map: "idx_payments_status")
+  @@index([transaction_reference], map: "idx_payments_transaction_reference")
 }
 
 model product_categories {
@@ -355,6 +377,7 @@ model sessions {
   @@index([users_id], map: "idx_sessions_user_id")
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model shipments {
   id              Int       @id(map: "shipments_pk") @default(autoincrement())
   public_id       String    @unique(map: "shipments_public_id_unique_key") @db.VarChar(50)
@@ -367,6 +390,14 @@ model shipments {
   updated_at      DateTime  @db.Timestamptz(6)
   orders_id       Int       @unique(map: "shipments__unique_key")
   deleted_at      DateTime? @db.Timestamptz(6)
+  recipient_name  String    @db.VarChar(100)
+  phone_number    String    @db.VarChar(20)
+  country         String    @db.VarChar(100)
+  state           String?   @db.VarChar(100)
+  city            String    @db.VarChar(100)
+  address_1       String    @db.VarChar(100)
+  address_2       String?   @db.VarChar(100)
+  postal_code     String?   @db.VarChar(20)
   orders          orders    @relation(fields: [orders_id], references: [id], map: "fk_shipments_orders")
 
   @@index([orders_id], map: "idx_shipments_order_id")
@@ -465,6 +496,14 @@ enum order_status {
   DELIVERED
   CANCELLED
   RETURNED
+  REFUNDED
+}
+
+enum payment_status {
+  PENDING
+  AUTHORIZED
+  PAID
+  FAILED
   REFUNDED
 }
 

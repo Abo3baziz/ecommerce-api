@@ -11,6 +11,7 @@ export const PUBLIC_ID_PREFIXES = {
   CART_ITEM: "ci",
   REVIEW: "rev",
   PAYMENT: "pay",
+  SHIPMENT: "shp",
   ADDRESS: "adr",
   VERIFICATION: "vrf",
   SESSION: "ses",
@@ -28,12 +29,14 @@ export const ORDER_STATUS = {
   SHIPPED: "shipped",
   DELIVERED: "delivered",
   CANCELLED: "cancelled",
+  RETURNED: "returned",
   REFUNDED: "refunded",
 } as const;
 
 export const PAYMENT_STATUS = {
   PENDING: "pending",
-  COMPLETED: "completed",
+  AUTHORIZED: "authorized",
+  PAID: "paid",
   FAILED: "failed",
   REFUNDED: "refunded",
 } as const;

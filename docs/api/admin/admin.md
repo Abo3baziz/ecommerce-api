@@ -269,13 +269,15 @@ PATCH  /api/v1/admin/inventory/{variant_public_id}
 
 # Order Management
 
+Full contract: `docs/api/orders/orders.md`.
+
 ```
-GET /api/v1/admin/orders
-
-GET /api/v1/admin/orders/{order_public_id}
-
+GET   /api/v1/admin/orders
+GET   /api/v1/admin/orders/{order_public_id}
 PATCH /api/v1/admin/orders/{order_public_id}
 ```
+
+The administrator surface manages the post-placement lifecycle (confirm, process, ship, deliver, cancel, return, refund) through a strict status-transition matrix with transactional stock/payment side effects; customers place and view orders through the customer Orders API.
 
 ---
 

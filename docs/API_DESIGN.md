@@ -74,3 +74,7 @@ Example:
 ## Cart
 
 - docs/api/cart/cart.md
+
+## Orders
+
+- docs/api/orders/orders.md
