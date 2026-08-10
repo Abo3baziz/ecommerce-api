@@ -307,11 +307,11 @@
 - Recovering a lost/compromised `SUPER_ADMIN` requires manual database intervention; an operator-driven CLI demotion/recovery path is a possible future enhancement.
 - Live client-side upload verification to ImageKit (upload a file with the issued auth params and confirm it lands in the media library + a product image row is created) is a manual step pending a client; the server-side auth-params endpoint was verified live with the real keys.
 - Orders-module inventory integration (`reserveStock`/`releaseStock`/`commitStock` per `docs/api/inventory/inventory.md`) — checkout-time stock reservation — is future work; the admin PATCH oversell guard is implemented and the locking invariants are documented for the orders module to reuse.
-- Cart module implementation (per `docs/api/cart/cart.md`) — the API is designed; the module (validators/dto/repository/service/controller/routes) is not yet implemented.
 - Cart stock availability (e.g., `max_available` on cart lines) is a documented possible future enhancement; the customer product contract stays stock-free until then.
 
 ### Next Step
 - **Inventory module merged to `main` via PR #9** (`0dabcd5`, merge commit `0dabcd55517f9565023279d8560ae83d300d35dd`); `feature/inventory` deleted locally + remotely per AGENTS.md.
+- **Cart module merged to `main` via PR #10** (`48b1dee`, merge commit `414e139`); `feature/cart` deleted locally + remotely per AGENTS.md.
 - **Designed the Cart API on `docs/cart-api`** (docs branch, uncommitted — awaiting commit instruction): `docs/api/cart/cart.md` + registration in `docs/API_DESIGN.md`.
 - Generate an OpenAPI 3.1 specification from `docs/api/**` so the Apidog guide's Import step becomes one-click (listed as a follow-up in `docs/APIDOG_TESTING.md`).
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
