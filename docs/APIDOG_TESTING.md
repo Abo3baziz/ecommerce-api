@@ -4,7 +4,7 @@
 
 This document describes the complete workflow for testing this REST API with **Apidog** (an OpenAPI-first API testing tool, Postman-compatible scripting). It covers environment setup, session-cookie authentication, the request tree for every implemented endpoint, end-to-end test flows, assertions, and troubleshooting.
 
-Scope: only **implemented** modules are documented — authentication, users (profile + admin customer management), addresses, products (catalog + admin), and categories (catalog + admin). Cart, orders, inventory, payments, and reviews are not implemented yet, so their endpoints are out of scope.
+Scope: all **implemented** modules are documented — authentication, users (profile + admin customer management), addresses, products (catalog + admin), categories (catalog + admin), cart, orders (customer + admin), inventory (admin), and reviews (public + customer + admin). Payments have no standalone surface; they are exercised only through the order `payment_method: "mock"` (see §6.6).
 
 The API contract is defined in `docs/API_DESIGN.md` and the per-module design docs under `docs/api/**`; those documents remain the source of truth. This guide only explains how to exercise that contract from Apidog.
 
@@ -39,6 +39,8 @@ Apidog → **Environments** → create environment **Local** and add the followi
 | `session_public_id` | *(empty)* | Captured from the sessions list |
 | `verification_token` | *(empty)* | From the verification email / DB (dev only) |
 | `user_public_id` | *(empty)* | Captured from admin customer list/detail responses |
+| `order_public_id` | *(empty)* | Captured from place-order/order-list responses |
+| `review_public_id` | *(empty)* | Captured from review create/list responses |
 
 All paths below use `{{base_url}}` as a prefix, e.g. `{{base_url}}/products`.
 
@@ -180,6 +182,73 @@ All requests carry the `Cookie: {{session_cookie}}` header **and** require the `
 | PATCH | `{{base_url}}/admin/users/{user_public_id}/activate` | 200 | 400 if already active |
 | PATCH | `{{base_url}}/admin/users/{user_public_id}/role` | 200 | Body: `role` `ADMIN`/`CUSTOMER` (not `SUPER_ADMIN`). **Super admin only** — regular admins get 403. 400 self-role-change; 404 unknown user; 409 demoting the last admin-privileged user; no-op → 200 idempotent |
 
+### 6.5 Folder: `05 Cart`
+
+All requests carry the `Cookie: {{session_cookie}}` header. Cart operations require an `ACTIVE` variant of a product; a non-purchasable variant → 404.
+
+| Method | Path | Expected | Notes |
+|--------|------|----------|-------|
+| GET | `{{base_url}}/cart` | 200 | 404 until a cart exists (the cart is created **lazily** on first add). Cart Object: `public_id` (`crt_…`), `items_count`, `total_quantity`, `subtotal`, `items[]`, `created_at`, `updated_at` |
+| POST | `{{base_url}}/cart/items` | 200 | Body: `variant_public_id` (required), `quantity` (optional, default 1, 1–999). Adds to an existing line (merge semantics); 400 if the merged quantity would exceed 999 |
+| PATCH | `{{base_url}}/cart/items/{variant_public_id}` | 200 | Body: `quantity` (required, **absolute** set, 1–999) |
+| DELETE | `{{base_url}}/cart/items/{variant_public_id}` | 204 | Removes the line |
+| DELETE | `{{base_url}}/cart` | 204 | Deletes the cart row; a following `GET /cart` returns 404 |
+
+### 6.6 Folder: `06 Orders`
+
+All requests carry the `Cookie: {{session_cookie}}` header.
+
+| Method | Path | Expected | Notes |
+|--------|------|----------|-------|
+| POST | `{{base_url}}/orders` | 201 | Checkout. Body: `address_public_id` (required), `payment_method` (`"mock"` — the only value in v1), `coupon_code`? (≤50), `notes`? (≤1000). 404 when there is no cart or address; 409 on empty cart, non-purchasable item, insufficient stock, or invalid coupon. Mock payment succeeds inline, so new orders are created **`confirmed`** |
+| GET | `{{base_url}}/orders` | 200 | Query: `page`, `limit`, `status` (`pending`/`confirmed`/`processing`/`shipped`/`delivered`/`cancelled`/`returned`/`refunded`), `sort` (`placed_at`, `order_number`, `total_amount`, `-` prefix; default `-placed_at`) |
+| GET | `{{base_url}}/orders/{order_public_id}` | 200 | Order detail: `order_number` (`ORD-…`), `status`, `placed_at`, `subtotal`, `discount_amount`, `shipping_fee`, `tax_amount`, `total_amount`, `shipping_address`, `payment`, `items[]`. 404 for unknown **or** foreign orders |
+
+### 6.7 Folder: `07 Admin Orders`
+
+All requests carry the `Cookie: {{session_cookie}}` header **and** require the `admin` role (see §5.3).
+
+| Method | Path | Expected | Notes |
+|--------|------|----------|-------|
+| GET | `{{base_url}}/admin/orders` | 200 | Query: `page`, `limit`, `status`, `search` (order number / customer name / email), `placed_from` + `placed_to` (ISO datetime; `from ≤ to`), `sort` (`placed_at`, `order_number`, `total_amount`, `customer_name`, `-` prefix; default `-placed_at`). Rows are lighter (no `items`/`payment`) and include `customer_public_id`/`customer_name`/`customer_email` |
+| GET | `{{base_url}}/admin/orders/{order_public_id}` | 200 | Full admin projection + `shipment` + customer summary |
+| PATCH | `{{base_url}}/admin/orders/{order_public_id}` | 200 | Body: `status` (required), `carrier` (required when transitioning to `shipped`, ≤100), `tracking_number`? (≤100). Legal transitions: `pending → confirmed/cancelled`, `confirmed → processing/cancelled`, `processing → shipped/cancelled`, `shipped → delivered`, `delivered → returned`, `returned → refunded`. 409 for illegal or same-status (no-op) transitions |
+
+### 6.8 Folder: `08 Admin Inventory`
+
+All requests carry the `Cookie: {{session_cookie}}` header **and** require the `admin` role (see §5.3). Inventory is keyed by `variant_public_id` — there is no separate inventory public ID.
+
+| Method | Path | Expected | Notes |
+|--------|------|----------|-------|
+| GET | `{{base_url}}/admin/inventory` | 200 | Query: `page`, `limit`, `search` (SKU/barcode/product name), `stock_status` (`IN_STOCK`/`LOW_STOCK`/`OUT_OF_STOCK`), `include_deleted`, `sort` (`product_name`, `sku`, `quantity_on_hand`, `quantity_available`, `last_stock_update`; default `product_name` asc). Fields: `product_public_id`, `product_name`, `sku`, `barcode`, `quantity_on_hand`, `quantity_reserved` (read-only), `quantity_available`, `reorder_level`, `stock_status` |
+| POST | `{{base_url}}/admin/inventory` | 201 | Body: `variant_public_id` (required), `quantity_on_hand` (required, ≥0), `reorder_level`? (≥0). 409 if an inventory record already exists for the variant |
+| GET | `{{base_url}}/admin/inventory/{variant_public_id}` | 200 | 404 if no record exists (or the variant is soft-deleted) |
+| PATCH | `{{base_url}}/admin/inventory/{variant_public_id}` | 200 | Body: `quantity_on_hand` (absolute, ≥0) **XOR** `quantity_change` (non-zero signed delta), `reorder_level` (`null` clears), `reason`? (≤255, audit-logged only). 400 if both quantity fields are sent or none is; 409 if a delta drives stock below zero |
+
+### 6.9 Folder: `09 Reviews`
+
+Public rows need **no** session; customer rows carry the `Cookie: {{session_cookie}}` header. Reviews are auto-approved on creation (`is_approved` defaults `true`), so a new review is immediately visible to the public. `REVIEWS_REQUIRE_PURCHASE` is disabled by default, so no qualifying order is needed.
+
+| Method | Path | Auth | Expected | Notes |
+|--------|------|------|----------|-------|
+| GET | `{{base_url}}/products/{product_public_id}/reviews` | – | 200 | List approved reviews + rating summary. Query: `page`, `limit`, `rating` (exact, 1–5), `sort` (`created_at`, `rating`; default `-created_at`). Response `data`: `{ summary: { average_rating, total_count }, reviews[], pagination }`. 404 if the product is missing/deleted |
+| GET | `{{base_url}}/reviews/{review_public_id}` | – | 200 | Single approved review. 404 for unapproved, soft-deleted, or foreign reviews |
+| POST | `{{base_url}}/reviews` | cookie | 201 | Body: `product_public_id` (required), `rating` (required, 1–5), `title`? (≤255), `comment`? (≤5000), `images`? (≤5 items, each `image_url` — absolute http/https — + `alt_text`? ≤255). 404 if the product is missing/deleted; **409** on a duplicate review for the same product |
+| PATCH | `{{base_url}}/reviews/{review_public_id}` | cookie | 200 | Partial update of own review: `rating`?, `title`? / `comment`? (`null` clears), `images`? (**replace-all**). Empty body → 400. 404 for foreign/unknown reviews |
+| DELETE | `{{base_url}}/reviews/{review_public_id}` | cookie | 204 | Soft-deletes own review + hard-deletes its images |
+| GET | `{{base_url}}/users/me/reviews` | cookie | 200 | Own reviews incl. unapproved (`is_approved` is exposed here and only here on the customer side). Query: `page`, `limit`, `sort` |
+
+### 6.10 Folder: `10 Admin Reviews`
+
+All requests carry the `Cookie: {{session_cookie}}` header **and** require the `admin` role (see §5.3).
+
+| Method | Path | Expected | Notes |
+|--------|------|----------|-------|
+| GET | `{{base_url}}/admin/reviews` | 200 | Moderation queue. Query: `page`, `limit`, `search` (product name / title / comment / customer email / customer name), `rating`, `is_approved` (`true`/`false`/`all`; default `all`), `include_deleted`, `sort`. Images are returned on the detail endpoint, not in list rows |
+| GET | `{{base_url}}/admin/reviews/{review_public_id}` | 200 | One review in **any** state (incl. unapproved/soft-deleted) with images + customer summary (`customer_public_id`, `customer_email`) |
+| PATCH | `{{base_url}}/admin/reviews/{review_public_id}` | 200 | Moderate: `is_approved`?, `rating`?, `title`? / `comment`? (`null` clears). No `images` here. 400 on empty body or when **approving a soft-deleted review** (deleted reviews are terminal in v1) |
+| DELETE | `{{base_url}}/admin/reviews/{review_public_id}` | 204 | Soft-deletes + hard-deletes images; 404 for unknown reviews |
+
 ---
 
 ## 7. Assertions
@@ -190,7 +259,7 @@ All responses use the shared envelope:
 - Success (list): `{ "success": true, "data": [ … ], "pagination": { "page", "limit", "total", "totalPages", "hasNext", "hasPrev" } }`
 - Error: `{ "success": false, "message": "…" }` — validation failures also include an `errors` object
 
-Never expect internal DB ids (`id`) or `deleted_at` in any payload; resources are identified by public IDs (`usr_…`, `prd_…`, `cat_…`, `var_…`, `pimg_…`, `vimg_…`, `adr_…`, `ses_…`, `vrf_…`).
+Never expect internal DB ids (`id`) or `deleted_at` in any payload; resources are identified by public IDs (`usr_…`, `prd_…`, `cat_…`, `var_…`, `pimg_…`, `vimg_…`, `adr_…`, `ses_…`, `vrf_…`, `crt_…`, `ord_…`, `pay_…`, `shp_…`, `rv_…`, `rvimg_…`).
 
 Example **post-response script** for a list endpoint (Postman-compatible `pm.*`):
 
@@ -247,16 +316,18 @@ Configure the **collection runner**: select the collection → **Run** → drag 
 1. *(one-time, terminal)* `npm run admin:create` with an existing user's email
 2. `POST /auth/login` as the admin user (cookie script fills `session_cookie`)
 3. `POST /admin/products` (capture `product_public_id`)
-4. `POST /admin/products/{product_public_id}/variants` (create an `ACTIVE` variant — required for customer visibility)
-5. `GET /admin/products/uploads/imagekit-auth` (signed upload params)
-6. `POST /admin/categories` (capture `category_public_id`)
-7. `PUT /admin/categories/{category_public_id}/products/{product_public_id}` (assign; repeat → still 204, idempotent)
-8. `GET /categories/{category_public_id}/products` (customer view now lists the product)
-9. `GET /categories/{category_public_id}` (customer `product_count` reflects the assignment)
-10. `PATCH /admin/categories/{category_public_id}` (`is_active: false`) → step 8 now **404s**
-11. `PATCH /admin/categories/{category_public_id}` (`is_active: true`) → step 8 works again
-12. `DELETE /admin/categories/{category_public_id}` (soft-delete; links removed; repeat → 404)
-13. `DELETE /admin/products/{product_public_id}` (soft-delete)
+4. `POST /admin/products/{product_public_id}/variants` (create an `ACTIVE` variant — required for customer visibility; capture `variant_public_id`)
+5. `POST /admin/inventory` (create an inventory record for the variant — **required for checkout**; body: `variant_public_id`, `quantity_on_hand`)
+6. `GET /admin/inventory/{variant_public_id}` (`quantity_available` mirrors `quantity_on_hand`)
+7. `GET /admin/products/uploads/imagekit-auth` (signed upload params)
+8. `POST /admin/categories` (capture `category_public_id`)
+9. `PUT /admin/categories/{category_public_id}/products/{product_public_id}` (assign; repeat → still 204, idempotent)
+10. `GET /categories/{category_public_id}/products` (customer view now lists the product)
+11. `GET /categories/{category_public_id}` (customer `product_count` reflects the assignment)
+12. `PATCH /admin/categories/{category_public_id}` (`is_active: false`) → step 10 now **404s**
+13. `PATCH /admin/categories/{category_public_id}` (`is_active: true`) → step 10 works again
+14. `DELETE /admin/categories/{category_public_id}` (soft-delete; links removed; repeat → 404)
+15. `DELETE /admin/products/{product_public_id}` (soft-delete)
 
 ### Flow C — Account security
 
@@ -267,6 +338,51 @@ Configure the **collection runner**: select the collection → **Run** → drag 
 5. `POST /auth/sessions` → list, capture a `session_public_id` other than the current one
 6. `DELETE /auth/sessions/{session_public_id}` (revoke another session)
 7. `DELETE /users/me` (delete account; cookie is cleared)
+
+### Flow D — Order lifecycle (cart → checkout → fulfillment)
+
+Self-contained: creates its own product, variant, and inventory as the admin, then exercises the full order journey as a customer and drives fulfillment back as the admin. Needs an admin account (from Flow B step 1). The login/register steps swap `session_cookie` between the two roles — keep them in the right order.
+
+1. `POST /auth/login` as the admin user
+2. `POST /admin/products` (capture `product_public_id`)
+3. `POST /admin/products/{product_public_id}/variants` (create an `ACTIVE` variant; capture `variant_public_id`)
+4. `POST /admin/inventory` (body: `variant_public_id`, `quantity_on_hand: 10`)
+5. `POST /auth/register` (new customer — session cookie switches to the customer)
+6. `POST /users/me/addresses` (create a shipping address; capture `address_public_id`)
+7. `POST /cart/items` (body: `variant_public_id`, `quantity: 1`) → 200; cart created lazily
+8. `POST /cart/items` (same variant, `quantity: 1`) → the line **merges** to quantity 2
+9. `GET /cart` (`items_count: 1`, `total_quantity: 2`, `subtotal` = 2 × unit price)
+10. `PATCH /cart/items/{variant_public_id}` (`quantity: 3`) → absolute set; subtotal updates
+11. `POST /orders` (body: `address_public_id`, `payment_method: "mock"`) → 201, status `confirmed`; capture `order_public_id`
+12. `GET /orders/{order_public_id}` (payment `succeeded`, item subtotal/discount/shipping/tax/total)
+13. `POST /auth/login` as the admin user (session cookie switches back)
+14. `GET /admin/orders` (the order is listed; `GET /admin/inventory/{variant_public_id}` now shows `quantity_available` = 7)
+15. `PATCH /admin/orders/{order_public_id}` (`status: processing`) → 200
+16. `PATCH /admin/orders/{order_public_id}` (`status: shipped`, `carrier: "FedEx"`, `tracking_number: "123456789"`) → 200 (`carrier` is required for this transition)
+17. `PATCH /admin/orders/{order_public_id}` (`status: delivered`) → 200
+18. `PATCH /admin/orders/{order_public_id}` (`status: delivered`) → **409** (same-status no-op)
+19. `PATCH /admin/orders/{order_public_id}` (`status: processing`) → **409** (illegal transition backwards)
+20. `GET /admin/orders/{order_public_id}` (shipment carries `carrier` + `tracking_number`)
+
+### Flow E — Reviews lifecycle
+
+Requires a product that exists at the time of the flow (run after Flow B step 8, or reuse a seeded product's `product_public_id`). Reviews are auto-approved (`is_approved` defaults `true`), so a new review is immediately public. Needs an admin account for moderation.
+
+1. `POST /auth/register` (customer)
+2. `POST /reviews` (body: `product_public_id`, `rating: 5`, `title`, `comment`) → 201; capture `review_public_id`
+3. `GET /products/{product_public_id}/reviews` → review visible; `summary.average_rating` reflects it
+4. `GET /users/me/reviews` → `is_approved: true` (the one customer-side view that exposes moderation state)
+5. `POST /reviews` (same product) → **409** (one review per user per product)
+6. `PATCH /reviews/{review_public_id}` (`rating: 4`, `comment`) → 200
+7. `POST /auth/login` as the admin user
+8. `GET /admin/reviews` (moderation queue shows the review)
+9. `PATCH /admin/reviews/{review_public_id}` (`is_approved: false`) → 200
+10. `GET /products/{product_public_id}/reviews` → review now **hidden**; summary updated
+11. `PATCH /admin/reviews/{review_public_id}` (`is_approved: true`) → visible again
+12. `POST /auth/login` as the customer
+13. `DELETE /reviews/{review_public_id}` → 204
+14. `GET /reviews/{review_public_id}` → **404**; `GET /products/{product_public_id}/reviews` no longer lists it
+15. `POST /auth/login` as the admin user → `GET /admin/reviews/{review_public_id}` → still **200** with `deleted_at` (soft-delete preserved)
 
 ---
 
@@ -282,11 +398,11 @@ Configure the **collection runner**: select the collection → **Run** → drag 
 
 | Symptom | Cause / fix |
 |---------|-------------|
-| 400 with `errors` | Validation failed. Check the message details: E.164 phone (`+1…`), password policy, slug regex `^[a-z0-9]+(?:-[a-z0-9]+)*$`, name/limit constraints |
+| 400 with `errors` | Validation failed. Check the message details: E.164 phone (`+1…`), password policy, slug regex `^[a-z0-9]+(?:-[a-z0-9]+)*$`, name/limit constraints, cart quantity 1–999, `quantity_on_hand`/`quantity_change` mutual exclusion on inventory, `carrier` required when an order moves to `shipped`, empty PATCH body |
 | 401 | No session cookie, expired/revoked session, or deactivated account → run Login again (or Register) to refresh `session_cookie` |
 | 403 | Authenticated but not `admin`/`super_admin` → promote via `npm run admin:create` (first promotion → `SUPER_ADMIN`). On the role endpoint, `403` also means the session is a regular `ADMIN` (super admin required) |
-| 404 | Unknown public ID, **or** an intentionally hidden resource (inactive/soft-deleted category or a product without an `ACTIVE` variant) — the API does not reveal existence |
-| 409 | Duplicate `name`/`slug` (categories), `slug`/SKU (products), email/phone (auth/users, incl. admin user updates), or **demoting the last admin** (role change) |
+| 404 | Unknown public ID, **or** an intentionally hidden resource (inactive/soft-deleted category, a product without an `ACTIVE` variant, an order/review that is absent, foreign, unapproved, or soft-deleted, or `GET /cart` before the first add) — the API does not reveal existence |
+| 409 | Duplicate `name`/`slug` (categories), `slug`/SKU (products), email/phone (auth/users, incl. admin user updates), **demoting the last admin** (role change), **order not placeable** (empty cart, non-purchasable item, insufficient stock, invalid coupon), **illegal/same-status order transition**, **duplicate inventory record** or **stock delta below zero**, or **duplicate review** for the same product |
 | 429 | Route rate limiter exceeded → wait 15 min or use a fresh account |
 | 500 | Server error — check `logs/log.json`; do not rely on the response body for internals |
 | Cookie not sent | Confirm the request actually carries `Cookie: {{session_cookie}}` (or the cookie jar is enabled); the value must be `session=<token>` |
@@ -301,5 +417,7 @@ Configure the **collection runner**: select the collection → **Run** → drag 
 - **Email verification is not required** for the flows in this guide: customer browsing and admin operations work with a fresh unverified account.
 - **Role changes are logged, not audited:** `PATCH /admin/users/{user_public_id}/role` records `actorId`, `targetUserId`, `previousRole`, `newRole` in the structured logger; a dedicated audit-log table is a documented future enhancement (see `docs/ENDPOINT_TESTING.md` for hand-run role-endpoint cases).
 - **ImageKit:** image URLs in product/variant image payloads must be absolute http/https URLs (validated). The API never receives file bytes — clients upload to ImageKit using the signed params from `GET /admin/products/uploads/imagekit-auth` and then store the returned URL.
+- **Order payments are mocked in v1:** `POST /orders` only accepts `payment_method: "mock"`. The payment is marked `succeeded` inline, so new orders start `confirmed` and can be moved through the fulfillment lifecycle by an admin.
+- **Reviews are auto-approved:** `is_approved` defaults to `true` on creation, so a fresh review is immediately public. The optional purchase-verification gate (`REVIEWS_REQUIRE_PURCHASE`) is disabled by default — no qualifying order is needed to write a review.
 - **OpenAPI import (follow-up):** generating an OpenAPI 3.1 specification from `docs/api/**` would make Apidog setup one-click (Import → OpenAPI/Swagger). The design docs are written to be directly convertible, per `docs/API_DESIGN.md`.
 - The API contract (endpoints, fields, error semantics) is defined in `docs/API_DESIGN.md` and the per-module docs under `docs/api/**` — when in doubt, those are the source of truth.
