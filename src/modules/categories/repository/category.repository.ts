@@ -181,7 +181,7 @@ export const categoryRepository = {
 
   listCategories(
     filters: CategoryFilters,
-    orderBy: Prisma.categoriesOrderByWithRelationInput,
+    orderBy: Prisma.categoriesOrderByWithRelationInput[],
     skip: number,
     take: number,
   ) {
@@ -310,7 +310,7 @@ export const categoryRepository = {
   listCategoryProducts(
     categories_id: number,
     filters: CategoryProductFilters,
-    orderBy: Prisma.productsOrderByWithRelationInput,
+    orderBy: Prisma.productsOrderByWithRelationInput[],
     skip: number,
     take: number,
   ) {

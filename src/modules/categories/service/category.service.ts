@@ -82,7 +82,10 @@ export async function listCategories(
   sort: string,
 ): Promise<ListCategoriesResult> {
   const { field, direction } = parseSort(sort);
-  const orderBy = { [field]: direction } as Prisma.categoriesOrderByWithRelationInput;
+  const orderBy: Prisma.categoriesOrderByWithRelationInput[] = [
+    { [field]: direction },
+    { id: direction },
+  ];
   const filters: CategoryFilters = { search, customerVisible: true };
 
   const [rows, total] = await Promise.all([
@@ -129,7 +132,10 @@ export async function listCategoryProducts(
   }
 
   const { field, direction } = parseSort(sort);
-  const orderBy = { [field]: direction } as Prisma.productsOrderByWithRelationInput;
+  const orderBy: Prisma.productsOrderByWithRelationInput[] = [
+    { [field]: direction },
+    { id: direction },
+  ];
   const filters: CategoryProductFilters = { search, customerVisible: true };
 
   const [rows, total] = await Promise.all([
@@ -158,7 +164,10 @@ export async function listAdminCategories(
   sort: string,
 ): Promise<ListAdminCategoriesResult> {
   const { field, direction } = parseSort(sort);
-  const orderBy = { [field]: direction } as Prisma.categoriesOrderByWithRelationInput;
+  const orderBy: Prisma.categoriesOrderByWithRelationInput[] = [
+    { [field]: direction },
+    { id: direction },
+  ];
   const filters: CategoryFilters = {
     search,
     is_active: isActive,
