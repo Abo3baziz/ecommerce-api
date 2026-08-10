@@ -22,6 +22,7 @@ import { NotFoundError } from "../../../src/shared/errors/NotFoundError.js";
 import { PUBLIC_ID_PREFIXES } from "../../../src/shared/constants/index.js";
 import { generatePublicId } from "../../../src/shared/utils/index.js";
 import { prisma } from "../../../src/config/database.js";
+import { ordersRepository } from "../../../src/modules/orders/repository/orders.repository.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { createUser } from "../../factories/user.factory.js";
 import { createProduct } from "../../factories/product.factory.js";
@@ -415,6 +416,46 @@ describe("orders.service", () => {
 
       expect(result.discount_amount).toBe("20.00");
       expect(result.total_amount).toBe("290.00");
+    });
+
+    it("caps a fixed amount coupon larger than the subtotal at the subtotal", async () => {
+      const { user, address } = await createCheckoutContext({
+        quantity: 3,
+      });
+      const coupon = await createCoupon({
+        code: `OVERSUB-${nanoid(8)}`,
+        discount_type: discount_type.FIXED_AMOUNT,
+        discount_value: "500.00",
+      });
+
+      const result = await placeOrder(user.id, {
+        address_public_id: address.public_id,
+        payment_method: "mock",
+        coupon_code: coupon.code,
+      });
+
+      expect(result.discount_amount).toBe("300.00");
+      expect(result.total_amount).toBe("10.00");
+    });
+
+    it("caps a percentage coupon over 100% at the subtotal", async () => {
+      const { user, address } = await createCheckoutContext({
+        quantity: 3,
+      });
+      const coupon = await createCoupon({
+        code: `PERCENTCAP-${nanoid(8)}`,
+        discount_type: discount_type.PERCENTAGE,
+        discount_value: "150.00",
+      });
+
+      const result = await placeOrder(user.id, {
+        address_public_id: address.public_id,
+        payment_method: "mock",
+        coupon_code: coupon.code,
+      });
+
+      expect(result.discount_amount).toBe("300.00");
+      expect(result.total_amount).toBe("10.00");
     });
 
     it("throws ConflictError when the coupon is inactive", async () => {
@@ -1120,6 +1161,40 @@ describe("orders.service", () => {
       await expect(getAdminOrder(`ord_${nanoid(10)}`)).rejects.toThrow(
         NotFoundError,
       );
+    });
+  });
+
+  describe("incrementCouponUsage", () => {
+    it("increments usage_count atomically when below the usage limit", async () => {
+      const coupon = await createCoupon({
+        code: `INC-${nanoid(8)}`,
+        usage_limit: 5,
+        usage_count: 4,
+      });
+
+      const affected = await ordersRepository.incrementCouponUsage(coupon.id);
+
+      expect(affected).toBe(1);
+      const updated = await prisma.coupons.findUnique({
+        where: { id: coupon.id },
+      });
+      expect(updated?.usage_count).toBe(5);
+    });
+
+    it("returns 0 and leaves usage_count unchanged when the limit is reached", async () => {
+      const coupon = await createCoupon({
+        code: `LIMITED-${nanoid(8)}`,
+        usage_limit: 5,
+        usage_count: 5,
+      });
+
+      const affected = await ordersRepository.incrementCouponUsage(coupon.id);
+
+      expect(affected).toBe(0);
+      const updated = await prisma.coupons.findUnique({
+        where: { id: coupon.id },
+      });
+      expect(updated?.usage_count).toBe(5);
     });
   });
 });

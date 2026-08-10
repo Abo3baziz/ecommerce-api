@@ -218,6 +218,7 @@ export interface AdminListRowRaw {
 const ordersTable = Prisma.raw(`"${dbSchema}"."orders"`);
 const usersTable = Prisma.raw(`"${dbSchema}"."users"`);
 const inventoryTable = Prisma.raw(`"${dbSchema}"."inventory"`);
+const couponsTable = Prisma.raw(`"${dbSchema}"."coupons"`);
 
 const adminFromJoins = Prisma.sql`
   FROM ${ordersTable} o
@@ -310,11 +311,12 @@ export const ordersRepository = {
   },
 
   incrementCouponUsage(coupons_id: number, client: DbClient = prisma) {
-    return client.coupons.update({
-      where: { id: coupons_id },
-      data: { usage_count: { increment: 1 }, updated_at: new Date() },
-      select: { id: true },
-    });
+    return client.$executeRaw`
+      UPDATE ${couponsTable}
+      SET usage_count = usage_count + 1, updated_at = now()
+      WHERE id = ${coupons_id}
+        AND usage_count < usage_limit
+    `;
   },
 
   createCouponUsage(
