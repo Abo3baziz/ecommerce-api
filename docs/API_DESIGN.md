@@ -79,3 +79,7 @@ Example:
 
 - docs/api/orders/orders.md
 - docs/api/orders/orders-design-review.md (design review of the Orders module)
+
+## Reviews
+
+- docs/api/reviews/reviews.md
