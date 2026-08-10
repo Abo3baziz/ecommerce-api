@@ -157,7 +157,6 @@ The payment module records:
 - payment provider
 - payment reference
 - amount
-- currency
 - timestamps
 
 Current implementation uses a mock payment provider.

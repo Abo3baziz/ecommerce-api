@@ -174,7 +174,7 @@ products_slug_unique_key
 product_variants_sku_unique_key
 ```
 
-> Note: unique constraints that span a foreign-key column only (no meaningful source column) use `{dt}__unique_key` (double underscore), e.g., `coupon_usages__unique_key` (on `orders_id`), `inventory__unique_key` (on `product_variants_id`), and `shipments__unique_key` (on `orders_id`).
+> Note: unique constraints that span a foreign-key column only (no meaningful source column) use `{dt}__unique_key` (double underscore), e.g., `coupon_usages__unique_key` (on `orders_id`), `inventory__unique_key` (on `product_variants_id`), `payments__unique_key` (on `orders_id`), and `shipments__unique_key` (on `orders_id`).
 
 ---
 
@@ -205,6 +205,7 @@ ck_inventory_quantity_non_negative
 > - payments
 > - product_variants
 > - reviews
+> - shipments
 >
 > The naming convention above applies to any check constraint introduced in the future.
 
@@ -971,6 +972,7 @@ Stores customer purchase orders. Each order represents a completed checkout and 
 - Many orders → One coupon
 - One order → Many order_items
 - One order → One coupon_usage
+- One order → One payment
 - One order → One shipment
 
 ---
@@ -979,7 +981,7 @@ Stores customer purchase orders. Each order represents a completed checkout and 
 
 #### Description
 
-Stores the individual products purchased within an order. Each order item represents a snapshot of the product variant and pricing at the time the order was placed, ensuring historical accuracy even if the original product changes later.
+Stores the individual products purchased within an order. Each order item is an immutable snapshot of the product variant at the time the order was placed — product context (`product_name`, `product_slug`, `sku`, variant attributes) and pricing (`unit_price`, `discount_percentage`, `total_amount`) — ensuring historical accuracy even if the original product changes later.
 
 #### Columns
 
@@ -987,12 +989,22 @@ Stores the individual products purchased within an order. Each order item repres
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
 | quantity | `INTEGER` | No | Quantity purchased |
-| unit_price | `DECIMAL(10,2)` | No | Price per unit at the time of purchase |
-| total_amount | `DECIMAL(10,2)` | No | Total amount for the order item after discounts |
+| unit_price | `DECIMAL(10,2)` | No | Snapshot of the charged unit price at the time of purchase |
+| total_amount | `DECIMAL(10,2)` | No | Snapshot of the item line total after discounts |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | orders_id | `INTEGER` | No | Reference to the associated order |
 | product_variants_id | `INTEGER` | No | Reference to the purchased product variant |
 | deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
+| product_name | `VARCHAR(255)` | No | Snapshot of the product name at the time of purchase |
+| product_slug | `VARCHAR(255)` | No | Snapshot of the product slug at the time of purchase |
+| sku | `VARCHAR(100)` | No | Snapshot of the variant SKU at the time of purchase |
+| variant_color | `VARCHAR(100)` | Yes | Snapshot of the variant color, when set at purchase time |
+| variant_size | `VARCHAR(100)` | Yes | Snapshot of the variant size, when set at purchase time |
+| variant_weight | `DECIMAL(10,2)` | Yes | Snapshot of the variant weight, when set at purchase time |
+| variant_width | `DECIMAL(10,2)` | Yes | Snapshot of the variant width, when set at purchase time |
+| variant_length | `DECIMAL(10,2)` | Yes | Snapshot of the variant length, when set at purchase time |
+| variant_height | `DECIMAL(10,2)` | Yes | Snapshot of the variant height, when set at purchase time |
+| discount_percentage | `DECIMAL(5,2)` | Yes | Snapshot of the variant discount percentage, when set at purchase time |
 
 #### Constraints
 
@@ -1018,7 +1030,7 @@ Stores the individual products purchased within an order. Each order item repres
 
 #### Description
 
-Stores shipment information for customer orders. Each shipment tracks the fulfillment and delivery details for a single order.
+Stores shipment information for customer orders. Each shipment tracks the fulfillment and delivery details for a single order (1:1 with `orders`) and also holds the immutable shipping-address snapshot copied from the selected `user_addresses` row at checkout, so later edits to saved addresses never alter historical order data.
 
 #### Columns
 
@@ -1035,6 +1047,14 @@ Stores shipment information for customer orders. Each shipment tracks the fulfil
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
 | orders_id | `INTEGER` | No | Reference to the associated order |
 | deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
+| recipient_name | `VARCHAR(100)` | No | Snapshot of the shipping recipient name at checkout |
+| phone_number | `VARCHAR(20)` | No | Snapshot of the shipping contact phone at checkout |
+| country | `VARCHAR(100)` | No | Snapshot of the shipping country at checkout |
+| state | `VARCHAR(100)` | Yes | Snapshot of the shipping state at checkout, when set |
+| city | `VARCHAR(100)` | No | Snapshot of the shipping city at checkout |
+| address_1 | `VARCHAR(100)` | No | Snapshot of the shipping address line 1 at checkout |
+| address_2 | `VARCHAR(100)` | Yes | Snapshot of the shipping address line 2 at checkout, when set |
+| postal_code | `VARCHAR(20)` | Yes | Snapshot of the shipping postal code at checkout, when set |
 
 #### Constraints
 
@@ -1065,22 +1085,26 @@ Stores shipment information for customer orders. Each shipment tracks the fulfil
 
 #### Description
 
-Stores payment records associated with a user account. Each record represents a payment transaction and tracks its processing status.
+Stores payment records for customer orders. Each record represents the payment attempt for exactly one order (1:1 via the unique `orders_id`) and tracks its processing status (`payment_status` enum), provider transaction reference, and lifecycle timestamps (`paid_at`, `failed_at`, `refunded_at`).
 
 #### Columns
 
 | Column | Type | Nullable | Description |
 | --- | --- | --- | --- |
 | id | `INTEGER` | No | Internal primary key |
+| public_id | `VARCHAR(50)` | No | Public payment identifier |
 | amount | `DECIMAL(10,2)` | No | Total payment amount |
 | payment_method | `VARCHAR(50)` | No | Payment method used by the customer |
-| payment_status | `VARCHAR(30)` | No | Current payment status |
-| transaction_reference | `VARCHAR(255)` | Yes | External payment provider transaction reference |
+| status | `payment_status` | No | Current payment status |
+| transaction_reference | `VARCHAR(255)` | Yes | External payment provider transaction reference (unique when set) |
 | paid_at | `TIMESTAMPTZ` | Yes | Timestamp when the payment was successfully completed |
 | created_at | `TIMESTAMPTZ` | No | Creation timestamp |
 | updated_at | `TIMESTAMPTZ` | No | Last modification timestamp |
 | users_id | `INTEGER` | No | Reference to the user associated with the payment |
 | deleted_at | `TIMESTAMPTZ` | Yes | Soft deletion timestamp |
+| failed_at | `TIMESTAMPTZ` | Yes | Timestamp when the payment failed |
+| refunded_at | `TIMESTAMPTZ` | Yes | Timestamp when the payment was refunded |
+| orders_id | `INTEGER` | No | Reference to the order paid for by this payment |
 
 #### Constraints
 
@@ -1088,14 +1112,23 @@ Stores payment records associated with a user account. Each record represents a 
 | --- | --- |
 | Primary Key | payments_pk |
 | Foreign Key | fk_payments_users |
+| Foreign Key | fk_payments_orders |
+| Unique | payments_public_id_unique_key |
+| Unique | payments_transaction_reference_unique_key |
+| Unique | payments__unique_key |
 
 #### Indexes
 
-> None.
+- idx_payments_order_id
+- idx_payments_paid_at
+- idx_payments_public_id
+- idx_payments_status
+- idx_payments_transaction_reference
 
 #### Relationships
 
 - Many payments → One user
+- One payment → One order
 
 ---
 
@@ -1293,7 +1326,7 @@ The following columns are used consistently throughout the schema.
 | updated_at | Last modification timestamp |
 | deleted_at | Soft deletion timestamp (where applicable) |
 
-> Note: `product_variant_images` has no `created_at`/`updated_at` columns, and `payments` has no `public_id` column. These deviations are intentional in the current schema.
+> Note: `product_variant_images` has no `created_at`/`updated_at` columns. This deviation is intentional in the current schema.
 
 ---
 
@@ -1327,6 +1360,16 @@ The following columns are used consistently throughout the schema.
 
 ---
 
+## payment_status
+
+- PENDING
+- AUTHORIZED
+- PAID
+- FAILED
+- REFUNDED
+
+---
+
 ## product_status
 
 - ACTIVE
@@ -1348,6 +1391,7 @@ The following columns are used consistently throughout the schema.
 
 - CUSTOMER
 - ADMIN
+- SUPER_ADMIN
 
 ---
 
