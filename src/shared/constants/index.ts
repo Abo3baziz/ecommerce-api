@@ -10,6 +10,7 @@ export const PUBLIC_ID_PREFIXES = {
   CART: "crt",
   CART_ITEM: "ci",
   REVIEW: "rev",
+  REVIEW_IMAGE: "rvimg",
   PAYMENT: "pay",
   SHIPMENT: "shp",
   ADDRESS: "adr",
@@ -50,6 +51,8 @@ export const PAGINATION = {
 export const FLAT_SHIPPING_FEE = "10.00";
 
 export const FREE_SHIPPING_THRESHOLD = "500.00";
+
+export const REVIEWS_REQUIRE_PURCHASE = false;
 
 export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
