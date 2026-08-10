@@ -78,3 +78,7 @@ Example:
 ## Orders
 
 - docs/api/orders/orders.md
+
+## Reviews
+
+- docs/api/reviews/reviews.md
