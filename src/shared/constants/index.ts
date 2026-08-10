@@ -47,6 +47,10 @@ export const PAGINATION = {
   MAX_LIMIT: 100,
 } as const;
 
+export const FLAT_SHIPPING_FEE = "10.00";
+
+export const FREE_SHIPPING_THRESHOLD = "500.00";
+
 export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const PHONE_OTP_TTL_MS = 10 * 60 * 1000;

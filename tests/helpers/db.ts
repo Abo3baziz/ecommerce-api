@@ -15,6 +15,21 @@ export async function cleanupTestData(): Promise<void> {
     await prisma.sessions.deleteMany({
       where: { users_id: { in: userIds } },
     });
+    await prisma.coupon_usages.deleteMany({
+      where: { users_id: { in: userIds } },
+    });
+    await prisma.order_items.deleteMany({
+      where: { orders: { users_id: { in: userIds } } },
+    });
+    await prisma.payments.deleteMany({
+      where: { users_id: { in: userIds } },
+    });
+    await prisma.shipments.deleteMany({
+      where: { orders: { users_id: { in: userIds } } },
+    });
+    await prisma.orders.deleteMany({
+      where: { users_id: { in: userIds } },
+    });
     await prisma.user_addresses.deleteMany({
       where: { users_id: { in: userIds } },
     });
@@ -32,9 +47,15 @@ export async function cleanupTestData(): Promise<void> {
   await prisma.product_categories.deleteMany({});
   await prisma.product_variant_images.deleteMany({});
   await prisma.cart_items.deleteMany({});
+  await prisma.order_items.deleteMany({});
+  await prisma.coupon_usages.deleteMany({});
+  await prisma.payments.deleteMany({});
+  await prisma.shipments.deleteMany({});
+  await prisma.orders.deleteMany({});
   await prisma.inventory.deleteMany({});
   await prisma.product_variants.deleteMany({});
   await prisma.product_images.deleteMany({});
   await prisma.products.deleteMany({});
   await prisma.categories.deleteMany({});
+  await prisma.coupons.deleteMany({});
 }

@@ -12,6 +12,10 @@ import {
 } from "../../modules/categories/index.js";
 import { adminInventoryRouter } from "../../modules/inventory/index.js";
 import { cartRouter } from "../../modules/cart/index.js";
+import {
+  adminOrdersRouter,
+  ordersRouter,
+} from "../../modules/orders/index.js";
 
 const v1Router = Router();
 
@@ -25,5 +29,7 @@ v1Router.use("/admin/categories", adminCategoriesRouter);
 v1Router.use("/admin/inventory", adminInventoryRouter);
 v1Router.use("/admin/users", adminUsersRouter);
 v1Router.use("/cart", cartRouter);
+v1Router.use("/orders", ordersRouter);
+v1Router.use("/admin/orders", adminOrdersRouter);
 
 export { v1Router };
