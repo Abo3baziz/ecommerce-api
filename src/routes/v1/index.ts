@@ -16,6 +16,12 @@ import {
   adminOrdersRouter,
   ordersRouter,
 } from "../../modules/orders/index.js";
+import {
+  adminReviewsRouter,
+  productReviewsRouter,
+  reviewsRouter,
+  userReviewsRouter,
+} from "../../modules/reviews/index.js";
 
 const v1Router = Router();
 
@@ -31,5 +37,9 @@ v1Router.use("/admin/users", adminUsersRouter);
 v1Router.use("/cart", cartRouter);
 v1Router.use("/orders", ordersRouter);
 v1Router.use("/admin/orders", adminOrdersRouter);
+v1Router.use("/products", productReviewsRouter);
+v1Router.use("/reviews", reviewsRouter);
+v1Router.use("/users", userReviewsRouter);
+v1Router.use("/admin/reviews", adminReviewsRouter);
 
 export { v1Router };

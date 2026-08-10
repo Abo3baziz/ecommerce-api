@@ -39,12 +39,20 @@ export async function cleanupTestData(): Promise<void> {
     await prisma.carts.deleteMany({
       where: { users_id: { in: userIds } },
     });
+    await prisma.review_images.deleteMany({
+      where: { reviews: { users_id: { in: userIds } } },
+    });
+    await prisma.reviews.deleteMany({
+      where: { users_id: { in: userIds } },
+    });
     await prisma.users.deleteMany({
       where: { id: { in: userIds } },
     });
   }
 
   await prisma.product_categories.deleteMany({});
+  await prisma.review_images.deleteMany({});
+  await prisma.reviews.deleteMany({});
   await prisma.product_variant_images.deleteMany({});
   await prisma.cart_items.deleteMany({});
   await prisma.order_items.deleteMany({});
