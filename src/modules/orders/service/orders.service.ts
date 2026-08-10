@@ -222,6 +222,7 @@ export async function placeOrder(
       if (discountAmount.lt(0)) {
         discountAmount = new Prisma.Decimal(0);
       }
+      discountAmount = Prisma.Decimal.min(discountAmount, subtotal);
       discountAmount = discountAmount.toDecimalPlaces(2);
       couponsId = coupon.id;
     }
@@ -297,7 +298,13 @@ export async function placeOrder(
     );
 
     if (couponsId !== null) {
-      await ordersRepository.incrementCouponUsage(couponsId, tx);
+      const incremented = await ordersRepository.incrementCouponUsage(
+        couponsId,
+        tx,
+      );
+      if (incremented === 0) {
+        throw new ConflictError("Coupon is invalid or not applicable");
+      }
       await ordersRepository.createCouponUsage(
         {
           orders_id: order.id,
