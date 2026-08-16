@@ -1,21 +1,30 @@
 import { Router } from "express";
 import { validate } from "../../../middleware/validate.js";
 import { authentication } from "../../../middleware/authentication.js";
-import { emailVerificationRateLimiter } from "../../../middleware/rateLimiter.js";
+import {
+  emailVerificationRateLimiter,
+  passwordResetRateLimiter,
+} from "../../../middleware/rateLimiter.js";
 import { registerSchema } from "../validators/register.js";
 import { loginSchema } from "../validators/login.js";
 import { verifyEmailSchema } from "../validators/verifyEmail.js";
 import { sessionParamsSchema } from "../validators/sessionParams.js";
+import {
+  requestPasswordResetSchema,
+  verifyPasswordResetSchema,
+} from "../validators/passwordReset.js";
 import {
   loginController,
   registerController,
   getCurrentSessionController,
   listSessionsController,
   logoutController,
+  requestPasswordResetController,
   resendVerificationEmailController,
   revokeAllOtherSessionsController,
   revokeSessionController,
   verifyEmailController,
+  verifyPasswordResetController,
 } from "../controller/auth.controller.js";
 
 const authRouter = Router();
@@ -42,6 +51,17 @@ authRouter.post(
   authentication,
   emailVerificationRateLimiter,
   resendVerificationEmailController,
+);
+authRouter.post(
+  "/password-reset",
+  passwordResetRateLimiter,
+  validate(requestPasswordResetSchema),
+  requestPasswordResetController,
+);
+authRouter.post(
+  "/password-reset/verify",
+  validate(verifyPasswordResetSchema),
+  verifyPasswordResetController,
 );
 
 export { authRouter };

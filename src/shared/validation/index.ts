@@ -13,6 +13,16 @@ export const paginationSchema = z.object({
 
 export type PaginationInput = z.infer<typeof paginationSchema>;
 
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+
+export const passwordField = z
+  .string()
+  .min(8)
+  .regex(
+    passwordRegex,
+    "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character",
+  );
+
 export function createEnumSchema<T extends readonly [string, ...string[]]>(values: T) {
   return z.enum(values);
 }

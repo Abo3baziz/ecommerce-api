@@ -121,6 +121,8 @@ Only `SUPER_ADMIN` sessions can call the role endpoint (`PATCH /admin/users/{use
 | DELETE | `{{base_url}}/auth/sessions` | cookie | 204 | Revoke all other sessions |
 | POST | `{{base_url}}/auth/email-verification/verify` | – | 200 | Body: `token` (from the emailed link). 404 unknown, 410 used/expired |
 | POST | `{{base_url}}/auth/email-verification/resend` | cookie | 202 | 409 if email already verified; route rate limiter 5/15 min → 429 |
+| POST | `{{base_url}}/auth/password-reset` | – | 202 | Body: `email`. Always returns the same message (no account enumeration); route rate limiter 5/15 min → 429 |
+| POST | `{{base_url}}/auth/password-reset/verify` | – | 204 | Body: `token`, `new_password` (password policy). 404 unknown token, 410 used/expired; revokes **all** sessions |
 
 ### 6.2 Folder: `02 Customer Catalog`
 
@@ -388,7 +390,7 @@ Requires a product that exists at the time of the flow (run after Flow B step 8,
 
 ## 9. Rate limiting
 
-- Route-level limiters apply **5 requests / 15 minutes** per user to: `POST /auth/email-verification/resend`, `PATCH /users/me/password`, `POST /users/me/email`, `POST /users/me/phone-number`. Exceeding them returns **429**.
+- Route-level limiters apply **5 requests / 15 minutes** per user to: `POST /auth/email-verification/resend`, `POST /auth/password-reset`, `PATCH /users/me/password`, `POST /users/me/email`, `POST /users/me/phone-number`. Exceeding them returns **429**.
 - The global API rate limiter is skipped only when `NODE_ENV=test`; under `npm run dev` it is active.
 - When re-running flows, either pace requests or use fresh test users (registration is not rate-limited by these rules).
 
@@ -413,7 +415,7 @@ Requires a product that exists at the time of the flow (run after Flow B step 8,
 ## 11. Notes
 
 - **CSRF:** `csrf-csrf` is installed but **not yet wired** into the request pipeline, so no CSRF token header is required today. If CSRF middleware is added, cookie-authenticated writes will need the documented fetch/validate token flow; revisit this guide then.
-- **Email/OTP tokens in dev:** verification links and the SMS OTP are delivered by real services (Resend) or the SMS stub (logs only). For local testing, read the pending token from the `verification_tokens` table or use the backend-served verify pages (`/verify-email?token=…`, `/verify-email-change?token=…`).
+- **Email/OTP tokens in dev:** verification links and the SMS OTP are delivered by real services (Resend) or the SMS stub (logs only). For local testing, read the pending token from the `verification_tokens` table (email-verification, email-change, and password-reset tokens all live there) or use the backend-served verify pages (`/verify-email?token=…`, `/verify-email-change?token=…`).
 - **Email verification is not required** for the flows in this guide: customer browsing and admin operations work with a fresh unverified account.
 - **Role changes are logged, not audited:** `PATCH /admin/users/{user_public_id}/role` records `actorId`, `targetUserId`, `previousRole`, `newRole` in the structured logger; a dedicated audit-log table is a documented future enhancement (see `docs/ENDPOINT_TESTING.md` for hand-run role-endpoint cases).
 - **ImageKit:** image URLs in product/variant image payloads must be absolute http/https URLs (validated). The API never receives file bytes — clients upload to ImageKit using the signed params from `GET /admin/products/uploads/imagekit-auth` and then store the returned URL.

@@ -37,3 +37,8 @@ export const passwordChangeRateLimiter = createRateLimiter(
   5,
   "Too many password change attempts, please try again later",
 );
+
+export const passwordResetRateLimiter = createRateLimiter(
+  5,
+  "Too many password reset requests, please try again later",
+);

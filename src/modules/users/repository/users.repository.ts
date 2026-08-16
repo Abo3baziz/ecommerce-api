@@ -107,8 +107,8 @@ export const usersRepository = {
     });
   },
 
-  updatePassword(id: number, password_hash: string) {
-    return prisma.users.update({
+  updatePassword(id: number, password_hash: string, client: DbClient = prisma) {
+    return client.users.update({
       where: { id },
       data: {
         password_hash,

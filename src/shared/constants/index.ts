@@ -56,6 +56,8 @@ export const REVIEWS_REQUIRE_PURCHASE = false;
 
 export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
+export const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+
 export const PHONE_OTP_TTL_MS = 10 * 60 * 1000;
 
 export const EMAIL_BRAND_NAME = "Ecommerce";
