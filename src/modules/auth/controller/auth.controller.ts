@@ -3,16 +3,22 @@ import {
   listSessions,
   login,
   register,
+  requestPasswordReset,
   resendVerificationEmail,
   revokeAllOtherSessions,
   revokeSession,
   verifyEmail,
+  verifyPasswordReset,
 } from "../service/auth.service.js";
 import { authRepository } from "../repository/auth.repository.js";
 import { setSessionCookie, clearSessionCookie } from "../utils/sessionCookie.js";
 import type { RegisterInput } from "../dto/register.js";
 import type { LoginInput } from "../dto/login.js";
 import type { VerifyEmailInput } from "../dto/verifyEmail.js";
+import type {
+  RequestPasswordResetInput,
+  VerifyPasswordResetInput,
+} from "../dto/passwordReset.js";
 import type { SessionParams } from "../validators/sessionParams.js";
 import type { RequestContext } from "../types/context.js";
 
@@ -184,6 +190,37 @@ export async function resendVerificationEmailController(
       success: true,
       data: result,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function requestPasswordResetController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const result = await requestPasswordReset(
+      req.body as RequestPasswordResetInput,
+    );
+    res.status(202).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function verifyPasswordResetController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    await verifyPasswordReset(req.body as VerifyPasswordResetInput);
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

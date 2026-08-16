@@ -3,6 +3,9 @@
 ## Project Progress
 
 ### Completed
+- **Implemented the Password Reset flow on `feature/password-reset`** per `docs/api/authentication/password-reset.md`: `POST /api/v1/auth/password-reset` (202, always the same message — no account enumeration; skips suspended/deleted users; invalidates prior unused tokens; 1h TTL via `PASSWORD_RESET_TOKEN_TTL_MS`) and `POST /api/v1/auth/password-reset/verify` (204; 404 unknown token, 410 used/expired; new password hashed with bcrypt (12 rounds), then in one `$transaction` updates the password, revokes **all** sessions, and invalidates the token).
+- Password reset reuses the auth module's token infrastructure (`createVerificationToken`, `findVerificationTokenByHash`, `invalidateUnusedVerificationTokens`, `invalidateVerificationToken` with `verification_type.PASSWORD_RESET`); no schema change needed. The reset email uses the shared mailer templates (`sendPasswordResetEmail` → `${CORS_ORIGIN}/reset-password?token=…`, no backend page). Shared `passwordField` extracted to `src/shared/validation` (reused by register + change password); `passwordResetRateLimiter` (5/15min) added via the shared limiter factory; `usersRepository.updatePassword` gained an optional transaction-client param.
+- Tests added: unit validator tests (9), service integration tests (8), e2e API tests (8) — all 25 pass; cover 202 same-message for unknown/suspended, token invalidation on re-request, 404/410 paths, password update + session revocation + re-login with the new password, old password/cookie rejection, weak-password 400. `docs/APIDOG_TESTING.md` updated (2 endpoint rows, rate-limit note, dev-token note). `npm run typecheck` passes; full suite run pending.
 - **Reimplemented the logger per `docs/LOGGER.md` on `feature/logger`**: replaced the custom JSON-lines logger with a **Pino**-based logger (`pino@10` + `pino-pretty`). Single shared instance writes to the terminal (pretty in dev, structured JSON in production) and to a categorized `logs/log.json`.
 - `logs/log.json` holds one top-level section per category (`success`, `info`, `warning`, `error`, `debug`); each entry gets the next sequential numeric key per category and existing records are never overwritten. Missing file is initialized with the empty category skeleton.
 - Levels map to categories: `success` (custom level 35), `warn`→`warning`, `error`/`fatal`→`error`, `trace`/`debug`→`debug`. `success` sits between info and warn so request logs aren't filtered at the default `info` level.
@@ -347,6 +350,7 @@
 - Cart stock availability (e.g., `max_available` on cart lines) is a documented possible future enhancement; the customer product contract stays stock-free until then.
 
 ### Next Step
+- **`feature/password-reset` implemented and verified** (typecheck + 25 new tests green); changes are uncommitted on the branch — awaiting instruction to commit and later merge.
 - **Reviews module merged to `main` via PR #12** (`6c3b851`, GitHub merge commit); `feature/reviews` deleted locally + remotely per AGENTS.md.
 - **Orders design-review fixes merged to `main`** (`bugfix/orders` → `main` via `b698899`, this session): discount capped at subtotal + atomic guarded coupon-limit increment; 4 regression tests; full suite **56 files / 977 tests green**.
 - **Categories sort tiebreaker fix merged to `main` and pushed** (`bugfix/categories-sort-tiebreaker` → `main` via `c73b49a` + `1a2ce44` docs(progress) commit, this session): `origin/main` is now `1a2ce44`, in sync with local `main`.

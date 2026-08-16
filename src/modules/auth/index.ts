@@ -3,8 +3,10 @@ export {
   listSessions,
   login,
   register,
+  requestPasswordReset,
   resendVerificationEmail,
   revokeAllOtherSessions,
   revokeSession,
   verifyEmail,
+  verifyPasswordReset,
 } from "./service/auth.service.js";

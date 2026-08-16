@@ -7,12 +7,15 @@ import { UnauthorizedError } from "../../../shared/errors/UnauthorizedError.js";
 import {
   PUBLIC_ID_PREFIXES,
   VERIFICATION_TOKEN_TTL_MS,
+  PASSWORD_RESET_TOKEN_TTL_MS,
 } from "../../../shared/constants/index.js";
 import { SESSION_TTL_MS } from "../../../shared/constants/session.js";
 import { generatePublicId } from "../../../shared/utils/index.js";
 import { logger } from "../../../shared/logger/index.js";
 import { prisma } from "../../../config/database.js";
 import { sendVerificationEmail } from "../../../shared/mailer/verification.js";
+import { sendPasswordResetEmail } from "../../../shared/mailer/passwordReset.js";
+import { usersRepository } from "../../users/repository/users.repository.js";
 import {
   user_role,
   user_status,
@@ -27,6 +30,11 @@ import type { LoginInput, LoginResult } from "../dto/login.js";
 import type { VerifyEmailInput, VerifyEmailResult } from "../dto/verifyEmail.js";
 import type { ListSessionsResult } from "../dto/session.js";
 import type { RequestContext } from "../types/context.js";
+import type {
+  RequestPasswordResetInput,
+  RequestPasswordResetResult,
+  VerifyPasswordResetInput,
+} from "../dto/passwordReset.js";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -224,4 +232,90 @@ export async function verifyEmail(input: VerifyEmailInput): Promise<VerifyEmailR
   });
 
   return { message: "Email verified successfully." };
+}
+
+async function issuePasswordResetToken(
+  user: Pick<users, "id" | "email" | "first_name">,
+): Promise<void> {
+  const resetToken = generateOpaqueToken();
+
+  await authRepository.createVerificationToken({
+    public_id: generatePublicId(PUBLIC_ID_PREFIXES.VERIFICATION),
+    token_hash: hashToken(resetToken),
+    target: user.email,
+    purpose: verification_type.PASSWORD_RESET,
+    expires_at: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+    users_id: user.id,
+  });
+
+  sendPasswordResetEmail(user.email, user.first_name, resetToken).catch((error) => {
+    logger.error(
+      { err: error, email: user.email },
+      "Failed to send password reset email",
+    );
+  });
+}
+
+export async function requestPasswordReset(
+  input: RequestPasswordResetInput,
+): Promise<RequestPasswordResetResult> {
+  const user = await authRepository.findUserByEmailWithCredentials(input.email);
+
+  if (
+    user &&
+    user.status === user_status.ACTIVE &&
+    user.deleted_at === null
+  ) {
+    await authRepository.invalidateUnusedVerificationTokens(
+      user.id,
+      verification_type.PASSWORD_RESET,
+    );
+
+    await issuePasswordResetToken(user);
+
+    logger.info({ email: input.email }, "Password reset requested");
+  } else {
+    logger.info(
+      { email: input.email },
+      "Password reset requested for unknown or inactive account",
+    );
+  }
+
+  return {
+    message:
+      "If an account exists for the provided email, a password reset email has been sent.",
+  };
+}
+
+export async function verifyPasswordReset(
+  input: VerifyPasswordResetInput,
+): Promise<void> {
+  const tokenHash = hashToken(input.token);
+
+  const resetToken = await authRepository.findVerificationTokenByHash(
+    tokenHash,
+    verification_type.PASSWORD_RESET,
+  );
+
+  if (!resetToken) {
+    throw new NotFoundError("Password reset token not found");
+  }
+
+  if (resetToken.used_at !== null || resetToken.verified_at !== null) {
+    throw new GoneError("Password reset token has already been used");
+  }
+
+  if (resetToken.expires_at.getTime() < Date.now()) {
+    throw new GoneError("Password reset token has expired");
+  }
+
+  const password_hash = await hash(input.new_password, BCRYPT_ROUNDS);
+
+  await prisma.$transaction(async (tx) => {
+    await usersRepository.updatePassword(resetToken.users_id, password_hash, tx);
+    await usersRepository.revokeAllSessions(resetToken.users_id, tx);
+    await authRepository.invalidateVerificationToken(resetToken.id, tx);
+  });
+
+  logger.info({ users_id: resetToken.users_id }, "Password reset completed");
 }
