@@ -341,6 +341,28 @@ export const ordersRepository = {
     });
   },
 
+  async restoreCouponUsage(orders_id: number, client: DbClient = prisma) {
+    const usage = await client.coupon_usages.findUnique({
+      where: { orders_id },
+      select: { coupons_id: true },
+    });
+
+    if (!usage) {
+      return false;
+    }
+
+    await client.coupon_usages.delete({ where: { orders_id } });
+
+    await client.$executeRaw`
+      UPDATE ${couponsTable}
+      SET usage_count = usage_count - 1, updated_at = now()
+      WHERE id = ${usage.coupons_id}
+        AND usage_count > 0
+    `;
+
+    return true;
+  },
+
   createOrder(data: CreateOrderData, client: DbClient = prisma) {
     const now = new Date();
     const public_id = generatePublicId(PUBLIC_ID_PREFIXES.ORDER);

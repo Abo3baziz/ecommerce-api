@@ -83,6 +83,7 @@ describe("orders.service", () => {
       status?: order_status;
       quantity?: number;
       onHand?: number;
+      coupon?: Awaited<ReturnType<typeof createCoupon>>;
     } = {},
   ) {
     const user = await createUser();
@@ -188,6 +189,25 @@ describe("orders.service", () => {
       await prisma.inventory.update({
         where: { product_variants_id: variant.id },
         data: { quantity_reserved: quantity },
+      });
+    }
+
+    if (overrides.coupon) {
+      await prisma.coupon_usages.create({
+        data: {
+          orders_id: order.id,
+          coupons_id: overrides.coupon.id,
+          users_id: user.id,
+          discount_amount: new Prisma.Decimal("10.00"),
+          redeemed_at: now,
+        },
+      });
+      await prisma.coupons.update({
+        where: { id: overrides.coupon.id },
+        data: {
+          usage_count: overrides.coupon.usage_count + 1,
+          updated_at: now,
+        },
       });
     }
 
@@ -886,6 +906,120 @@ describe("orders.service", () => {
       });
       expect(payment?.status).toBe(payment_status.REFUNDED);
       expect(payment?.refunded_at).toBeTruthy();
+    });
+
+    it("restores the coupon quota when a confirmed order is cancelled", async () => {
+      const coupon = await createCoupon({
+        code: `RESTORE-${nanoid(8)}`,
+        usage_limit: 1,
+      });
+      const { user, order } = await createOrderInStatus({
+        status: order_status.CONFIRMED,
+        coupon,
+      });
+
+      await updateOrderStatus(
+        order.public_id,
+        { status: "cancelled" },
+        { id: user.id },
+      );
+
+      const usage = await prisma.coupon_usages.findFirst({
+        where: { orders_id: order.id },
+      });
+      expect(usage).toBeNull();
+
+      const updatedCoupon = await prisma.coupons.findUnique({
+        where: { id: coupon.id },
+      });
+      expect(updatedCoupon?.usage_count).toBe(0);
+
+      const address = await createAddress(user.id);
+      const cart = await createCart(user.id);
+      const variant = await createVariant(
+        await createProduct().then((p) => p.id),
+        { sku: `SKU-${nanoid(8)}`, price: "100.00" },
+      );
+      await createInventory(variant.id, { quantity_on_hand: 10 });
+      await createCartItem(cart.id, variant.id, 1);
+
+      const result = await placeOrder(user.id, {
+        address_public_id: address.public_id,
+        payment_method: "mock",
+        coupon_code: coupon.code,
+      });
+      expect(Number(result.discount_amount)).toBeGreaterThan(0);
+    });
+
+    it("restores the coupon quota when a pending order is cancelled", async () => {
+      const coupon = await createCoupon({
+        code: `RESTORE-P-${nanoid(8)}`,
+        usage_limit: 1,
+      });
+      const { user, order } = await createOrderInStatus({
+        status: order_status.PENDING,
+        coupon,
+      });
+
+      await updateOrderStatus(
+        order.public_id,
+        { status: "cancelled" },
+        { id: user.id },
+      );
+
+      const usage = await prisma.coupon_usages.findFirst({
+        where: { orders_id: order.id },
+      });
+      expect(usage).toBeNull();
+
+      const updatedCoupon = await prisma.coupons.findUnique({
+        where: { id: coupon.id },
+      });
+      expect(updatedCoupon?.usage_count).toBe(0);
+    });
+
+    it("keeps the coupon quota consumed when a returned order is refunded", async () => {
+      const coupon = await createCoupon({
+        code: `KEEP-${nanoid(8)}`,
+        usage_limit: 1,
+      });
+      const { user, order } = await createOrderInStatus({
+        status: order_status.RETURNED,
+        coupon,
+      });
+
+      await updateOrderStatus(
+        order.public_id,
+        { status: "refunded" },
+        { id: user.id },
+      );
+
+      const usage = await prisma.coupon_usages.findFirst({
+        where: { orders_id: order.id },
+      });
+      expect(usage).not.toBeNull();
+
+      const updatedCoupon = await prisma.coupons.findUnique({
+        where: { id: coupon.id },
+      });
+      expect(updatedCoupon?.usage_count).toBe(1);
+    });
+
+    it("no-ops coupon restore when the cancelled order had no coupon", async () => {
+      const { user, order } = await createOrderInStatus({
+        status: order_status.CONFIRMED,
+      });
+
+      await updateOrderStatus(
+        order.public_id,
+        { status: "cancelled" },
+        { id: user.id },
+      );
+
+      const usage = await prisma.coupon_usages.findFirst({
+        where: { orders_id: order.id },
+      });
+      expect(usage).toBeNull();
     });
 
     it("transitions confirmed to processing with no side effects", async () => {

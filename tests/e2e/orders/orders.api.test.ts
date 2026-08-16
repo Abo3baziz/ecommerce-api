@@ -263,6 +263,46 @@ describe("orders API", () => {
     });
   });
 
+  describe("coupon quota restore on cancellation", () => {
+    it("reuses the coupon after an admin cancels the order", async () => {
+      const { cookie } = await registerUser(app);
+      const { variant } = await createCatalog();
+      await addToCart(cookie!, variant.public_id, 2);
+      const coupon = await createCoupon({
+        code: `E2E-RESTORE-${nanoid(8)}`,
+        discount_type: discount_type.FIXED_AMOUNT,
+        discount_value: "25.00",
+        usage_limit: 1,
+      });
+      const addressResponse = await createAddress(cookie!);
+
+      const firstOrder = await placeOrder(
+        cookie!,
+        addressResponse.body.data.public_id,
+        { coupon_code: coupon.code },
+      );
+      expect(firstOrder.status).toBe(201);
+      expect(firstOrder.body.data.discount_amount).toBe("25.00");
+
+      const admin = await createAdminUser(app);
+      const cancelled = await request(app)
+        .patch(`${ADMIN_ORDERS_URL}/${firstOrder.body.data.public_id}`)
+        .set("Cookie", admin.cookie!)
+        .send({ status: "cancelled" });
+      expect(cancelled.status).toBe(200);
+      expect(cancelled.body.data.status).toBe("cancelled");
+
+      await addToCart(cookie!, variant.public_id, 2);
+      const secondOrder = await placeOrder(
+        cookie!,
+        addressResponse.body.data.public_id,
+        { coupon_code: coupon.code },
+      );
+      expect(secondOrder.status).toBe(201);
+      expect(secondOrder.body.data.discount_amount).toBe("25.00");
+    });
+  });
+
   describe("GET /api/v1/orders", () => {
     it("returns an empty history for a new user (200)", async () => {
       const { cookie } = await registerUser(app);

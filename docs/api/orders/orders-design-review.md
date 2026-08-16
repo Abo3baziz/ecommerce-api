@@ -42,7 +42,9 @@ and treat 0 affected rows as a 409 (moves the limit check into the same statemen
 
 `countCouponUsagesByUser` counts every redemption ever, and cancel/refund neither removes the `coupon_usages` row nor decrements `usage_count`. So a coupon redeemed, then the order cancelled, still burns quota. The doc says "the session user's prior usage" — ambiguous.
 
-**Fix (decision needed)**: either (a) document this as intended (quota = lifetime redemptions), or (b) delete/decrement on `pending → cancelled` (stock released, order never charged) — cheap to do inside the existing transaction. At minimum, note it explicitly in the doc's Business Rules.
+**Decision (resolved)**: quota is restored when an order is cancelled **before fulfillment** (`pending/confirmed/processing → cancelled`) and stays consumed on post-fulfillment refunds (`returned → refunded`). Rationale: a pre-fulfillment cancellation means the sale never happened (the payment is refunded, stock released) — restoring the quota is customer-friendly with no abuse vector, since every *active* redemption still counts toward `usage_limit`. A refunded order was fulfilled and returned, so the coupon already served its conversion purpose and stays consumed.
+
+**Implemented**: `restoreCouponUsage(orders_id, client)` in the orders repository deletes the order's `coupon_usages` row (restoring the per-user count; `orders_id` is unique) and guarded-decrements `coupons.usage_count` (`WHERE usage_count > 0`), all inside the existing status-transition `$transaction`; called only in the `CANCELLED` case of `updateOrderStatus`. Covered by integration + e2e tests; business rule added to `docs/api/orders/orders.md`.
 
 ### 2.4 🟡 Low — Admin status update is read-then-act, no row lock
 
@@ -78,8 +80,7 @@ and treat 0 affected rows as a 409 (moves the limit check into the same statemen
 ## 4. Recommended action
 
 1. **Fix now** (small, testable): cap discount at subtotal (§2.1); guarded atomic `usage_count` increment (§2.2).
-2. **Decide + document**: cancelled/refunded coupon quota semantics (§2.3).
-3. **Next touch**: row-lock the admin transition (§2.4), check `updateMany` counts (§2.5).
-4. **Document**: case-sensitivity (§2.6) and LIKE-wildcard notes (§2.7).
+2. **Next touch**: row-lock the admin transition (§2.4), check `updateMany` counts (§2.5).
+3. **Document**: case-sensitivity (§2.6) and LIKE-wildcard notes (§2.7).
 
 None of these block the merge already done; they're hardening items.
