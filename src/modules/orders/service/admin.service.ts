@@ -169,6 +169,7 @@ export async function updateOrderStatus(
         } else {
           await ordersRepository.markPaymentRefunded(order.id, now, tx);
         }
+        await ordersRepository.restoreCouponUsage(order.id, tx);
         break;
       }
       case order_status.SHIPPED: {

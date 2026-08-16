@@ -456,6 +456,7 @@ Any authenticated user. The order is created for, and the cart consumed from, th
 - The mock payment always succeeds synchronously; the order is therefore created in the `confirmed` state with stock committed. `pending` remains the initial state for future asynchronous providers.
 - Order placement is effectively idempotent for the customer: after a successful checkout the cart is gone, so a duplicate request is rejected (404/409) rather than double-charging. Parallel duplicate checkouts are serialized by the per-user advisory lock (see **Security Considerations** and **Design Decisions**).
 - `coupon_usages.orders_id` is unique, so at most one coupon applies per order.
+- **Coupon quota semantics on cancellation/refund:** cancelling an order **before fulfillment** (`pending/confirmed/processing → cancelled`) deletes its `coupon_usages` row and decrements the coupon's `usage_count` (never below zero), so the coupon can be reused. Refunding a **returned** order (`returned → refunded`) does **not** restore quota — the coupon stays consumed (see `docs/api/orders/orders-design-review.md` §2.3).
 
 ---
 
