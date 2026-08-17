@@ -6,7 +6,9 @@ import {
   createAdminUser,
   createSuperAdminUser,
   registerUser,
+  csrfHeaders,
 } from "../../helpers/auth.js";
+import type { CsrfPair } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { createProduct } from "../../factories/product.factory.js";
 import { createVariant } from "../../factories/variant.factory.js";
@@ -48,37 +50,49 @@ async function createCatalog(overrides: {
   return { product, variant };
 }
 
-async function addToCart(cookie: string, variantPublicId: string, quantity = 1) {
+async function addToCart(
+  cookie: string,
+  csrf: CsrfPair,
+  variantPublicId: string,
+  quantity = 1,
+) {
   return request(app)
     .post(CART_ITEMS_URL)
-    .set("Cookie", cookie)
+    .set(csrfHeaders(cookie, csrf))
     .send({ variant_public_id: variantPublicId, quantity });
 }
 
-async function createAddress(cookie: string) {
+async function createAddress(cookie: string, csrf: CsrfPair) {
   const response = await request(app)
     .post(ADDRESS_URL)
-    .set("Cookie", cookie)
+    .set(csrfHeaders(cookie, csrf))
     .send(validAddressPayload());
   return response;
 }
 
-async function placeOrder(cookie: string, addressPublicId: string, body: Record<string, unknown> = {}) {
+async function placeOrder(
+  cookie: string,
+  csrf: CsrfPair,
+  addressPublicId: string,
+  body: Record<string, unknown> = {},
+) {
   return request(app)
     .post(ORDERS_URL)
-    .set("Cookie", cookie)
+    .set(csrfHeaders(cookie, csrf))
     .send({ address_public_id: addressPublicId, payment_method: "mock", ...body });
 }
 
 async function createReadyOrder(
   cookie: string,
+  csrf: CsrfPair,
   overrides: { quantity?: number; stock?: number } = {},
 ) {
   const { variant } = await createCatalog(overrides);
-  await addToCart(cookie, variant.public_id, overrides.quantity ?? 1);
-  const addressResponse = await createAddress(cookie);
+  await addToCart(cookie, csrf, variant.public_id, overrides.quantity ?? 1);
+  const addressResponse = await createAddress(cookie, csrf);
   const orderResponse = await placeOrder(
     cookie,
+    csrf,
     addressResponse.body.data.public_id,
   );
   return { variant, address: addressResponse, order: orderResponse };
@@ -117,12 +131,12 @@ describe("orders API", () => {
 
   describe("POST /api/v1/orders", () => {
     it("places an order and returns the confirmed projection (201)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const { variant } = await createCatalog();
 
-      await addToCart(cookie!, variant.public_id, 2);
-      const addressResponse = await createAddress(cookie!);
-      const response = await placeOrder(cookie!, addressResponse.body.data.public_id);
+      await addToCart(cookie!, csrf!, variant.public_id, 2);
+      const addressResponse = await createAddress(cookie!, csrf!);
+      const response = await placeOrder(cookie!, csrf!, addressResponse.body.data.public_id);
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
@@ -149,12 +163,12 @@ describe("orders API", () => {
     });
 
     it("echoes notes on the created order (201)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const { variant } = await createCatalog();
-      await addToCart(cookie!, variant.public_id);
-      const addressResponse = await createAddress(cookie!);
+      await addToCart(cookie!, csrf!, variant.public_id);
+      const addressResponse = await createAddress(cookie!, csrf!);
 
-      const response = await placeOrder(cookie!, addressResponse.body.data.public_id, {
+      const response = await placeOrder(cookie!, csrf!, addressResponse.body.data.public_id, {
         notes: "Leave at the front door",
       });
 
@@ -163,17 +177,17 @@ describe("orders API", () => {
     });
 
     it("applies a valid coupon (201)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const { variant } = await createCatalog();
-      await addToCart(cookie!, variant.public_id, 2);
+      await addToCart(cookie!, csrf!, variant.public_id, 2);
       const coupon = await createCoupon({
         code: `E2E-${nanoid(8)}`,
         discount_type: discount_type.FIXED_AMOUNT,
         discount_value: "25.00",
       });
-      const addressResponse = await createAddress(cookie!);
+      const addressResponse = await createAddress(cookie!, csrf!);
 
-      const response = await placeOrder(cookie!, addressResponse.body.data.public_id, {
+      const response = await placeOrder(cookie!, csrf!, addressResponse.body.data.public_id, {
         coupon_code: coupon.code,
       });
 
@@ -183,13 +197,13 @@ describe("orders API", () => {
     });
 
     it("returns 400 for an unsupported payment_method", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       await createCatalog();
-      const addressResponse = await createAddress(cookie!);
+      const addressResponse = await createAddress(cookie!, csrf!);
 
       const response = await request(app)
         .post(ORDERS_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({
           address_public_id: addressResponse.body.data.public_id,
           payment_method: "stripe",
@@ -200,62 +214,62 @@ describe("orders API", () => {
     });
 
     it("returns 400 for a missing address_public_id", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       await createCatalog();
 
       const response = await request(app)
         .post(ORDERS_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ payment_method: "mock" });
 
       expect(response.status).toBe(400);
     });
 
     it("returns 404 for an unknown address", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       await createCatalog();
-      await addToCart(cookie!, (await createCatalog()).variant.public_id);
+      await addToCart(cookie!, csrf!, (await createCatalog()).variant.public_id);
 
-      const response = await placeOrder(cookie!, `adr_${nanoid(10)}`);
+      const response = await placeOrder(cookie!, csrf!, `adr_${nanoid(10)}`);
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
     });
 
     it("returns 409 for an empty cart", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const { variant } = await createCatalog();
-      await addToCart(cookie!, variant.public_id);
+      await addToCart(cookie!, csrf!, variant.public_id);
       await request(app)
         .delete(`${CART_ITEMS_URL}/${variant.public_id}`)
-        .set("Cookie", cookie!);
-      const addressResponse = await createAddress(cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
+      const addressResponse = await createAddress(cookie!, csrf!);
 
-      const response = await placeOrder(cookie!, addressResponse.body.data.public_id);
+      const response = await placeOrder(cookie!, csrf!, addressResponse.body.data.public_id);
 
       expect(response.status).toBe(409);
       expect(response.body.success).toBe(false);
     });
 
     it("returns 409 for insufficient stock", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       await createCatalog({ stock: 1 });
-      const addressResponse = await createAddress(cookie!);
+      const addressResponse = await createAddress(cookie!, csrf!);
       const { variant } = await createCatalog({ stock: 1 });
-      await addToCart(cookie!, variant.public_id, 2);
+      await addToCart(cookie!, csrf!, variant.public_id, 2);
 
-      const response = await placeOrder(cookie!, addressResponse.body.data.public_id);
+      const response = await placeOrder(cookie!, csrf!, addressResponse.body.data.public_id);
 
       expect(response.status).toBe(409);
     });
 
     it("returns 409 for an invalid coupon code", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const { variant } = await createCatalog();
-      await addToCart(cookie!, variant.public_id);
-      const addressResponse = await createAddress(cookie!);
+      await addToCart(cookie!, csrf!, variant.public_id);
+      const addressResponse = await createAddress(cookie!, csrf!);
 
-      const response = await placeOrder(cookie!, addressResponse.body.data.public_id, {
+      const response = await placeOrder(cookie!, csrf!, addressResponse.body.data.public_id, {
         coupon_code: "NOT-A-COUPON",
       });
 
@@ -265,19 +279,20 @@ describe("orders API", () => {
 
   describe("coupon quota restore on cancellation", () => {
     it("reuses the coupon after an admin cancels the order", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const { variant } = await createCatalog();
-      await addToCart(cookie!, variant.public_id, 2);
+      await addToCart(cookie!, csrf!, variant.public_id, 2);
       const coupon = await createCoupon({
         code: `E2E-RESTORE-${nanoid(8)}`,
         discount_type: discount_type.FIXED_AMOUNT,
         discount_value: "25.00",
         usage_limit: 1,
       });
-      const addressResponse = await createAddress(cookie!);
+      const addressResponse = await createAddress(cookie!, csrf!);
 
       const firstOrder = await placeOrder(
         cookie!,
+        csrf!,
         addressResponse.body.data.public_id,
         { coupon_code: coupon.code },
       );
@@ -287,14 +302,15 @@ describe("orders API", () => {
       const admin = await createAdminUser(app);
       const cancelled = await request(app)
         .patch(`${ADMIN_ORDERS_URL}/${firstOrder.body.data.public_id}`)
-        .set("Cookie", admin.cookie!)
+        .set(csrfHeaders(admin.cookie!, admin.csrf!))
         .send({ status: "cancelled" });
       expect(cancelled.status).toBe(200);
       expect(cancelled.body.data.status).toBe("cancelled");
 
-      await addToCart(cookie!, variant.public_id, 2);
+      await addToCart(cookie!, csrf!, variant.public_id, 2);
       const secondOrder = await placeOrder(
         cookie!,
+        csrf!,
         addressResponse.body.data.public_id,
         { coupon_code: coupon.code },
       );
@@ -305,7 +321,7 @@ describe("orders API", () => {
 
   describe("GET /api/v1/orders", () => {
     it("returns an empty history for a new user (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app).get(ORDERS_URL).set("Cookie", cookie!);
 
@@ -316,8 +332,8 @@ describe("orders API", () => {
     });
 
     it("returns the user's orders", async () => {
-      const { cookie } = await registerUser(app);
-      const { order } = await createReadyOrder(cookie!);
+      const { cookie, csrf } = await registerUser(app);
+      const { order } = await createReadyOrder(cookie!, csrf!);
 
       const response = await request(app).get(ORDERS_URL).set("Cookie", cookie!);
 
@@ -328,8 +344,8 @@ describe("orders API", () => {
     });
 
     it("filters by status", async () => {
-      const { cookie } = await registerUser(app);
-      await createReadyOrder(cookie!);
+      const { cookie, csrf } = await registerUser(app);
+      await createReadyOrder(cookie!, csrf!);
 
       const confirmed = await request(app)
         .get(`${ORDERS_URL}?status=confirmed`)
@@ -343,7 +359,7 @@ describe("orders API", () => {
     });
 
     it("returns 400 for an invalid sort field", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(`${ORDERS_URL}?sort=customer_name`)
@@ -353,7 +369,7 @@ describe("orders API", () => {
     });
 
     it("returns 400 for an invalid status", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(`${ORDERS_URL}?status=paid`)
@@ -365,8 +381,8 @@ describe("orders API", () => {
 
   describe("GET /api/v1/orders/:order_public_id", () => {
     it("returns the requesting user's order (200)", async () => {
-      const { cookie } = await registerUser(app);
-      const { order } = await createReadyOrder(cookie!);
+      const { cookie, csrf } = await registerUser(app);
+      const { order } = await createReadyOrder(cookie!, csrf!);
 
       const response = await request(app)
         .get(`${ORDERS_URL}/${order.body.data.public_id}`)
@@ -377,8 +393,8 @@ describe("orders API", () => {
     });
 
     it("returns 404 for another user's order", async () => {
-      const { cookie } = await registerUser(app);
-      const { order } = await createReadyOrder(cookie!);
+      const { cookie, csrf } = await registerUser(app);
+      const { order } = await createReadyOrder(cookie!, csrf!);
       const other = await registerUser(app);
 
       const response = await request(app)
@@ -389,7 +405,7 @@ describe("orders API", () => {
     });
 
     it("returns 404 for an unknown order", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(`${ORDERS_URL}/ord_${nanoid(10)}`)
@@ -401,8 +417,8 @@ describe("orders API", () => {
 
   describe("admin authorization", () => {
     it("returns 403 for a customer on admin endpoints", async () => {
-      const { cookie } = await registerUser(app);
-      const { order } = await createReadyOrder(cookie!);
+      const { cookie, csrf } = await registerUser(app);
+      const { order } = await createReadyOrder(cookie!, csrf!);
       const publicId = order.body.data.public_id;
 
       const list = await request(app)
@@ -413,7 +429,7 @@ describe("orders API", () => {
         .set("Cookie", cookie!);
       const patch = await request(app)
         .patch(`${ADMIN_ORDERS_URL}/${publicId}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ status: "processing" });
 
       expect(list.status).toBe(403);
@@ -425,7 +441,7 @@ describe("orders API", () => {
   describe("GET /api/v1/admin/orders", () => {
     it("returns admin rows with customer summaries", async () => {
       const customer = await registerUser(app);
-      const { order } = await createReadyOrder(customer.cookie!);
+      const { order } = await createReadyOrder(customer.cookie!, customer.csrf!);
       const admin = await createAdminUser(app);
 
       const response = await request(app)
@@ -446,7 +462,7 @@ describe("orders API", () => {
 
     it("filters by status and search", async () => {
       const customer = await registerUser(app);
-      await createReadyOrder(customer.cookie!);
+      await createReadyOrder(customer.cookie!, customer.csrf!);
       const admin = await createSuperAdminUser(app);
 
       const byStatus = await request(app)
@@ -480,7 +496,7 @@ describe("orders API", () => {
   describe("GET /api/v1/admin/orders/:order_public_id", () => {
     it("returns the full admin projection", async () => {
       const customer = await registerUser(app);
-      const { order } = await createReadyOrder(customer.cookie!);
+      const { order } = await createReadyOrder(customer.cookie!, customer.csrf!);
       const admin = await createAdminUser(app);
 
       const response = await request(app)
@@ -509,20 +525,20 @@ describe("orders API", () => {
   describe("PATCH /api/v1/admin/orders/:order_public_id", () => {
     it("transitions an order through the lifecycle (200)", async () => {
       const customer = await registerUser(app);
-      const { order } = await createReadyOrder(customer.cookie!);
+      const { order } = await createReadyOrder(customer.cookie!, customer.csrf!);
       const admin = await createAdminUser(app);
       const publicId = order.body.data.public_id;
 
       const processing = await request(app)
         .patch(`${ADMIN_ORDERS_URL}/${publicId}`)
-        .set("Cookie", admin.cookie!)
+        .set(csrfHeaders(admin.cookie!, admin.csrf!))
         .send({ status: "processing" });
       expect(processing.status).toBe(200);
       expect(processing.body.data.status).toBe("processing");
 
       const shipped = await request(app)
         .patch(`${ADMIN_ORDERS_URL}/${publicId}`)
-        .set("Cookie", admin.cookie!)
+        .set(csrfHeaders(admin.cookie!, admin.csrf!))
         .send({ status: "shipped", carrier: "DHL", tracking_number: "TRK-1" });
       expect(shipped.status).toBe(200);
       expect(shipped.body.data.status).toBe("shipped");
@@ -532,7 +548,7 @@ describe("orders API", () => {
 
       const delivered = await request(app)
         .patch(`${ADMIN_ORDERS_URL}/${publicId}`)
-        .set("Cookie", admin.cookie!)
+        .set(csrfHeaders(admin.cookie!, admin.csrf!))
         .send({ status: "delivered" });
       expect(delivered.status).toBe(200);
       expect(delivered.body.data.status).toBe("delivered");
@@ -541,12 +557,12 @@ describe("orders API", () => {
 
     it("returns 400 when shipping without a carrier", async () => {
       const customer = await registerUser(app);
-      const { order } = await createReadyOrder(customer.cookie!);
+      const { order } = await createReadyOrder(customer.cookie!, customer.csrf!);
       const admin = await createAdminUser(app);
 
       const response = await request(app)
         .patch(`${ADMIN_ORDERS_URL}/${order.body.data.public_id}`)
-        .set("Cookie", admin.cookie!)
+        .set(csrfHeaders(admin.cookie!, admin.csrf!))
         .send({ status: "shipped" });
 
       expect(response.status).toBe(400);
@@ -554,12 +570,12 @@ describe("orders API", () => {
 
     it("returns 409 for an illegal transition", async () => {
       const customer = await registerUser(app);
-      const { order } = await createReadyOrder(customer.cookie!);
+      const { order } = await createReadyOrder(customer.cookie!, customer.csrf!);
       const admin = await createAdminUser(app);
 
       const response = await request(app)
         .patch(`${ADMIN_ORDERS_URL}/${order.body.data.public_id}`)
-        .set("Cookie", admin.cookie!)
+        .set(csrfHeaders(admin.cookie!, admin.csrf!))
         .send({ status: "delivered" });
 
       expect(response.status).toBe(409);
@@ -568,12 +584,12 @@ describe("orders API", () => {
 
     it("returns 409 for an unchanged status", async () => {
       const customer = await registerUser(app);
-      const { order } = await createReadyOrder(customer.cookie!);
+      const { order } = await createReadyOrder(customer.cookie!, customer.csrf!);
       const admin = await createAdminUser(app);
 
       const response = await request(app)
         .patch(`${ADMIN_ORDERS_URL}/${order.body.data.public_id}`)
-        .set("Cookie", admin.cookie!)
+        .set(csrfHeaders(admin.cookie!, admin.csrf!))
         .send({ status: "confirmed" });
 
       expect(response.status).toBe(409);
@@ -581,12 +597,12 @@ describe("orders API", () => {
 
     it("returns 400 for an invalid status", async () => {
       const customer = await registerUser(app);
-      const { order } = await createReadyOrder(customer.cookie!);
+      const { order } = await createReadyOrder(customer.cookie!, customer.csrf!);
       const admin = await createAdminUser(app);
 
       const response = await request(app)
         .patch(`${ADMIN_ORDERS_URL}/${order.body.data.public_id}`)
-        .set("Cookie", admin.cookie!)
+        .set(csrfHeaders(admin.cookie!, admin.csrf!))
         .send({ status: "paid" });
 
       expect(response.status).toBe(400);
@@ -597,7 +613,7 @@ describe("orders API", () => {
 
       const response = await request(app)
         .patch(`${ADMIN_ORDERS_URL}/ord_${nanoid(10)}`)
-        .set("Cookie", admin.cookie!)
+        .set(csrfHeaders(admin.cookie!, admin.csrf!))
         .send({ status: "processing" });
 
       expect(response.status).toBe(404);

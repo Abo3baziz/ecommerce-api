@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
-import { createAdminUser, registerUser } from "../../helpers/auth.js";
+import { createAdminUser, registerUser, csrfHeaders } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { createProduct } from "../../factories/product.factory.js";
 import { createVariant } from "../../factories/variant.factory.js";
@@ -118,7 +118,7 @@ describe("products API", () => {
       });
 
       it("returns 403 for a non-admin session", async () => {
-        const { cookie } = await registerUser(app);
+        const { cookie, csrf } = await registerUser(app);
 
         const response = await request(app)
           .get(ADMIN_BASE_URL)
@@ -130,7 +130,7 @@ describe("products API", () => {
 
     describe("GET /api/v1/admin/products", () => {
       it("lists products and excludes deleted ones by default (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const active = await createProduct();
         await createVariant(active.id);
         await createProduct({ deleted_at: new Date() });
@@ -146,7 +146,7 @@ describe("products API", () => {
       });
 
       it("includes deleted products when include_deleted=true (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const deleted = await createProduct({ deleted_at: new Date() });
         await createVariant(deleted.id);
 
@@ -164,11 +164,11 @@ describe("products API", () => {
 
     describe("POST /api/v1/admin/products", () => {
       it("creates a product and auto-generates a slug (201)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
 
         const response = await request(app)
           .post(ADMIN_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ name: "Wireless Noise-Cancelling Headphones" });
 
         expect(response.status).toBe(201);
@@ -179,12 +179,12 @@ describe("products API", () => {
       });
 
       it("returns 409 for a duplicate slug", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         await createProduct({ slug: "existing-slug" });
 
         const response = await request(app)
           .post(ADMIN_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ name: "New Product", slug: "existing-slug" });
 
         expect(response.status).toBe(409);
@@ -192,11 +192,11 @@ describe("products API", () => {
       });
 
       it("rejects a malformed slug (400)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
 
         const response = await request(app)
           .post(ADMIN_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ name: "New Product", slug: "Invalid Slug!" });
 
         expect(response.status).toBe(400);
@@ -205,7 +205,7 @@ describe("products API", () => {
 
     describe("GET /api/v1/admin/products/:product_public_id", () => {
       it("returns the admin detail (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const product = await createProduct();
         await createVariant(product.id, { cost_price: "85.00" });
 
@@ -219,7 +219,7 @@ describe("products API", () => {
       });
 
       it("returns 404 for a soft-deleted product", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const product = await createProduct({ deleted_at: new Date() });
 
         const response = await request(app)
@@ -232,12 +232,12 @@ describe("products API", () => {
 
     describe("PATCH /api/v1/admin/products/:product_public_id", () => {
       it("updates the product (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const product = await createProduct({ brand: "OldBrand" });
 
         const response = await request(app)
           .patch(`${ADMIN_BASE_URL}/${product.public_id}`)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ name: "Updated Product", brand: null });
 
         expect(response.status).toBe(200);
@@ -247,13 +247,13 @@ describe("products API", () => {
       });
 
       it("returns 409 for a slug conflict", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const first = await createProduct({ slug: "first-slug" });
         const second = await createProduct({ slug: "second-slug" });
 
         const response = await request(app)
           .patch(`${ADMIN_BASE_URL}/${second.public_id}`)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ slug: "first-slug" });
 
         expect(response.status).toBe(409);
@@ -262,13 +262,13 @@ describe("products API", () => {
 
     describe("DELETE /api/v1/admin/products/:product_public_id", () => {
       it("soft-deletes the product and its variants (204)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const product = await createProduct();
         await createVariant(product.id);
 
         const response = await request(app)
           .delete(`${ADMIN_BASE_URL}/${product.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(204);
 
@@ -279,12 +279,12 @@ describe("products API", () => {
       });
 
       it("returns 404 for an already deleted product", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const product = await createProduct({ deleted_at: new Date() });
 
         const response = await request(app)
           .delete(`${ADMIN_BASE_URL}/${product.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(404);
       });

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
-import { createAdminUser, registerUser } from "../../helpers/auth.js";
+import { createAdminUser, registerUser, csrfHeaders } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { imageKitImageUrl } from "../../helpers/image-url.js";
 import { createProduct } from "../../factories/product.factory.js";
@@ -37,7 +37,7 @@ describe("product variant images API", () => {
     it("returns 403 for a non-admin session", async () => {
       const product = await createProduct();
       const variant = await createVariant(product.id);
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(
@@ -51,7 +51,7 @@ describe("product variant images API", () => {
 
   describe("GET /api/v1/admin/products/:product_public_id/variants/:variant_public_id/images", () => {
     it("lists the variant's images ordered by display_order (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       const first = await createVariantImage(variant.id, { display_order: 1 });
@@ -77,7 +77,7 @@ describe("product variant images API", () => {
     });
 
     it("returns 404 for an unknown variant", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
 
       const response = await request(app)
@@ -90,7 +90,7 @@ describe("product variant images API", () => {
     });
 
     it("returns 404 for a variant of another product", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const otherProduct = await createProduct();
       const variant = await createVariant(product.id);
@@ -107,7 +107,7 @@ describe("product variant images API", () => {
 
   describe("POST /api/v1/admin/products/:product_public_id/variants/:variant_public_id/images", () => {
     it("creates a variant image with display_order 0 (201)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
@@ -115,7 +115,7 @@ describe("product variant images API", () => {
         .post(
           `/api/v1/admin/products/${product.public_id}/variants/${variant.public_id}/images`,
         )
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(variantImagePayload());
 
       expect(response.status).toBe(201);
@@ -129,7 +129,7 @@ describe("product variant images API", () => {
     });
 
     it("appends the display_order when omitted (201)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createVariantImage(variant.id, { display_order: 0 });
@@ -138,7 +138,7 @@ describe("product variant images API", () => {
         .post(
           `/api/v1/admin/products/${product.public_id}/variants/${variant.public_id}/images`,
         )
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(variantImagePayload());
 
       expect(response.status).toBe(201);
@@ -146,7 +146,7 @@ describe("product variant images API", () => {
     });
 
     it("returns 409 for a duplicate display_order", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createVariantImage(variant.id, { display_order: 3 });
@@ -155,7 +155,7 @@ describe("product variant images API", () => {
         .post(
           `/api/v1/admin/products/${product.public_id}/variants/${variant.public_id}/images`,
         )
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(variantImagePayload({ display_order: 3 }));
 
       expect(response.status).toBe(409);
@@ -163,7 +163,7 @@ describe("product variant images API", () => {
     });
 
     it("rejects an invalid image_url (400)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
@@ -171,7 +171,7 @@ describe("product variant images API", () => {
         .post(
           `/api/v1/admin/products/${product.public_id}/variants/${variant.public_id}/images`,
         )
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ image_url: "javascript:alert(1)" });
 
       expect(response.status).toBe(400);
@@ -180,7 +180,7 @@ describe("product variant images API", () => {
 
   describe("GET /api/v1/admin/products/:product_public_id/variants/:variant_public_id/images/:variant_image_public_id", () => {
     it("returns a single variant image (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       const image = await createVariantImage(variant.id);
@@ -197,7 +197,7 @@ describe("product variant images API", () => {
     });
 
     it("returns 404 for an image of another variant", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       const otherVariant = await createVariant(product.id);
@@ -215,7 +215,7 @@ describe("product variant images API", () => {
 
   describe("PATCH /api/v1/admin/products/:product_public_id/variants/:variant_public_id/images/:variant_image_public_id", () => {
     it("updates the image and clears alt_text with null (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       const image = await createVariantImage(variant.id, { alt_text: "Old alt" });
@@ -224,7 +224,7 @@ describe("product variant images API", () => {
         .patch(
           `/api/v1/admin/products/${product.public_id}/variants/${variant.public_id}/images/${image.public_id}`,
         )
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ alt_text: null, display_order: 4 });
 
       expect(response.status).toBe(200);
@@ -233,7 +233,7 @@ describe("product variant images API", () => {
     });
 
     it("returns 409 for a display_order conflict", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       const first = await createVariantImage(variant.id, { display_order: 1 });
@@ -243,7 +243,7 @@ describe("product variant images API", () => {
         .patch(
           `/api/v1/admin/products/${product.public_id}/variants/${variant.public_id}/images/${second.public_id}`,
         )
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ display_order: 1 });
 
       expect(response.status).toBe(409);
@@ -252,7 +252,7 @@ describe("product variant images API", () => {
 
   describe("DELETE /api/v1/admin/products/:product_public_id/variants/:variant_public_id/images/:variant_image_public_id", () => {
     it("hard-deletes the image (204) and removes it from the list", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       const image = await createVariantImage(variant.id);
@@ -261,7 +261,7 @@ describe("product variant images API", () => {
         .delete(
           `/api/v1/admin/products/${product.public_id}/variants/${variant.public_id}/images/${image.public_id}`,
         )
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(204);
 
@@ -274,7 +274,7 @@ describe("product variant images API", () => {
     });
 
     it("returns 404 for an image of another variant", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       const otherVariant = await createVariant(product.id);
@@ -284,7 +284,7 @@ describe("product variant images API", () => {
         .delete(
           `/api/v1/admin/products/${product.public_id}/variants/${otherVariant.public_id}/images/${image.public_id}`,
         )
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(404);
     });

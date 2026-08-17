@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
-import { registerUser } from "../../helpers/auth.js";
+import { registerUser, csrfHeaders } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { randomPhoneNumber } from "../../helpers/random.js";
 
@@ -36,7 +36,7 @@ describe("addresses API", () => {
     });
 
     it("returns an empty list with pagination metadata (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(BASE_URL)
@@ -56,11 +56,11 @@ describe("addresses API", () => {
     });
 
     it("lists addresses with pagination metadata (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       for (let index = 0; index < 3; index += 1) {
         await request(app)
           .post(BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send(addressPayload());
       }
 
@@ -83,11 +83,11 @@ describe("addresses API", () => {
 
   describe("POST /api/v1/users/me/addresses", () => {
     it("creates an address as default when it is the first one (201)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .post(BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(addressPayload());
 
       expect(response.status).toBe(201);
@@ -99,15 +99,15 @@ describe("addresses API", () => {
     });
 
     it("does not default a subsequent address (201)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       await request(app)
         .post(BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(addressPayload());
 
       const response = await request(app)
         .post(BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(addressPayload());
 
       expect(response.status).toBe(201);
@@ -116,11 +116,11 @@ describe("addresses API", () => {
     });
 
     it("rejects an invalid payload (400)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .post(BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ recipient_name: "" });
 
       expect(response.status).toBe(400);
@@ -130,10 +130,10 @@ describe("addresses API", () => {
 
   describe("GET /api/v1/users/me/addresses/:address_public_id", () => {
     it("returns an owned address (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const created = await request(app)
         .post(BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(addressPayload());
 
       const response = await request(app)
@@ -146,7 +146,7 @@ describe("addresses API", () => {
     });
 
     it("returns 404 for an unknown address", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(`${BASE_URL}/adr_${nanoid(10)}`)
@@ -161,7 +161,7 @@ describe("addresses API", () => {
       const other = await registerUser(app);
       const created = await request(app)
         .post(BASE_URL)
-        .set("Cookie", owner.cookie!)
+        .set(csrfHeaders(owner.cookie!, owner.csrf!))
         .send(addressPayload());
 
       const response = await request(app)
@@ -174,15 +174,15 @@ describe("addresses API", () => {
 
   describe("PATCH /api/v1/users/me/addresses/:address_public_id", () => {
     it("updates an owned address (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const created = await request(app)
         .post(BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(addressPayload());
 
       const response = await request(app)
         .patch(`${BASE_URL}/${created.body.data.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ recipient_name: "Omar Hassan", city: "Giza" });
 
       expect(response.status).toBe(200);
@@ -196,12 +196,12 @@ describe("addresses API", () => {
       const other = await registerUser(app);
       const created = await request(app)
         .post(BASE_URL)
-        .set("Cookie", owner.cookie!)
+        .set(csrfHeaders(owner.cookie!, owner.csrf!))
         .send(addressPayload());
 
       const response = await request(app)
         .patch(`${BASE_URL}/${created.body.data.public_id}`)
-        .set("Cookie", other.cookie!)
+        .set(csrfHeaders(other.cookie!, other.csrf!))
         .send({ recipient_name: "Omar" });
 
       expect(response.status).toBe(404);
@@ -210,15 +210,15 @@ describe("addresses API", () => {
 
   describe("DELETE /api/v1/users/me/addresses/:address_public_id", () => {
     it("deletes an owned address (204) and hides it afterwards", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const created = await request(app)
         .post(BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(addressPayload());
 
       const response = await request(app)
         .delete(`${BASE_URL}/${created.body.data.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(204);
 
@@ -233,12 +233,12 @@ describe("addresses API", () => {
       const other = await registerUser(app);
       const created = await request(app)
         .post(BASE_URL)
-        .set("Cookie", owner.cookie!)
+        .set(csrfHeaders(owner.cookie!, owner.csrf!))
         .send(addressPayload());
 
       const response = await request(app)
         .delete(`${BASE_URL}/${created.body.data.public_id}`)
-        .set("Cookie", other.cookie!);
+        .set(csrfHeaders(other.cookie!, other.csrf!))
 
       expect(response.status).toBe(404);
     });

@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
 import { sendEmailChangeVerificationEmail } from "../../../src/shared/mailer/emailChange.js";
 import { sendSms } from "../../../src/shared/sms/index.js";
-import { loginUser, registerUser } from "../../helpers/auth.js";
+import { loginUser, registerUser, csrfHeaders } from "../../helpers/auth.js";
 import { TEST_PASSWORD } from "../../factories/user.factory.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { randomPhoneNumber } from "../../helpers/random.js";
@@ -45,7 +45,7 @@ describe("users API", () => {
     });
 
     it("returns the current user profile (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get("/api/v1/users/me")
@@ -62,11 +62,11 @@ describe("users API", () => {
 
   describe("PATCH /api/v1/users/me", () => {
     it("updates the current user profile (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .patch("/api/v1/users/me")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ first_name: "Omar", last_name: "Hassan" });
 
       expect(response.status).toBe(200);
@@ -76,11 +76,11 @@ describe("users API", () => {
     });
 
     it("rejects an invalid payload (400)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .patch("/api/v1/users/me")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ first_name: "" });
 
       expect(response.status).toBe(400);
@@ -90,11 +90,11 @@ describe("users API", () => {
 
   describe("DELETE /api/v1/users/me", () => {
     it("deletes the account with a valid password (204)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .delete("/api/v1/users/me")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ password: TEST_PASSWORD });
 
       expect(response.status).toBe(204);
@@ -106,11 +106,11 @@ describe("users API", () => {
     });
 
     it("rejects an incorrect password (401)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .delete("/api/v1/users/me")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ password: "WrongPassword123!" });
 
       expect(response.status).toBe(401);
@@ -120,12 +120,12 @@ describe("users API", () => {
 
   describe("PATCH /api/v1/users/me/password", () => {
     it("changes the password and keeps the current session (204)", async () => {
-      const { payload, cookie } = await registerUser(app);
+      const { payload, cookie, csrf } = await registerUser(app);
       const newPassword = "NewStrongPassword456!";
 
       const response = await request(app)
         .patch("/api/v1/users/me/password")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ current_password: TEST_PASSWORD, new_password: newPassword });
 
       expect(response.status).toBe(204);
@@ -143,11 +143,11 @@ describe("users API", () => {
     });
 
     it("rejects an incorrect current password (401)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .patch("/api/v1/users/me/password")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({
           current_password: "WrongPassword123!",
           new_password: "NewStrongPassword456!",
@@ -157,11 +157,11 @@ describe("users API", () => {
     });
 
     it("rejects a new password equal to the current one (400)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .patch("/api/v1/users/me/password")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ current_password: TEST_PASSWORD, new_password: TEST_PASSWORD });
 
       expect(response.status).toBe(400);
@@ -171,12 +171,12 @@ describe("users API", () => {
 
   describe("POST /api/v1/users/me/email", () => {
     it("issues a change email request (202)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const new_email = `test-${nanoid(8)}@example.com`;
 
       const response = await request(app)
         .post("/api/v1/users/me/email")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ password: TEST_PASSWORD, new_email });
 
       expect(response.status).toBe(202);
@@ -186,11 +186,11 @@ describe("users API", () => {
 
     it("rejects an email already in use (409)", async () => {
       const first = await registerUser(app);
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .post("/api/v1/users/me/email")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ password: TEST_PASSWORD, new_email: first.payload.email });
 
       expect(response.status).toBe(409);
@@ -200,17 +200,17 @@ describe("users API", () => {
 
   describe("POST /api/v1/users/me/email/verify", () => {
     it("verifies the new email (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const new_email = `test-${nanoid(8)}@example.com`;
       await request(app)
         .post("/api/v1/users/me/email")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ password: TEST_PASSWORD, new_email });
       const token = capturedEmailToken();
 
       const response = await request(app)
         .post("/api/v1/users/me/email/verify")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ token });
 
       expect(response.status).toBe(200);
@@ -225,11 +225,11 @@ describe("users API", () => {
     });
 
     it("returns 404 for an unknown token", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .post("/api/v1/users/me/email/verify")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ token: `test-${nanoid(20)}` });
 
       expect(response.status).toBe(404);
@@ -239,11 +239,11 @@ describe("users API", () => {
 
   describe("POST /api/v1/users/me/phone-number", () => {
     it("issues a phone change request (202)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .post("/api/v1/users/me/phone-number")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ password: TEST_PASSWORD, new_phone_number: randomPhoneNumber() });
 
       expect(response.status).toBe(202);
@@ -254,17 +254,17 @@ describe("users API", () => {
 
   describe("POST /api/v1/users/me/phone-number/verify", () => {
     it("verifies the new phone number (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const new_phone_number = randomPhoneNumber();
       await request(app)
         .post("/api/v1/users/me/phone-number")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ password: TEST_PASSWORD, new_phone_number });
       const otp = capturedOtp();
 
       const response = await request(app)
         .post("/api/v1/users/me/phone-number/verify")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ otp });
 
       expect(response.status).toBe(200);
@@ -278,17 +278,17 @@ describe("users API", () => {
     });
 
     it("rejects an invalid code (400)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       await request(app)
         .post("/api/v1/users/me/phone-number")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ password: TEST_PASSWORD, new_phone_number: randomPhoneNumber() });
       const realOtp = capturedOtp();
       const wrongOtp = realOtp === "000000" ? "000001" : "000000";
 
       const response = await request(app)
         .post("/api/v1/users/me/phone-number/verify")
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ otp: wrongOtp });
 
       expect(response.status).toBe(400);

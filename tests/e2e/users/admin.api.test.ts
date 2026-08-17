@@ -6,6 +6,7 @@ import {
   createAdminUser,
   createSuperAdminUser,
   registerUser,
+  csrfHeaders,
 } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { createUser } from "../../factories/user.factory.js";
@@ -30,7 +31,7 @@ describe("admin users API", () => {
     });
 
     it("returns 403 for a non-admin session", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(ADMIN_BASE_URL)
@@ -40,7 +41,7 @@ describe("admin users API", () => {
     });
 
     it("returns 200 for a super admin session", async () => {
-      const { cookie } = await createSuperAdminUser(app);
+      const { cookie, csrf } = await createSuperAdminUser(app);
 
       const response = await request(app)
         .get(ADMIN_BASE_URL)
@@ -52,7 +53,7 @@ describe("admin users API", () => {
 
   describe("GET /api/v1/admin/users", () => {
     it("lists customers with pagination metadata (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const customer = await createUser({ first_name: "Qux" });
 
       const response = await request(app)
@@ -78,7 +79,7 @@ describe("admin users API", () => {
     });
 
     it("excludes admins from the list (200)", async () => {
-      const { cookie, user } = await createAdminUser(app);
+      const { cookie, user, csrf } = await createAdminUser(app);
       await createUser({ first_name: "Qux" });
       await createUser({ first_name: "Qux", role: user_role.ADMIN });
 
@@ -97,7 +98,7 @@ describe("admin users API", () => {
     });
 
     it("filters by status (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       await createUser({ first_name: "Qux" });
       const suspended = await createUser({
         first_name: "Qux",
@@ -114,7 +115,7 @@ describe("admin users API", () => {
     });
 
     it("rejects an invalid status filter (400)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .get(`${ADMIN_BASE_URL}?status=BANNED`)
@@ -126,7 +127,7 @@ describe("admin users API", () => {
 
   describe("GET /api/v1/admin/users/:user_public_id", () => {
     it("returns a customer's profile (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const customer = await createUser();
 
       const response = await request(app)
@@ -143,7 +144,7 @@ describe("admin users API", () => {
     });
 
     it("returns 404 for an unknown user", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .get(`${ADMIN_BASE_URL}/usr_does_not_exist`)
@@ -153,7 +154,7 @@ describe("admin users API", () => {
     });
 
     it("returns 404 for an admin user", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const admin = await createUser({ role: user_role.ADMIN });
 
       const response = await request(app)
@@ -166,12 +167,12 @@ describe("admin users API", () => {
 
   describe("PATCH /api/v1/admin/users/:user_public_id", () => {
     it("updates a customer (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const customer = await createUser();
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${customer.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ first_name: "Updated", last_name: "Name" });
 
       expect(response.status).toBe(200);
@@ -181,13 +182,13 @@ describe("admin users API", () => {
     });
 
     it("returns 409 for an email conflict", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const first = await createUser({ email: `test-taken-${nanoid(8)}@example.com` });
       const second = await createUser();
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${second.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ email: first.email });
 
       expect(response.status).toBe(409);
@@ -196,13 +197,13 @@ describe("admin users API", () => {
 
   describe("PATCH /api/v1/admin/users/:user_public_id/suspend", () => {
     it("suspends a customer and locks their session (200 then 401)", async () => {
-      const { cookie: adminCookie } = await createAdminUser(app);
-      const { cookie: userCookie, response: userResponse } = await registerUser(app);
+      const { cookie: adminCookie, csrf: adminCsrf } = await createAdminUser(app);
+      const { cookie: userCookie, response: userResponse, csrf: userCsrf } = await registerUser(app);
       const userPublicId = publicIdFrom(userResponse);
 
       const suspendResponse = await request(app)
         .patch(`${ADMIN_BASE_URL}/${userPublicId}/suspend`)
-        .set("Cookie", adminCookie!);
+        .set(csrfHeaders(adminCookie!, adminCsrf!))
 
       expect(suspendResponse.status).toBe(200);
       expect(suspendResponse.body.data.status).toBe(user_status.SUSPENDED);
@@ -215,12 +216,12 @@ describe("admin users API", () => {
     });
 
     it("returns 400 when the user is already suspended", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const customer = await createUser({ status: user_status.SUSPENDED });
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${customer.public_id}/suspend`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(400);
     });
@@ -228,24 +229,24 @@ describe("admin users API", () => {
 
   describe("PATCH /api/v1/admin/users/:user_public_id/activate", () => {
     it("activates a suspended customer (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const customer = await createUser({ status: user_status.SUSPENDED });
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${customer.public_id}/activate`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(200);
       expect(response.body.data.status).toBe(user_status.ACTIVE);
     });
 
     it("returns 400 when the user is already active", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const customer = await createUser();
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${customer.public_id}/activate`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(400);
     });
@@ -253,14 +254,14 @@ describe("admin users API", () => {
 
   describe("PATCH /api/v1/admin/users/:user_public_id/role", () => {
     it("promotes a customer to admin (super admin actor) (200)", async () => {
-      const { cookie } = await createSuperAdminUser(app);
+      const { cookie, csrf } = await createSuperAdminUser(app);
       const { cookie: customerCookie, response: customerResponse } =
         await registerUser(app);
       const customerPublicId = publicIdFrom(customerResponse);
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${customerPublicId}/role`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ role: "ADMIN" });
 
       expect(response.status).toBe(200);
@@ -278,12 +279,12 @@ describe("admin users API", () => {
     });
 
     it("demotes an admin to customer when another admin remains (200)", async () => {
-      const { cookie } = await createSuperAdminUser(app);
+      const { cookie, csrf } = await createSuperAdminUser(app);
       const targetAdmin = await createUser({ role: user_role.ADMIN });
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${targetAdmin.public_id}/role`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ role: "CUSTOMER" });
 
       expect(response.status).toBe(200);
@@ -291,48 +292,48 @@ describe("admin users API", () => {
     });
 
     it("returns 403 when a regular admin attempts a role change", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const customer = await createUser();
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${customer.public_id}/role`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ role: "ADMIN" });
 
       expect(response.status).toBe(403);
     });
 
     it("returns 403 when a regular admin attempts to demote the super admin", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const superAdmin = await createUser({ role: user_role.SUPER_ADMIN });
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${superAdmin.public_id}/role`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ role: "CUSTOMER" });
 
       expect(response.status).toBe(403);
     });
 
     it("returns 403 when targeting the super admin even from another super admin", async () => {
-      const { cookie } = await createSuperAdminUser(app);
+      const { cookie, csrf } = await createSuperAdminUser(app);
       const targetSuperAdmin = await createUser({ role: user_role.SUPER_ADMIN });
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${targetSuperAdmin.public_id}/role`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ role: "CUSTOMER" });
 
       expect(response.status).toBe(403);
     });
 
     it("returns 200 idempotently when the role already matches", async () => {
-      const { cookie } = await createSuperAdminUser(app);
+      const { cookie, csrf } = await createSuperAdminUser(app);
       const targetAdmin = await createUser({ role: user_role.ADMIN });
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${targetAdmin.public_id}/role`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ role: "ADMIN" });
 
       expect(response.status).toBe(200);
@@ -340,46 +341,46 @@ describe("admin users API", () => {
     });
 
     it("returns 404 for an unknown user", async () => {
-      const { cookie } = await createSuperAdminUser(app);
+      const { cookie, csrf } = await createSuperAdminUser(app);
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/usr_does_not_exist/role`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ role: "ADMIN" });
 
       expect(response.status).toBe(404);
     });
 
     it("returns 400 when a super admin changes their own role", async () => {
-      const { cookie, user } = await createSuperAdminUser(app);
+      const { cookie, user, csrf } = await createSuperAdminUser(app);
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${user.public_id}/role`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ role: "CUSTOMER" });
 
       expect(response.status).toBe(400);
     });
 
     it("returns 400 for an invalid role", async () => {
-      const { cookie } = await createSuperAdminUser(app);
+      const { cookie, csrf } = await createSuperAdminUser(app);
       const customer = await createUser();
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${customer.public_id}/role`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ role: "SUPERADMIN" });
 
       expect(response.status).toBe(400);
     });
 
     it("returns 400 for the SUPER_ADMIN role (CLI-only grant)", async () => {
-      const { cookie } = await createSuperAdminUser(app);
+      const { cookie, csrf } = await createSuperAdminUser(app);
       const customer = await createUser();
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${customer.public_id}/role`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ role: "SUPER_ADMIN" });
 
       expect(response.status).toBe(400);

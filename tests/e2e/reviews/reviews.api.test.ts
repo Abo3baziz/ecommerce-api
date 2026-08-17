@@ -3,7 +3,7 @@ import request from "supertest";
 import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
 import { prisma } from "../../../src/config/database.js";
-import { createAdminUser, registerUser } from "../../helpers/auth.js";
+import { createAdminUser, registerUser, csrfHeaders } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { createProduct } from "../../factories/product.factory.js";
 import {
@@ -137,12 +137,12 @@ describe("reviews API", () => {
   describe("customer review management", () => {
     describe("POST /api/v1/reviews", () => {
       it("creates a review for an authenticated user (201)", async () => {
-        const { cookie } = await registerUser(app);
+        const { cookie, csrf } = await registerUser(app);
         const product = await createProduct();
 
         const response = await request(app)
           .post(REVIEWS_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send(reviewPayload({ product_public_id: product.public_id }));
 
         expect(response.status).toBe(201);
@@ -154,12 +154,12 @@ describe("reviews API", () => {
       });
 
       it("creates a review with images (201)", async () => {
-        const { cookie } = await registerUser(app);
+        const { cookie, csrf } = await registerUser(app);
         const product = await createProduct();
 
         const response = await request(app)
           .post(REVIEWS_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send(
             reviewPayload({
               product_public_id: product.public_id,
@@ -185,14 +185,14 @@ describe("reviews API", () => {
       });
 
       it("returns 409 for a duplicate review", async () => {
-        const { cookie, payload } = await registerUser(app);
+        const { cookie, payload, csrf } = await registerUser(app);
         const product = await createProduct();
         const storedUser = await userByEmail(payload.email);
         await createReview({ users_id: storedUser!.id, products_id: product.id });
 
         const response = await request(app)
           .post(REVIEWS_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send(reviewPayload({ product_public_id: product.public_id }));
 
         expect(response.status).toBe(409);
@@ -200,24 +200,24 @@ describe("reviews API", () => {
       });
 
       it("returns 404 for a soft-deleted product", async () => {
-        const { cookie } = await registerUser(app);
+        const { cookie, csrf } = await registerUser(app);
         const product = await createProduct({ deleted_at: new Date() });
 
         const response = await request(app)
           .post(REVIEWS_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send(reviewPayload({ product_public_id: product.public_id }));
 
         expect(response.status).toBe(404);
       });
 
       it("rejects a rating out of range (400)", async () => {
-        const { cookie } = await registerUser(app);
+        const { cookie, csrf } = await registerUser(app);
         const product = await createProduct();
 
         const response = await request(app)
           .post(REVIEWS_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send(reviewPayload({ product_public_id: product.public_id, rating: 6 }));
 
         expect(response.status).toBe(400);
@@ -227,7 +227,7 @@ describe("reviews API", () => {
 
     describe("PATCH /api/v1/reviews/:review_public_id", () => {
       it("updates the user's own review (200)", async () => {
-        const { cookie, payload } = await registerUser(app);
+        const { cookie, payload, csrf } = await registerUser(app);
         const product = await createProduct();
         const storedUser = await userByEmail(payload.email);
         const review = await createReview({
@@ -238,7 +238,7 @@ describe("reviews API", () => {
 
         const response = await request(app)
           .patch(`${REVIEWS_BASE_URL}/${review.public_id}`)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ rating: 4, comment: "Updated" });
 
         expect(response.status).toBe(200);
@@ -247,7 +247,7 @@ describe("reviews API", () => {
       });
 
       it("returns 404 for another user's review", async () => {
-        const { cookie } = await registerUser(app);
+        const { cookie, csrf } = await registerUser(app);
         const owner = await registerUser(app);
         const product = await createProduct();
         const storedOwner = await userByEmail(owner.payload.email);
@@ -258,14 +258,14 @@ describe("reviews API", () => {
 
         const response = await request(app)
           .patch(`${REVIEWS_BASE_URL}/${review.public_id}`)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ rating: 3 });
 
         expect(response.status).toBe(404);
       });
 
       it("rejects an empty body (400)", async () => {
-        const { cookie, payload } = await registerUser(app);
+        const { cookie, payload, csrf } = await registerUser(app);
         const product = await createProduct();
         const storedUser = await userByEmail(payload.email);
         const review = await createReview({
@@ -275,7 +275,7 @@ describe("reviews API", () => {
 
         const response = await request(app)
           .patch(`${REVIEWS_BASE_URL}/${review.public_id}`)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({});
 
         expect(response.status).toBe(400);
@@ -284,7 +284,7 @@ describe("reviews API", () => {
 
     describe("DELETE /api/v1/reviews/:review_public_id", () => {
       it("soft-deletes the user's own review (204)", async () => {
-        const { cookie, payload } = await registerUser(app);
+        const { cookie, payload, csrf } = await registerUser(app);
         const product = await createProduct();
         const storedUser = await userByEmail(payload.email);
         const review = await createReview({
@@ -294,7 +294,7 @@ describe("reviews API", () => {
 
         const response = await request(app)
           .delete(`${REVIEWS_BASE_URL}/${review.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(204);
 
@@ -305,7 +305,7 @@ describe("reviews API", () => {
       });
 
       it("returns 404 for another user's review", async () => {
-        const { cookie } = await registerUser(app);
+        const { cookie, csrf } = await registerUser(app);
         const owner = await registerUser(app);
         const product = await createProduct();
         const storedOwner = await userByEmail(owner.payload.email);
@@ -316,7 +316,7 @@ describe("reviews API", () => {
 
         const response = await request(app)
           .delete(`${REVIEWS_BASE_URL}/${review.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(404);
       });
@@ -324,7 +324,7 @@ describe("reviews API", () => {
 
     describe("GET /api/v1/users/me/reviews", () => {
       it("returns the user's own reviews including unapproved (200)", async () => {
-        const { cookie, payload } = await registerUser(app);
+        const { cookie, payload, csrf } = await registerUser(app);
         const product = await createProduct();
         const storedUser = await userByEmail(payload.email);
         const approved = await createReview({
@@ -379,7 +379,7 @@ describe("reviews API", () => {
       });
 
       it("returns 403 for a non-admin session", async () => {
-        const { cookie } = await registerUser(app);
+        const { cookie, csrf } = await registerUser(app);
 
         const response = await request(app)
           .get(ADMIN_REVIEWS_BASE_URL)
@@ -391,7 +391,7 @@ describe("reviews API", () => {
 
     describe("GET /api/v1/admin/reviews", () => {
       it("lists reviews with admin projections (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const review = await customerReview();
 
         const response = await request(app)
@@ -408,7 +408,7 @@ describe("reviews API", () => {
       });
 
       it("includes soft-deleted reviews when include_deleted=true (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const { payload } = await registerUser(app);
         const product = await createProduct();
         const storedUser = await userByEmail(payload.email);
@@ -429,7 +429,7 @@ describe("reviews API", () => {
       });
 
       it("filters by is_approved=false (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const { payload } = await registerUser(app);
         const product = await createProduct();
         const storedUser = await userByEmail(payload.email);
@@ -452,7 +452,7 @@ describe("reviews API", () => {
       });
 
       it("rejects an invalid is_approved value (400)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
 
         const response = await request(app)
           .get(`${ADMIN_REVIEWS_BASE_URL}?is_approved=yes`)
@@ -464,7 +464,7 @@ describe("reviews API", () => {
 
     describe("GET /api/v1/admin/reviews/:review_public_id", () => {
       it("returns a review in any state with images (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const review = await customerReview();
         await createReviewImage({ reviews_id: review.id, display_order: 1 });
 
@@ -479,7 +479,7 @@ describe("reviews API", () => {
       });
 
       it("returns 404 for an unknown review", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
 
         const response = await request(app)
           .get(`${ADMIN_REVIEWS_BASE_URL}/rev_${nanoid(10)}`)
@@ -491,12 +491,12 @@ describe("reviews API", () => {
 
     describe("PATCH /api/v1/admin/reviews/:review_public_id", () => {
       it("moderates a review (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const review = await customerReview();
 
         const response = await request(app)
           .patch(`${ADMIN_REVIEWS_BASE_URL}/${review.public_id}`)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ is_approved: false, comment: "Edited by support" });
 
         expect(response.status).toBe(200);
@@ -505,7 +505,7 @@ describe("reviews API", () => {
       });
 
       it("rejects approving a soft-deleted review (400)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const { payload } = await registerUser(app);
         const product = await createProduct();
         const storedUser = await userByEmail(payload.email);
@@ -517,7 +517,7 @@ describe("reviews API", () => {
 
         const response = await request(app)
           .patch(`${ADMIN_REVIEWS_BASE_URL}/${deleted.public_id}`)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ is_approved: true });
 
         expect(response.status).toBe(400);
@@ -525,12 +525,12 @@ describe("reviews API", () => {
       });
 
       it("rejects an empty body (400)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const review = await customerReview();
 
         const response = await request(app)
           .patch(`${ADMIN_REVIEWS_BASE_URL}/${review.public_id}`)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({});
 
         expect(response.status).toBe(400);
@@ -539,12 +539,12 @@ describe("reviews API", () => {
 
     describe("DELETE /api/v1/admin/reviews/:review_public_id", () => {
       it("soft-deletes a review (204)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const review = await customerReview();
 
         const response = await request(app)
           .delete(`${ADMIN_REVIEWS_BASE_URL}/${review.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(204);
 
@@ -556,11 +556,11 @@ describe("reviews API", () => {
       });
 
       it("returns 404 for an unknown review", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
 
         const response = await request(app)
           .delete(`${ADMIN_REVIEWS_BASE_URL}/rev_${nanoid(10)}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(404);
       });

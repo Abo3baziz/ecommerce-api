@@ -42,6 +42,7 @@ Example:
 - docs/api/authentication/session-management.md
 - docs/api/authentication/email-verification.md
 - docs/api/authentication/password-reset.md
+- docs/api/authentication/csrf.md
 
 ## Users
 

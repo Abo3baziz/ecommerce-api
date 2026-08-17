@@ -27,9 +27,25 @@ async function verify() {
   }
 
   try {
+    const csrfResponse = await fetch("/api/v1/auth/csrf-token", {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!csrfResponse.ok) {
+      renderError("Sign in required", "Please sign in again and try the link once more.");
+      return;
+    }
+
+    const csrfData = await csrfResponse.json();
+
     const res = await fetch("/api/v1/users/me/email/verify", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": csrfData.data.csrf_token,
+      },
       body: JSON.stringify({ token }),
     });
 
@@ -39,6 +55,8 @@ async function verify() {
       renderSuccess(result.data?.message || "Your email has been updated.");
     } else if (res.status === 400) {
       renderError("Invalid request", result.message || "The verification request was invalid.");
+    } else if (res.status === 403) {
+      renderError("Invalid request", "Your session is not valid. Please sign in again and try the link once more.");
     } else if (res.status === 401) {
       renderError("Sign in required", "Please sign in again and try the link once more.");
     } else if (res.status === 404) {

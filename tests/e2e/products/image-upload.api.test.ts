@@ -19,7 +19,7 @@ describe("ImageKit upload auth API", () => {
     });
 
     it("returns 403 for a non-admin session", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get("/api/v1/admin/products/uploads/imagekit-auth")
@@ -31,7 +31,7 @@ describe("ImageKit upload auth API", () => {
 
   describe("GET /api/v1/admin/products/uploads/imagekit-auth", () => {
     it("returns signed upload authentication parameters for an admin (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .get("/api/v1/admin/products/uploads/imagekit-auth")

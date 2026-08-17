@@ -127,6 +127,26 @@ If authentication fails:
 
 ---
 
+# CSRF Protection
+
+Cookie-authenticated write requests are protected against cross-site request forgery using the **Double Submit Cookie** pattern (`csrf-csrf`).
+
+Flow:
+
+1. Client authenticates (`POST /auth/register` or `/auth/login`).
+2. Client fetches a token via `GET /api/v1/auth/csrf-token`. The API sets an HttpOnly `x-csrf-token` cookie and returns the token in the response body.
+3. Client sends the token on every protected write in the `x-csrf-token` header.
+4. The server recomputes the token's HMAC against the session and rejects mismatches with **403**.
+
+Rules:
+
+- Only non-safe methods (`POST`, `PATCH`, `PUT`, `DELETE`) that carry a session cookie are validated.
+- Requests without a session cookie are skipped — this covers the pure public writes (`/auth/register`, `/auth/login`, `/auth/password-reset`, `/auth/password-reset/verify`, `/auth/email-verification/verify`) which rely on body credentials/tokens rather than the session.
+- Tokens are bound to the session cookie value; re-authentication invalidates previously issued tokens.
+- Index of the token endpoint contract: `docs/api/authentication/csrf.md`.
+
+---
+
 # Authorization
 
 Authorization occurs after authentication.

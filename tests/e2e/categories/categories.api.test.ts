@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
-import { createAdminUser, registerUser } from "../../helpers/auth.js";
+import { createAdminUser, registerUser, csrfHeaders } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { createCategory } from "../../factories/category.factory.js";
 import { createCategoryProductLink } from "../../factories/category-product.factory.js";
@@ -155,7 +155,7 @@ describe("categories API", () => {
       });
 
       it("returns 403 for a non-admin session", async () => {
-        const { cookie } = await registerUser(app);
+        const { cookie, csrf } = await registerUser(app);
 
         const response = await request(app)
           .get(ADMIN_BASE_URL)
@@ -167,7 +167,7 @@ describe("categories API", () => {
 
     describe("GET /api/v1/admin/categories", () => {
       it("lists categories and excludes deleted ones by default (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const active = await createCategory({ name: "Headphones" });
         await createCategory({ name: "Deleted", deleted_at: new Date() });
 
@@ -184,7 +184,7 @@ describe("categories API", () => {
       });
 
       it("includes deleted categories when include_deleted=true (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const deleted = await createCategory({ deleted_at: new Date() });
 
         const response = await request(app)
@@ -199,7 +199,7 @@ describe("categories API", () => {
       });
 
       it("filters by is_active (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         await createCategory({ name: "Active" });
         const hidden = await createCategory({ name: "Hidden", is_active: false });
 
@@ -216,11 +216,11 @@ describe("categories API", () => {
 
     describe("POST /api/v1/admin/categories", () => {
       it("creates a category and auto-generates a slug (201)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
 
         const response = await request(app)
           .post(ADMIN_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ name: "Wireless Noise-Cancelling Headphones" });
 
         expect(response.status).toBe(201);
@@ -232,12 +232,12 @@ describe("categories API", () => {
       });
 
       it("returns 409 for a duplicate slug", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         await createCategory({ slug: "existing-slug" });
 
         const response = await request(app)
           .post(ADMIN_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ name: "New Category", slug: "existing-slug" });
 
         expect(response.status).toBe(409);
@@ -245,12 +245,12 @@ describe("categories API", () => {
       });
 
       it("returns 409 for a duplicate name", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         await createCategory({ name: "Headphones" });
 
         const response = await request(app)
           .post(ADMIN_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ name: "Headphones" });
 
         expect(response.status).toBe(409);
@@ -258,11 +258,11 @@ describe("categories API", () => {
       });
 
       it("rejects a malformed slug (400)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
 
         const response = await request(app)
           .post(ADMIN_BASE_URL)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ name: "New Category", slug: "Invalid Slug!" });
 
         expect(response.status).toBe(400);
@@ -271,7 +271,7 @@ describe("categories API", () => {
 
     describe("GET /api/v1/admin/categories/:category_public_id", () => {
       it("returns the admin detail (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const category = await createCategory({ name: "Headphones" });
         const product = await visibleProduct();
         await createCategoryProductLink(category.id, product.id);
@@ -286,7 +286,7 @@ describe("categories API", () => {
       });
 
       it("returns 404 for a soft-deleted category", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const category = await createCategory({ deleted_at: new Date() });
 
         const response = await request(app)
@@ -299,12 +299,12 @@ describe("categories API", () => {
 
     describe("PATCH /api/v1/admin/categories/:category_public_id", () => {
       it("updates the category (200)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const category = await createCategory({ name: "Original Name" });
 
         const response = await request(app)
           .patch(`${ADMIN_BASE_URL}/${category.public_id}`)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ name: "Headphones & Earbuds", description: null, is_active: false });
 
         expect(response.status).toBe(200);
@@ -315,13 +315,13 @@ describe("categories API", () => {
       });
 
       it("returns 409 for a name conflict", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         await createCategory({ name: "Existing Name" });
         const category = await createCategory({ name: "My Category" });
 
         const response = await request(app)
           .patch(`${ADMIN_BASE_URL}/${category.public_id}`)
-          .set("Cookie", cookie!)
+          .set(csrfHeaders(cookie!, csrf!))
           .send({ name: "Existing Name" });
 
         expect(response.status).toBe(409);
@@ -330,14 +330,14 @@ describe("categories API", () => {
 
     describe("DELETE /api/v1/admin/categories/:category_public_id", () => {
       it("soft-deletes the category and removes its links (204)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const category = await createCategory({ name: "Headphones" });
         const product = await visibleProduct();
         await createCategoryProductLink(category.id, product.id);
 
         const response = await request(app)
           .delete(`${ADMIN_BASE_URL}/${category.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(204);
 
@@ -348,12 +348,12 @@ describe("categories API", () => {
       });
 
       it("returns 404 for an already deleted category", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const category = await createCategory({ deleted_at: new Date() });
 
         const response = await request(app)
           .delete(`${ADMIN_BASE_URL}/${category.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(404);
       });
@@ -361,13 +361,13 @@ describe("categories API", () => {
 
     describe("PUT /api/v1/admin/categories/:category_public_id/products/:product_public_id", () => {
       it("assigns a product to the category (204)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const category = await createCategory({ name: "Headphones" });
         const product = await visibleProduct();
 
         const response = await request(app)
           .put(`${ADMIN_BASE_URL}/${category.public_id}/products/${product.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(204);
 
@@ -380,27 +380,27 @@ describe("categories API", () => {
       });
 
       it("is idempotent when the product is already assigned (204)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const category = await createCategory({ name: "Headphones" });
         const product = await createProduct();
 
         await request(app)
           .put(`${ADMIN_BASE_URL}/${category.public_id}/products/${product.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
         const response = await request(app)
           .put(`${ADMIN_BASE_URL}/${category.public_id}/products/${product.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(204);
       });
 
       it("returns 404 for an unknown product", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const category = await createCategory({ name: "Headphones" });
 
         const response = await request(app)
           .put(`${ADMIN_BASE_URL}/${category.public_id}/products/prd_${nanoid(10)}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(404);
       });
@@ -408,14 +408,14 @@ describe("categories API", () => {
 
     describe("DELETE /api/v1/admin/categories/:category_public_id/products/:product_public_id", () => {
       it("unassigns a product from the category (204)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const category = await createCategory({ name: "Headphones" });
         const product = await createProduct();
         await createCategoryProductLink(category.id, product.id);
 
         const response = await request(app)
           .delete(`${ADMIN_BASE_URL}/${category.public_id}/products/${product.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(204);
 
@@ -426,24 +426,24 @@ describe("categories API", () => {
       });
 
       it("is idempotent when the link does not exist (204)", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const category = await createCategory({ name: "Headphones" });
         const product = await createProduct();
 
         const response = await request(app)
           .delete(`${ADMIN_BASE_URL}/${category.public_id}/products/${product.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(204);
       });
 
       it("returns 404 for an unknown category", async () => {
-        const { cookie } = await createAdminUser(app);
+        const { cookie, csrf } = await createAdminUser(app);
         const product = await createProduct();
 
         const response = await request(app)
           .delete(`${ADMIN_BASE_URL}/cat_${nanoid(10)}/products/${product.public_id}`)
-          .set("Cookie", cookie!);
+          .set(csrfHeaders(cookie!, csrf!))
 
         expect(response.status).toBe(404);
       });

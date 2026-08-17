@@ -7,6 +7,7 @@ import {
   extractSessionCookie,
   loginUser,
   registerUser,
+  csrfHeaders,
 } from "../../helpers/auth.js";
 import { TEST_PASSWORD } from "../../factories/user.factory.js";
 import { cleanupTestData } from "../../helpers/db.js";
@@ -29,7 +30,7 @@ describe("auth API", () => {
 
   describe("POST /api/v1/auth/register", () => {
     it("registers a user and sets a session cookie (201)", async () => {
-      const { response, cookie } = await registerUser(app);
+      const { response, cookie, csrf } = await registerUser(app);
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
@@ -75,7 +76,7 @@ describe("auth API", () => {
     it("authenticates valid credentials and sets a session cookie (200)", async () => {
       const { payload } = await registerUser(app);
 
-      const { response, cookie } = await loginUser(app, payload.email, TEST_PASSWORD);
+      const { response, cookie, csrf } = await loginUser(app, payload.email, TEST_PASSWORD);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -107,7 +108,7 @@ describe("auth API", () => {
 
   describe("GET /api/v1/auth/session", () => {
     it("returns the current session for an authenticated request (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get("/api/v1/auth/session")
@@ -133,11 +134,11 @@ describe("auth API", () => {
 
   describe("DELETE /api/v1/auth/session", () => {
     it("logs out and clears the session cookie (204)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .delete("/api/v1/auth/session")
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(204);
       expect(extractSessionCookie(response.headers["set-cookie"])).toBe("session=");
@@ -182,7 +183,7 @@ describe("auth API", () => {
 
   describe("DELETE /api/v1/auth/sessions/:session_public_id", () => {
     it("revokes another session (204)", async () => {
-      const { payload, cookie: firstCookie } = await registerUser(app);
+      const { payload, cookie: firstCookie, csrf: firstCsrf } = await registerUser(app);
       const second = await loginUser(app, payload.email, TEST_PASSWORD);
 
       const sessionsResponse = await request(app)
@@ -194,7 +195,7 @@ describe("auth API", () => {
 
       const response = await request(app)
         .delete(`/api/v1/auth/sessions/${otherSession.public_id}`)
-        .set("Cookie", second.cookie!);
+        .set(csrfHeaders(second.cookie!, second.csrf!))
       expect(response.status).toBe(204);
 
       const sessionResponse = await request(app)
@@ -204,11 +205,11 @@ describe("auth API", () => {
     });
 
     it("returns 404 for an unknown session", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .delete(`/api/v1/auth/sessions/ses_${nanoid(10)}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
@@ -225,12 +226,12 @@ describe("auth API", () => {
 
   describe("DELETE /api/v1/auth/sessions", () => {
     it("revokes all other sessions (204)", async () => {
-      const { payload, cookie: firstCookie } = await registerUser(app);
+      const { payload, cookie: firstCookie, csrf: firstCsrf } = await registerUser(app);
       const second = await loginUser(app, payload.email, TEST_PASSWORD);
 
       const response = await request(app)
         .delete("/api/v1/auth/sessions")
-        .set("Cookie", second.cookie!);
+        .set(csrfHeaders(second.cookie!, second.csrf!))
       expect(response.status).toBe(204);
 
       const sessionResponse = await request(app)
@@ -290,11 +291,11 @@ describe("auth API", () => {
 
   describe("POST /api/v1/auth/email-verification/resend", () => {
     it("resends a verification email (202)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .post("/api/v1/auth/email-verification/resend")
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(202);
       expect(response.body.success).toBe(true);

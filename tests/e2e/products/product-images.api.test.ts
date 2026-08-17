@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
-import { createAdminUser, registerUser } from "../../helpers/auth.js";
+import { createAdminUser, registerUser, csrfHeaders } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { imageKitImageUrl } from "../../helpers/image-url.js";
 import { createProduct } from "../../factories/product.factory.js";
@@ -34,7 +34,7 @@ describe("product images API", () => {
 
     it("returns 403 for a non-admin session", async () => {
       const product = await createProduct();
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(`/api/v1/admin/products/${product.public_id}/images`)
@@ -46,7 +46,7 @@ describe("product images API", () => {
 
   describe("GET /api/v1/admin/products/:product_public_id/images", () => {
     it("lists the product's images ordered by display_order (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const first = await createProductImage(product.id, { display_order: 1 });
       const second = await createProductImage(product.id, { display_order: 0 });
@@ -69,7 +69,7 @@ describe("product images API", () => {
     });
 
     it("returns 404 for an unknown product", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .get(`/api/v1/admin/products/prd_${nanoid(10)}/images`)
@@ -81,12 +81,12 @@ describe("product images API", () => {
 
   describe("POST /api/v1/admin/products/:product_public_id/images", () => {
     it("creates the first image as primary with display_order 0 (201)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
 
       const response = await request(app)
         .post(`/api/v1/admin/products/${product.public_id}/images`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(imagePayload());
 
       expect(response.status).toBe(201);
@@ -98,13 +98,13 @@ describe("product images API", () => {
     });
 
     it("appends the display_order when omitted (201)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       await createProductImage(product.id, { display_order: 0 });
 
       const response = await request(app)
         .post(`/api/v1/admin/products/${product.public_id}/images`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(imagePayload());
 
       expect(response.status).toBe(201);
@@ -113,13 +113,13 @@ describe("product images API", () => {
     });
 
     it("demotes the previous primary when is_primary=true (201)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const first = await createProductImage(product.id, { display_order: 0 });
 
       const response = await request(app)
         .post(`/api/v1/admin/products/${product.public_id}/images`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(imagePayload({ is_primary: true }));
 
       expect(response.status).toBe(201);
@@ -132,13 +132,13 @@ describe("product images API", () => {
     });
 
     it("returns 409 for a duplicate display_order", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       await createProductImage(product.id, { display_order: 2 });
 
       const response = await request(app)
         .post(`/api/v1/admin/products/${product.public_id}/images`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(imagePayload({ display_order: 2 }));
 
       expect(response.status).toBe(409);
@@ -146,12 +146,12 @@ describe("product images API", () => {
     });
 
     it("rejects an invalid image_url (400)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
 
       const response = await request(app)
         .post(`/api/v1/admin/products/${product.public_id}/images`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ image_url: "not-a-url" });
 
       expect(response.status).toBe(400);
@@ -160,7 +160,7 @@ describe("product images API", () => {
 
   describe("GET /api/v1/admin/products/:product_public_id/images/:image_public_id", () => {
     it("returns a single image (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const image = await createProductImage(product.id);
 
@@ -174,7 +174,7 @@ describe("product images API", () => {
     });
 
     it("returns 404 for an image of another product", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const otherProduct = await createProduct();
       const image = await createProductImage(product.id);
@@ -189,13 +189,13 @@ describe("product images API", () => {
 
   describe("PATCH /api/v1/admin/products/:product_public_id/images/:image_public_id", () => {
     it("updates the image and clears alt_text with null (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const image = await createProductImage(product.id, { alt_text: "Old alt" });
 
       const response = await request(app)
         .patch(`/api/v1/admin/products/${product.public_id}/images/${image.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ alt_text: null, display_order: 5 });
 
       expect(response.status).toBe(200);
@@ -204,27 +204,27 @@ describe("product images API", () => {
     });
 
     it("returns 409 for a display_order conflict", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const first = await createProductImage(product.id, { display_order: 1 });
       const second = await createProductImage(product.id, { display_order: 2 });
 
       const response = await request(app)
         .patch(`/api/v1/admin/products/${product.public_id}/images/${second.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ display_order: 1 });
 
       expect(response.status).toBe(409);
     });
 
     it("returns 400 when clearing the primary flag on the only image", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const image = await createProductImage(product.id, { is_primary: true });
 
       const response = await request(app)
         .patch(`/api/v1/admin/products/${product.public_id}/images/${image.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ is_primary: false });
 
       expect(response.status).toBe(400);
@@ -233,13 +233,13 @@ describe("product images API", () => {
 
   describe("DELETE /api/v1/admin/products/:product_public_id/images/:image_public_id", () => {
     it("hard-deletes the image (204) and removes it from the list", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const image = await createProductImage(product.id);
 
       const response = await request(app)
         .delete(`/api/v1/admin/products/${product.public_id}/images/${image.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(204);
 
@@ -250,7 +250,7 @@ describe("product images API", () => {
     });
 
     it("promotes the lowest display_order image when the primary is deleted", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const primary = await createProductImage(product.id, { display_order: 0, is_primary: true });
       const second = await createProductImage(product.id, { display_order: 2, is_primary: false });
@@ -258,7 +258,7 @@ describe("product images API", () => {
 
       const response = await request(app)
         .delete(`/api/v1/admin/products/${product.public_id}/images/${primary.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(204);
 
@@ -277,14 +277,14 @@ describe("product images API", () => {
     });
 
     it("returns 404 for an image of another product", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const otherProduct = await createProduct();
       const image = await createProductImage(product.id);
 
       const response = await request(app)
         .delete(`/api/v1/admin/products/${otherProduct.public_id}/images/${image.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(404);
     });

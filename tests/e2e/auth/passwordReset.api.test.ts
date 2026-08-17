@@ -70,7 +70,7 @@ describe("password reset API", () => {
   describe("POST /api/v1/auth/password-reset/verify", () => {
     it("resets the password, revokes sessions, and allows login with the new password", async () => {
       const user = await createUser();
-      const { cookie } = await loginUser(app, user.email, TEST_PASSWORD);
+      const { cookie, csrf } = await loginUser(app, user.email, TEST_PASSWORD);
 
       await request(app)
         .post("/api/v1/auth/password-reset")

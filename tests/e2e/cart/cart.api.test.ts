@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
-import { createAdminUser, registerUser } from "../../helpers/auth.js";
+import { createAdminUser, registerUser, csrfHeaders } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { createProduct } from "../../factories/product.factory.js";
 import { createVariant } from "../../factories/variant.factory.js";
@@ -41,7 +41,7 @@ describe("cart API", () => {
 
   describe("GET /api/v1/cart", () => {
     it("returns 404 when the user has no cart", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(CART_URL)
@@ -52,7 +52,7 @@ describe("cart API", () => {
     });
 
     it("returns the full cart with no internal ids (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct({ name: "Wireless Headphones" });
       const variant = await createVariant(product.id, {
         sku: "WH-1000",
@@ -62,7 +62,7 @@ describe("cart API", () => {
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id, quantity: 3 });
 
       const response = await request(app)
@@ -96,7 +96,7 @@ describe("cart API", () => {
     });
 
     it("resolves the variant image over the product primary image", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createProductImage(product.id, { is_primary: true, image_url: "https://ik.imagekit.io/ecommerceImages/primary.jpg" });
@@ -104,7 +104,7 @@ describe("cart API", () => {
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id });
 
       const response = await request(app)
@@ -117,17 +117,17 @@ describe("cart API", () => {
     });
 
     it("returns 200 with an empty cart after all lines are removed", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id });
       await request(app)
         .delete(`${CART_URL}/items/${variant.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       const response = await request(app)
         .get(CART_URL)
@@ -143,13 +143,13 @@ describe("cart API", () => {
 
   describe("POST /api/v1/cart/items", () => {
     it("creates the cart lazily and returns the full cart (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id, { price: "19.99" });
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id, quantity: 2 });
 
       expect(response.status).toBe(200);
@@ -162,13 +162,13 @@ describe("cart API", () => {
     });
 
     it("defaults quantity to 1 when omitted", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id });
 
       expect(response.status).toBe(200);
@@ -176,18 +176,18 @@ describe("cart API", () => {
     });
 
     it("increments an existing line instead of duplicating it (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id, { price: "10.00" });
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id, quantity: 2 });
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id, quantity: 3 });
 
       expect(response.status).toBe(200);
@@ -197,11 +197,11 @@ describe("cart API", () => {
     });
 
     it("returns 404 for an unknown variant", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: `var_${nanoid(10)}` });
 
       expect(response.status).toBe(404);
@@ -209,39 +209,39 @@ describe("cart API", () => {
     });
 
     it("returns 404 for a soft-deleted variant", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id, { deleted_at: new Date() });
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id });
 
       expect(response.status).toBe(404);
     });
 
     it("returns 404 for a non-ACTIVE variant", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id, { status: "DRAFT" });
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id });
 
       expect(response.status).toBe(404);
     });
 
     it("returns 400 for a quantity below 1", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id, quantity: 0 });
 
       expect(response.status).toBe(400);
@@ -249,55 +249,55 @@ describe("cart API", () => {
     });
 
     it("returns 400 for a quantity above 999", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id, quantity: 1000 });
 
       expect(response.status).toBe(400);
     });
 
     it("returns 400 for a missing variant_public_id", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity: 1 });
 
       expect(response.status).toBe(400);
     });
 
     it("returns 400 when the merge would exceed the maximum quantity", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id, quantity: 999 });
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id, quantity: 1 });
 
       expect(response.status).toBe(400);
     });
 
     it("works for any authenticated role (admin)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       const response = await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id });
 
       expect(response.status).toBe(200);
@@ -306,18 +306,18 @@ describe("cart API", () => {
 
   describe("PATCH /api/v1/cart/items/:variant_public_id", () => {
     it("sets the absolute quantity (200)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id, { price: "10.00" });
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id, quantity: 2 });
 
       const response = await request(app)
         .patch(`${CART_URL}/items/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity: 4 });
 
       expect(response.status).toBe(200);
@@ -327,32 +327,32 @@ describe("cart API", () => {
     });
 
     it("returns 404 when the user has no cart", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       const response = await request(app)
         .patch(`${CART_URL}/items/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity: 2 });
 
       expect(response.status).toBe(404);
     });
 
     it("returns 404 when the variant is not in the cart", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const inCart = await createVariant(product.id, { sku: "IN-CART" });
       const other = await createVariant(product.id, { sku: "NOT-IN-CART" });
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: inCart.public_id });
 
       const response = await request(app)
         .patch(`${CART_URL}/items/${other.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity: 2 });
 
       expect(response.status).toBe(404);
@@ -360,18 +360,18 @@ describe("cart API", () => {
     });
 
     it("returns 400 for an invalid quantity", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id });
 
       const response = await request(app)
         .patch(`${CART_URL}/items/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity: 0 });
 
       expect(response.status).toBe(400);
@@ -380,18 +380,18 @@ describe("cart API", () => {
 
   describe("DELETE /api/v1/cart/items/:variant_public_id", () => {
     it("removes the line and preserves the cart (204)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id });
 
       const response = await request(app)
         .delete(`${CART_URL}/items/${variant.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(204);
 
@@ -403,51 +403,51 @@ describe("cart API", () => {
     });
 
     it("returns 404 when the user has no cart", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       const response = await request(app)
         .delete(`${CART_URL}/items/${variant.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(404);
     });
 
     it("returns 404 when the variant is not in the cart", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const inCart = await createVariant(product.id, { sku: "IN-CART" });
       const other = await createVariant(product.id, { sku: "NOT-IN-CART" });
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: inCart.public_id });
 
       const response = await request(app)
         .delete(`${CART_URL}/items/${other.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(404);
     });
 
     it("returns 404 when removing an already-removed line", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id });
       await request(app)
         .delete(`${CART_URL}/items/${variant.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       const response = await request(app)
         .delete(`${CART_URL}/items/${variant.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(404);
     });
@@ -455,18 +455,18 @@ describe("cart API", () => {
 
   describe("DELETE /api/v1/cart", () => {
     it("clears the cart and its lines (204)", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       await request(app)
         .post(`${CART_URL}/items`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ variant_public_id: variant.public_id });
 
       const response = await request(app)
         .delete(CART_URL)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(204);
 
@@ -477,11 +477,11 @@ describe("cart API", () => {
     });
 
     it("returns 404 when the user has no cart", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .delete(CART_URL)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(404);
     });

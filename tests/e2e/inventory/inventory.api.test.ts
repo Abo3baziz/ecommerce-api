@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
-import { createAdminUser, registerUser } from "../../helpers/auth.js";
+import { createAdminUser, registerUser, csrfHeaders } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { createProduct } from "../../factories/product.factory.js";
 import { createVariant } from "../../factories/variant.factory.js";
@@ -32,7 +32,7 @@ describe("inventory API", () => {
     });
 
     it("returns 403 for a non-admin session", async () => {
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(ADMIN_BASE_URL)
@@ -44,7 +44,7 @@ describe("inventory API", () => {
 
   describe("GET /api/v1/admin/inventory", () => {
     it("returns an empty list with pagination metadata (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .get(ADMIN_BASE_URL)
@@ -64,7 +64,7 @@ describe("inventory API", () => {
     });
 
     it("lists inventory with derived fields and no internal ids (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct({ name: "Wireless Headphones" });
       const variant = await createVariant(product.id, { sku: "WH-1000" });
       await createInventory(variant.id, { quantity_on_hand: 100, quantity_reserved: 5 });
@@ -87,7 +87,7 @@ describe("inventory API", () => {
     });
 
     it("excludes soft-deleted variants by default and includes them when requested (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const deletedVariant = await createVariant(product.id, { deleted_at: new Date() });
       await createInventory(deletedVariant.id);
@@ -105,7 +105,7 @@ describe("inventory API", () => {
     });
 
     it("filters by stock_status (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const out = await createVariant(product.id, { sku: "OUT-1" });
       const low = await createVariant(product.id, { sku: "LOW-1" });
@@ -123,7 +123,7 @@ describe("inventory API", () => {
     });
 
     it("searches by sku (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id, { sku: "WH-1000XM5" });
       await createInventory(variant.id);
@@ -139,7 +139,7 @@ describe("inventory API", () => {
     });
 
     it("rejects an invalid sort field (400)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .get(`${ADMIN_BASE_URL}?sort=price`)
@@ -150,7 +150,7 @@ describe("inventory API", () => {
     });
 
     it("rejects an invalid stock_status (400)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .get(`${ADMIN_BASE_URL}?stock_status=SOLD_OUT`)
@@ -163,13 +163,13 @@ describe("inventory API", () => {
 
   describe("POST /api/v1/admin/inventory", () => {
     it("creates inventory for a variant (201)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct({ name: "Wireless Headphones" });
       const variant = await createVariant(product.id, { sku: "WH-1000" });
 
       const response = await request(app)
         .post(ADMIN_BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(createInventoryPayload({ variant_public_id: variant.public_id }));
 
       expect(response.status).toBe(201);
@@ -183,11 +183,11 @@ describe("inventory API", () => {
     });
 
     it("returns 404 for an unknown variant", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .post(ADMIN_BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(createInventoryPayload());
 
       expect(response.status).toBe(404);
@@ -195,27 +195,27 @@ describe("inventory API", () => {
     });
 
     it("returns 404 for a soft-deleted variant", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id, { deleted_at: new Date() });
 
       const response = await request(app)
         .post(ADMIN_BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(createInventoryPayload({ variant_public_id: variant.public_id }));
 
       expect(response.status).toBe(404);
     });
 
     it("returns 409 when inventory already exists for the variant", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createInventory(variant.id);
 
       const response = await request(app)
         .post(ADMIN_BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(createInventoryPayload({ variant_public_id: variant.public_id }));
 
       expect(response.status).toBe(409);
@@ -223,24 +223,24 @@ describe("inventory API", () => {
     });
 
     it("rejects a negative quantity_on_hand (400)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       const response = await request(app)
         .post(ADMIN_BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send(createInventoryPayload({ variant_public_id: variant.public_id, quantity_on_hand: -1 }));
 
       expect(response.status).toBe(400);
     });
 
     it("rejects a missing variant_public_id (400)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .post(ADMIN_BASE_URL)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity_on_hand: 10 });
 
       expect(response.status).toBe(400);
@@ -249,7 +249,7 @@ describe("inventory API", () => {
 
   describe("GET /api/v1/admin/inventory/:variant_public_id", () => {
     it("returns the inventory object (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct({ name: "Wireless Headphones" });
       const variant = await createVariant(product.id, { sku: "WH-1000" });
       await createInventory(variant.id, { quantity_on_hand: 100, quantity_reserved: 5, reorder_level: 20 });
@@ -268,7 +268,7 @@ describe("inventory API", () => {
     });
 
     it("returns 404 for a variant without an inventory record", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
@@ -281,7 +281,7 @@ describe("inventory API", () => {
     });
 
     it("returns 404 for an unknown variant", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .get(`${ADMIN_BASE_URL}/var_${nanoid(10)}`)
@@ -291,7 +291,7 @@ describe("inventory API", () => {
     });
 
     it("returns 404 for a soft-deleted variant", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id, { deleted_at: new Date() });
       await createInventory(variant.id);
@@ -306,14 +306,14 @@ describe("inventory API", () => {
 
   describe("PATCH /api/v1/admin/inventory/:variant_public_id", () => {
     it("sets an absolute quantity_on_hand (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createInventory(variant.id, { quantity_on_hand: 100 });
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity_on_hand: 75, reason: "Stocktake correction" });
 
       expect(response.status).toBe(200);
@@ -323,14 +323,14 @@ describe("inventory API", () => {
     });
 
     it("applies a quantity_change delta (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createInventory(variant.id, { quantity_on_hand: 10 });
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity_change: 25 });
 
       expect(response.status).toBe(200);
@@ -338,14 +338,14 @@ describe("inventory API", () => {
     });
 
     it("returns 409 when a delta would drive stock below zero", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createInventory(variant.id, { quantity_on_hand: 10 });
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity_change: -15 });
 
       expect(response.status).toBe(409);
@@ -353,56 +353,56 @@ describe("inventory API", () => {
     });
 
     it("returns 400 for an empty body", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createInventory(variant.id);
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({});
 
       expect(response.status).toBe(400);
     });
 
     it("returns 400 when both quantity fields are sent", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createInventory(variant.id);
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity_on_hand: 50, quantity_change: 10 });
 
       expect(response.status).toBe(400);
     });
 
     it("returns 400 for a zero quantity_change", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createInventory(variant.id);
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity_change: 0 });
 
       expect(response.status).toBe(400);
     });
 
     it("clears reorder_level with null (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
       await createInventory(variant.id, { reorder_level: 20 });
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ reorder_level: null });
 
       expect(response.status).toBe(200);
@@ -410,13 +410,13 @@ describe("inventory API", () => {
     });
 
     it("returns 404 for a variant without an inventory record", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       const response = await request(app)
         .patch(`${ADMIN_BASE_URL}/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ quantity_change: 5 });
 
       expect(response.status).toBe(404);

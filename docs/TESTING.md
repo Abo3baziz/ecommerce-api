@@ -183,7 +183,7 @@ How to test:
   - Replay it on subsequent requests: `.set('Cookie', cookies)` (or extract the `session=…` pair).
 - **Seeding a session directly:** for middleware/repository-level tests, insert a session row via the auth repository/factory (hashed token + matching `SESSION_TTL_MS`), then set the cookie to the raw token value.
 - **Session lifecycle:** register/logout clears the cookie; revoking a session returns 401 on the next use of that cookie; password change revokes other sessions while keeping the current one; deleting the account revokes all sessions.
-- **CSRF:** the app uses `csrf-csrf`. API tests that exercise cookie-authenticated writes must replicate the CSRF flow (fetch/validate token pair) exactly as the docs describe; do not disable CSRF in tests.
+- **CSRF:** the app uses `csrf-csrf` (Double Submit Cookie pattern) and it is **active in the test environment**. API tests that exercise cookie-authenticated writes must replicate the CSRF flow exactly as the docs describe; do not disable CSRF in tests. Helpers in `tests/helpers/auth.ts` automate this: `registerUser`, `loginUser`, `createAdminUser`, and `createSuperAdminUser` already fetch a token and return `{ cookie, csrf }` (`csrf.token` + `csrf.cookie`); apply both to a write via the `csrfHeaders(cookie, csrf)` helper (combines the session+CSRF cookies and the `x-csrf-token` header). Existing e2e suites follow this pattern — keep new tests consistent. Writes without a valid token must assert **403**.
 
 ---
 

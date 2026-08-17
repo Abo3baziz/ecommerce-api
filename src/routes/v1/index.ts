@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { csrfProtection } from "../../middleware/csrf.js";
 import { authRouter } from "../../modules/auth/index.js";
 import { addressesRouter } from "../../modules/addresses/index.js";
 import { adminUsersRouter, usersRouter } from "../../modules/users/index.js";
@@ -24,6 +25,8 @@ import {
 } from "../../modules/reviews/index.js";
 
 const v1Router = Router();
+
+v1Router.use(csrfProtection);
 
 v1Router.use("/auth", authRouter);
 v1Router.use("/users", usersRouter);

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
-import { createAdminUser, registerUser } from "../../helpers/auth.js";
+import { createAdminUser, registerUser, csrfHeaders } from "../../helpers/auth.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { createProduct } from "../../factories/product.factory.js";
 import { createVariant } from "../../factories/variant.factory.js";
@@ -40,7 +40,7 @@ describe("product variants API", () => {
 
     it("returns 403 for a non-admin session", async () => {
       const product = await createProduct();
-      const { cookie } = await registerUser(app);
+      const { cookie, csrf } = await registerUser(app);
 
       const response = await request(app)
         .get(`/api/v1/admin/products/${product.public_id}/variants`)
@@ -52,7 +52,7 @@ describe("product variants API", () => {
 
   describe("GET /api/v1/admin/products/:product_public_id/variants", () => {
     it("lists the product's variants with pagination metadata (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
@@ -69,7 +69,7 @@ describe("product variants API", () => {
     });
 
     it("filters by status (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const draft = await createVariant(product.id, { status: "DRAFT" });
       await createVariant(product.id, { status: "ACTIVE" });
@@ -85,7 +85,7 @@ describe("product variants API", () => {
     });
 
     it("returns 404 for an unknown product", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
 
       const response = await request(app)
         .get(`/api/v1/admin/products/prd_${nanoid(10)}/variants`)
@@ -97,12 +97,12 @@ describe("product variants API", () => {
 
   describe("POST /api/v1/admin/products/:product_public_id/variants", () => {
     it("creates a variant defaulting status to ACTIVE and discount to 0.00 (201)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
 
       const response = await request(app)
         .post(`/api/v1/admin/products/${product.public_id}/variants`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ sku: "SW-HP-001", price: "99.99" });
 
       expect(response.status).toBe(201);
@@ -114,13 +114,13 @@ describe("product variants API", () => {
     });
 
     it("returns 409 for a duplicate SKU", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       const response = await request(app)
         .post(`/api/v1/admin/products/${product.public_id}/variants`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ sku: variant.sku, price: "99.99" });
 
       expect(response.status).toBe(409);
@@ -128,12 +128,12 @@ describe("product variants API", () => {
     });
 
     it("rejects an invalid payload (400)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
 
       const response = await request(app)
         .post(`/api/v1/admin/products/${product.public_id}/variants`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ sku: "", price: "-5.00" });
 
       expect(response.status).toBe(400);
@@ -142,7 +142,7 @@ describe("product variants API", () => {
 
   describe("GET /api/v1/admin/products/:product_public_id/variants/:variant_public_id", () => {
     it("returns the variant with its images (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
@@ -157,7 +157,7 @@ describe("product variants API", () => {
     });
 
     it("returns 404 for a variant that does not belong to the product", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const otherProduct = await createProduct();
       const variant = await createVariant(product.id);
@@ -172,13 +172,13 @@ describe("product variants API", () => {
 
   describe("PATCH /api/v1/admin/products/:product_public_id/variants/:variant_public_id", () => {
     it("updates the variant and clears fields with null (200)", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id, { barcode: "12345" });
 
       const response = await request(app)
         .patch(`/api/v1/admin/products/${product.public_id}/variants/${variant.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ price: "119.99", barcode: null });
 
       expect(response.status).toBe(200);
@@ -187,14 +187,14 @@ describe("product variants API", () => {
     });
 
     it("returns 409 for a duplicate SKU", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const first = await createVariant(product.id);
       const second = await createVariant(product.id);
 
       const response = await request(app)
         .patch(`/api/v1/admin/products/${product.public_id}/variants/${second.public_id}`)
-        .set("Cookie", cookie!)
+        .set(csrfHeaders(cookie!, csrf!))
         .send({ sku: first.sku });
 
       expect(response.status).toBe(409);
@@ -203,13 +203,13 @@ describe("product variants API", () => {
 
   describe("DELETE /api/v1/admin/products/:product_public_id/variants/:variant_public_id", () => {
     it("soft-deletes the variant (204) and hides it from the list", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id);
 
       const response = await request(app)
         .delete(`/api/v1/admin/products/${product.public_id}/variants/${variant.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(204);
 
@@ -220,13 +220,13 @@ describe("product variants API", () => {
     });
 
     it("returns 404 for an already deleted variant", async () => {
-      const { cookie } = await createAdminUser(app);
+      const { cookie, csrf } = await createAdminUser(app);
       const product = await createProduct();
       const variant = await createVariant(product.id, { deleted_at: new Date() });
 
       const response = await request(app)
         .delete(`/api/v1/admin/products/${product.public_id}/variants/${variant.public_id}`)
-        .set("Cookie", cookie!);
+        .set(csrfHeaders(cookie!, csrf!))
 
       expect(response.status).toBe(404);
     });

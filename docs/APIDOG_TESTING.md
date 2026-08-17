@@ -32,6 +32,7 @@ Apidog → **Environments** → create environment **Local** and add the followi
 |----------|-------|---------|
 | `base_url` | `http://localhost:3000/api/v1` | Base for every request |
 | `session_cookie` | *(empty)* | Filled by the login script (see §5) |
+| `csrf_token` | *(empty)* | Filled by the CSRF fetch (see §5.4) |
 | `product_public_id` | *(empty)* | Captured from create/list responses |
 | `category_public_id` | *(empty)* | Captured from create/list responses |
 | `variant_public_id` | *(empty)* | Captured from create/list responses |
@@ -104,6 +105,41 @@ Admin endpoints require an authenticated session whose user has the `admin` or `
 
 Only `SUPER_ADMIN` sessions can call the role endpoint (`PATCH /admin/users/{user_public_id}/role`); regular `ADMIN` sessions get **403** on it but can use the rest of the Admin folder.
 
+### 5.4 CSRF tokens (required for every cookie-authenticated write)
+
+Cookie-authenticated **write** requests (`POST`/`PATCH`/`PUT`/`DELETE` with a session cookie) must also carry a CSRF token in the `x-csrf-token` header. Requests without it return **403**.
+
+Happy-path flow after login/registration:
+
+1. Create request **Fetch CSRF Token**: `GET {{base_url}}/auth/csrf-token`. It requires the session cookie (`{{session_cookie}}` or the cookie jar), sets the HttpOnly `x-csrf-token` cookie, and returns:
+   ```json
+   { "success": true, "data": { "csrf_token": "…" } }
+   ```
+2. **Post-response script** stores the token in the environment:
+   ```js
+   pm.environment.set("csrf_token", pm.response.json().data.csrf_token);
+   ```
+   If you use the manual `Cookie: {{session_cookie}}` header instead of the cookie jar, also store the new `x-csrf-token` cookie and append it to the Cookie header on writes:
+   ```js
+   const match = pm.response.headers.get("set-cookie") && pm.response.headers.get("set-cookie").match(/x-csrf-token=([^;]+)/);
+   if (match) {
+     const c = "x-csrf-token=" + match[1];
+     const cur = pm.environment.get("session_cookie") || "";
+     pm.environment.set("session_cookie", cur ? cur + "; " + c : c);
+   }
+   ```
+3. On every cookie-authenticated write request, add the header:
+   ```
+   x-csrf-token: {{csrf_token}}
+   ```
+
+Notes:
+
+- Fetch a fresh token after **every** login/registration — tokens are bound to the session and a new session invalidates old ones.
+- `GET`/`HEAD`/`OPTIONS` requests and anonymous writes (register, login, password reset, token-in-body verifies) never need a CSRF token.
+- If your cookie jar is enabled, the `x-csrf-token` cookie is stored automatically; only the header from step 3 is needed.
+- When running the end-to-end **flows** in §8, add the `x-csrf-token: {{csrf_token}}` header to every write step (flows already re-login/register where a session switch happens, so re-run the token fetch after those steps).
+
 ---
 
 ## 6. Request tree
@@ -112,6 +148,7 @@ Only `SUPER_ADMIN` sessions can call the role endpoint (`PATCH /admin/users/{use
 
 | Method | Path | Auth | Expected | Notes |
 |--------|------|------|----------|-------|
+| GET | `{{base_url}}/auth/csrf-token` | cookie | 200 | Fetch a CSRF token (see §5.4). Sets the HttpOnly `x-csrf-token` cookie and returns `data.csrf_token`; required on every cookie-authenticated write header |
 | POST | `{{base_url}}/auth/register` | – | 201 | Body: `first_name`, `last_name`, `phone_number` (E.164, e.g. `+15551234567`), `email`, `password` (≥8 chars, upper + lower + digit + special). Sets the session cookie. |
 | POST | `{{base_url}}/auth/login` | – | 200 | Body: `email`, `password`. 401 for unknown email **or** wrong password (identical message — no enumeration). |
 | GET | `{{base_url}}/auth/session` | cookie | 200 | Current session + user info |
@@ -136,7 +173,7 @@ Only `SUPER_ADMIN` sessions can call the role endpoint (`PATCH /admin/users/{use
 
 ### 6.3 Folder: `03 Account`
 
-All requests carry the `Cookie: {{session_cookie}}` header.
+All requests carry the `Cookie: {{session_cookie}}` header. **Every write request** (`PATCH`/`POST`/`DELETE`) additionally carries the `x-csrf-token: {{csrf_token}}` header (see §5.4).
 
 | Method | Path | Expected | Notes |
 |--------|------|----------|-------|
@@ -156,7 +193,7 @@ All requests carry the `Cookie: {{session_cookie}}` header.
 
 ### 6.4 Folder: `04 Admin`
 
-All requests carry the `Cookie: {{session_cookie}}` header **and** require the `admin` role (see §5.3). Non-admin sessions get **403**.
+All requests carry the `Cookie: {{session_cookie}}` header **and** the `x-csrf-token: {{csrf_token}}` header on writes **and** require the `admin` role (see §5.3). Non-admin sessions get **403**.
 
 | Method | Path | Expected | Notes |
 |--------|------|----------|-------|
@@ -186,7 +223,7 @@ All requests carry the `Cookie: {{session_cookie}}` header **and** require the `
 
 ### 6.5 Folder: `05 Cart`
 
-All requests carry the `Cookie: {{session_cookie}}` header. Cart operations require an `ACTIVE` variant of a product; a non-purchasable variant → 404.
+All requests carry the `Cookie: {{session_cookie}}` header, plus `x-csrf-token: {{csrf_token}}` on writes. Cart operations require an `ACTIVE` variant of a product; a non-purchasable variant → 404.
 
 | Method | Path | Expected | Notes |
 |--------|------|----------|-------|
@@ -198,7 +235,7 @@ All requests carry the `Cookie: {{session_cookie}}` header. Cart operations requ
 
 ### 6.6 Folder: `06 Orders`
 
-All requests carry the `Cookie: {{session_cookie}}` header.
+All requests carry the `Cookie: {{session_cookie}}` header, plus `x-csrf-token: {{csrf_token}}` on writes.
 
 | Method | Path | Expected | Notes |
 |--------|------|----------|-------|
@@ -208,7 +245,7 @@ All requests carry the `Cookie: {{session_cookie}}` header.
 
 ### 6.7 Folder: `07 Admin Orders`
 
-All requests carry the `Cookie: {{session_cookie}}` header **and** require the `admin` role (see §5.3).
+All requests carry the `Cookie: {{session_cookie}}` header and the `x-csrf-token: {{csrf_token}}` header on writes, and require the `admin` role (see §5.3).
 
 | Method | Path | Expected | Notes |
 |--------|------|----------|-------|
@@ -218,7 +255,7 @@ All requests carry the `Cookie: {{session_cookie}}` header **and** require the `
 
 ### 6.8 Folder: `08 Admin Inventory`
 
-All requests carry the `Cookie: {{session_cookie}}` header **and** require the `admin` role (see §5.3). Inventory is keyed by `variant_public_id` — there is no separate inventory public ID.
+All requests carry the `Cookie: {{session_cookie}}` header and the `x-csrf-token: {{csrf_token}}` header on writes, and require the `admin` role (see §5.3). Inventory is keyed by `variant_public_id` — there is no separate inventory public ID.
 
 | Method | Path | Expected | Notes |
 |--------|------|----------|-------|
@@ -229,7 +266,7 @@ All requests carry the `Cookie: {{session_cookie}}` header **and** require the `
 
 ### 6.9 Folder: `09 Reviews`
 
-Public rows need **no** session; customer rows carry the `Cookie: {{session_cookie}}` header. Reviews are auto-approved on creation (`is_approved` defaults `true`), so a new review is immediately visible to the public. `REVIEWS_REQUIRE_PURCHASE` is disabled by default, so no qualifying order is needed.
+Public rows need **no** session; customer rows carry the `Cookie: {{session_cookie}}` header (plus `x-csrf-token: {{csrf_token}}` on writes). Reviews are auto-approved on creation (`is_approved` defaults `true`), so a new review is immediately visible to the public. `REVIEWS_REQUIRE_PURCHASE` is disabled by default, so no qualifying order is needed.
 
 | Method | Path | Auth | Expected | Notes |
 |--------|------|------|----------|-------|
@@ -242,7 +279,7 @@ Public rows need **no** session; customer rows carry the `Cookie: {{session_cook
 
 ### 6.10 Folder: `10 Admin Reviews`
 
-All requests carry the `Cookie: {{session_cookie}}` header **and** require the `admin` role (see §5.3).
+All requests carry the `Cookie: {{session_cookie}}` header and the `x-csrf-token: {{csrf_token}}` header on writes, and require the `admin` role (see §5.3).
 
 | Method | Path | Expected | Notes |
 |--------|------|----------|-------|
@@ -299,7 +336,7 @@ pm.environment.set("product_public_id", pm.response.json().data.public_id);
 
 ## 8. End-to-end flows
 
-Configure the **collection runner**: select the collection → **Run** → drag requests into order below (or rely on folder order). Apidog runs requests sequentially and shares the environment, so captured variables carry over.
+Configure the **collection runner**: select the collection → **Run** → drag requests into order below (or rely on folder order). Apidog runs requests sequentially and shares the environment, so captured variables carry over. Where a flow logs in or registers a user it creates a new session, so re-fetch the CSRF token (`GET /auth/csrf-token`, §5.4) right after that step and apply the `x-csrf-token` header to every write in the flow.
 
 ### Flow A — Customer journey (no admin)
 
@@ -401,8 +438,8 @@ Requires a product that exists at the time of the flow (run after Flow B step 8,
 | Symptom | Cause / fix |
 |---------|-------------|
 | 400 with `errors` | Validation failed. Check the message details: E.164 phone (`+1…`), password policy, slug regex `^[a-z0-9]+(?:-[a-z0-9]+)*$`, name/limit constraints, cart quantity 1–999, `quantity_on_hand`/`quantity_change` mutual exclusion on inventory, `carrier` required when an order moves to `shipped`, empty PATCH body |
-| 401 | No session cookie, expired/revoked session, or deactivated account → run Login again (or Register) to refresh `session_cookie` |
-| 403 | Authenticated but not `admin`/`super_admin` → promote via `npm run admin:create` (first promotion → `SUPER_ADMIN`). On the role endpoint, `403` also means the session is a regular `ADMIN` (super admin required) |
+| 401 | No session cookie, expired/revoked session, or deactivated account → run Login again (or Register) to refresh `session_cookie`, then re-fetch the CSRF token |
+| 403 | Authenticated but not `admin`/`super_admin` → promote via `npm run admin:create` (first promotion → `SUPER_ADMIN`). On the role endpoint, `403` also means the session is a regular `ADMIN` (super admin required). `403` with `Invalid CSRF token` means a cookie-authenticated write was missing or had a wrong `x-csrf-token` header → re-fetch the token (§5.4) and retry |
 | 404 | Unknown public ID, **or** an intentionally hidden resource (inactive/soft-deleted category, a product without an `ACTIVE` variant, an order/review that is absent, foreign, unapproved, or soft-deleted, or `GET /cart` before the first add) — the API does not reveal existence |
 | 409 | Duplicate `name`/`slug` (categories), `slug`/SKU (products), email/phone (auth/users, incl. admin user updates), **demoting the last admin** (role change), **order not placeable** (empty cart, non-purchasable item, insufficient stock, invalid coupon), **illegal/same-status order transition**, **duplicate inventory record** or **stock delta below zero**, or **duplicate review** for the same product |
 | 429 | Route rate limiter exceeded → wait 15 min or use a fresh account |
@@ -414,7 +451,7 @@ Requires a product that exists at the time of the flow (run after Flow B step 8,
 
 ## 11. Notes
 
-- **CSRF:** `csrf-csrf` is installed but **not yet wired** into the request pipeline, so no CSRF token header is required today. If CSRF middleware is added, cookie-authenticated writes will need the documented fetch/validate token flow; revisit this guide then.
+- **CSRF:** the API enforces the Double Submit Cookie pattern on every cookie-authenticated write. Fetch a token via `GET /api/v1/auth/csrf-token` after login/registration and send it in the `x-csrf-token` header on writes (missing/mismatched → 403). See §5.4 and `docs/api/authentication/csrf.md`. Anonymous requests and safe methods (`GET`/`HEAD`/`OPTIONS`) are exempt.
 - **Email/OTP tokens in dev:** verification links and the SMS OTP are delivered by real services (Resend) or the SMS stub (logs only). For local testing, read the pending token from the `verification_tokens` table (email-verification, email-change, and password-reset tokens all live there) or use the backend-served verify pages (`/verify-email?token=…`, `/verify-email-change?token=…`).
 - **Email verification is not required** for the flows in this guide: customer browsing and admin operations work with a fresh unverified account.
 - **Role changes are logged, not audited:** `PATCH /admin/users/{user_public_id}/role` records `actorId`, `targetUserId`, `previousRole`, `newRole` in the structured logger; a dedicated audit-log table is a documented future enhancement (see `docs/ENDPOINT_TESTING.md` for hand-run role-endpoint cases).

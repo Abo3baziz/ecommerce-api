@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { validate } from "../../../middleware/validate.js";
 import { authentication } from "../../../middleware/authentication.js";
+import { csrfTokenController } from "../../../middleware/csrf.js";
 import {
   emailVerificationRateLimiter,
   passwordResetRateLimiter,
@@ -28,6 +29,8 @@ import {
 } from "../controller/auth.controller.js";
 
 const authRouter = Router();
+
+authRouter.get("/csrf-token", authentication, csrfTokenController);
 
 authRouter.post("/register", validate(registerSchema), registerController);
 authRouter.post("/login", validate(loginSchema), loginController);
