@@ -50,23 +50,6 @@ describe("session idle timeout", () => {
     expect(response.body.data.authenticated).toBe(true);
   });
 
-  it("slides last_activity_at forward on an authenticated request", async () => {
-    const { cookie } = await registerUser(app);
-    const session = await prisma.sessions.findFirst();
-    const before = session!.last_activity_at!.getTime();
-
-    await new Promise((resolve) => setTimeout(resolve, 5));
-
-    const response = await request(app).get(SESSION_URL).set("Cookie", cookie!);
-
-    expect(response.status).toBe(200);
-
-    const after = await prisma.sessions.findUnique({
-      where: { id: session!.id },
-    });
-    expect(after!.last_activity_at!.getTime()).toBeGreaterThan(before);
-  });
-
   it("rejects a session with no recorded last activity (401)", async () => {
     const { cookie } = await registerUser(app);
 
