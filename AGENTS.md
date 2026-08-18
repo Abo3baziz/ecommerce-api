@@ -298,6 +298,14 @@ Defines operator-facing tooling and maintenance procedures
 
 - `docs/OPERATIONS.md`
 
+### Decision Records
+
+Architecture Decision Records (ADRs) capture significant architectural decisions and their rationale.
+
+- `docs/adr/0001-imagekit-client-side-signed-upload.md`
+
+New ADRs should be added in `docs/adr/` with sequential numbering (`0002-…`, `0003-…`) and registered here.
+
 ---
 
 ## Documentation Priority
