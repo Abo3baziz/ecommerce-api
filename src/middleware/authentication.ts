@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { UnauthorizedError } from "../shared/errors/UnauthorizedError.js";
-import { SESSION_COOKIE_NAME } from "../shared/constants/session.js";
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_IDLE_TIMEOUT_MS,
+} from "../shared/constants/session.js";
 import { hashToken } from "../modules/auth/utils/tokens.js";
 import { authRepository } from "../modules/auth/repository/auth.repository.js";
 
@@ -28,6 +31,13 @@ export async function authentication(
 
     if (session.expires_at.getTime() < Date.now()) {
       throw new UnauthorizedError("Session has expired");
+    }
+
+    if (
+      session.last_activity_at === null ||
+      session.last_activity_at.getTime() < Date.now() - SESSION_IDLE_TIMEOUT_MS
+    ) {
+      throw new UnauthorizedError("Session has been inactive for too long");
     }
 
     if (session.users.status !== "ACTIVE" || session.users.deleted_at !== null) {

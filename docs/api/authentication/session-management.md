@@ -180,8 +180,9 @@ Every authenticated request performs the following checks:
 2. Verify session exists.
 3. Verify session is active.
 4. Verify session has not expired.
-5. Load associated user.
-6. Attach authenticated user to the request context.
+5. Verify the session is not idle (`last_activity_at` within `SESSION_IDLE_TIMEOUT_MS`; every authenticated request slides `last_activity_at` forward).
+6. Load associated user.
+7. Attach authenticated user to the request context.
 
 If any check fails:
 
@@ -193,11 +194,12 @@ If any check fails:
 
 # Session Expiration
 
-Recommended policy:
+Policy:
 
-- Idle timeout: 30 days since last activity.
+- Absolute TTL: `SESSION_TTL_MS` (30 days) since creation — never extended.
+- Idle timeout: `SESSION_IDLE_TIMEOUT_MS` (30 days) since last activity — enforced by the authentication middleware.
 - Update the last activity timestamp on authenticated requests.
-- Expired sessions are rejected and removed during cleanup.
+- Idle/expired sessions are rejected with 401 and removed by the session cleanup job.
 
 ---
 

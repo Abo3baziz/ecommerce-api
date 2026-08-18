@@ -71,6 +71,7 @@ A session is destroyed after:
 - Logout
 - Password change (optional: revoke all sessions)
 - Session expiration
+- Idle timeout (no authenticated request within `SESSION_IDLE_TIMEOUT_MS`)
 - Administrative revocation
 
 ---
@@ -118,6 +119,7 @@ Responsibilities:
 - Read session cookie
 - Validate session
 - Verify expiration
+- Verify idle timeout
 - Load authenticated user
 - Attach user to request context
 
@@ -126,6 +128,20 @@ If authentication fails:
 - Return HTTP 401 Unauthorized
 
 ---
+
+# Session Idle Timeout
+
+Sessions have an absolute TTL (`SESSION_TTL_MS`, 30 days by default) **and** an idle timeout (`SESSION_IDLE_TIMEOUT_MS`, 30 days by default).
+
+The authentication middleware records `last_activity_at` on every authenticated request (`touchSession`). If a session's `last_activity_at` is older than `SESSION_IDLE_TIMEOUT_MS` — i.e. the session has not been used within the idle window — the request is rejected with **401** even if the absolute TTL has not yet elapsed.
+
+Semantics:
+
+- **Absolute expiry**: `expires_at` is fixed at login and never extended; a session dies at most `SESSION_TTL_MS` after creation.
+- **Idle timeout**: `last_activity_at` slides forward on every authenticated request; an idle session is rejected once the idle window passes without activity.
+- The effective session lifetime is `min(absolute TTL, last activity + idle timeout)`.
+
+Operators can shorten `SESSION_IDLE_TIMEOUT_MS` in `src/shared/constants/session.ts` to force less-active sessions to re-authenticate. Idle rejection does **not** revoke the session row; expired/revoked rows are removed by the session cleanup job (see `docs/OPERATIONS.md`).
 
 # CSRF Protection
 
@@ -356,6 +372,7 @@ The authentication system must implement:
 - Secure cookies in production
 - SameSite protection
 - Session expiration
+- Session idle timeout
 - Session revocation
 - CSRF protection where appropriate
 - Rate limiting
