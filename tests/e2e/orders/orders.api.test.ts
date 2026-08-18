@@ -15,6 +15,7 @@ import { createVariant } from "../../factories/variant.factory.js";
 import { createInventory } from "../../factories/inventory.factory.js";
 import { createCoupon } from "../../factories/coupon.factory.js";
 import { discount_type } from "../../../src/generated/prisma/enums.js";
+import { prisma } from "../../../src/config/database.js";
 
 const ORDERS_URL = "/api/v1/orders";
 const ADMIN_ORDERS_URL = "/api/v1/admin/orders";
@@ -316,6 +317,32 @@ describe("orders API", () => {
       );
       expect(secondOrder.status).toBe(201);
       expect(secondOrder.body.data.discount_amount).toBe("25.00");
+    });
+  });
+
+  describe("auto-restock on cancel/refund", () => {
+    it("restocks inventory when an admin cancels a confirmed order", async () => {
+      const customer = await registerUser(app);
+      const { variant, order } = await createReadyOrder(
+        customer.cookie!,
+        customer.csrf!,
+        { quantity: 2, stock: 100 },
+      );
+      const admin = await createAdminUser(app);
+
+      const cancelled = await request(app)
+        .patch(`${ADMIN_ORDERS_URL}/${order.body.data.public_id}`)
+        .set(csrfHeaders(admin.cookie!, admin.csrf!))
+        .send({ status: "cancelled" });
+
+      expect(cancelled.status).toBe(200);
+      expect(cancelled.body.data.status).toBe("cancelled");
+
+      const inventory = await prisma.inventory.findUnique({
+        where: { product_variants_id: variant.id },
+      });
+      expect(inventory?.quantity_on_hand).toBe(100);
+      expect(inventory?.quantity_reserved).toBe(0);
     });
   });
 

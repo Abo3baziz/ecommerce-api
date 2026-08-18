@@ -1,4 +1,5 @@
 import { prisma } from "../../../config/database.js";
+import { Prisma } from "../../../generated/prisma/client.js";
 import { order_status } from "../../../generated/prisma/enums.js";
 import { ConflictError } from "../../../shared/errors/ConflictError.js";
 import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
@@ -116,6 +117,24 @@ export interface OrderStatusActor {
   id: number;
 }
 
+async function restockOrderLines(
+  order: AdminOrderRow,
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  for (const line of order.order_items) {
+    const affected = await ordersRepository.restockStock(
+      line.product_variants_id,
+      line.quantity,
+      tx,
+    );
+    if (affected === 0) {
+      throw new ConflictError(
+        "Inventory record not found for one or more order items",
+      );
+    }
+  }
+}
+
 export async function updateOrderStatus(
   orderPublicId: string,
   input: UpdateOrderStatusBody,
@@ -141,6 +160,8 @@ export async function updateOrderStatus(
       `Order ${orderPublicId} cannot transition from ${from.toLowerCase()} to ${input.status}.`,
     );
   }
+
+  let restocked = false;
 
   const updated = await prisma.$transaction(async (tx) => {
     const now = new Date();
@@ -168,6 +189,8 @@ export async function updateOrderStatus(
           }
         } else {
           await ordersRepository.markPaymentRefunded(order.id, now, tx);
+          await restockOrderLines(order, tx);
+          restocked = true;
         }
         await ordersRepository.restoreCouponUsage(order.id, tx);
         break;
@@ -188,6 +211,8 @@ export async function updateOrderStatus(
       }
       case order_status.REFUNDED: {
         await ordersRepository.markPaymentRefunded(order.id, now, tx);
+        await restockOrderLines(order, tx);
+        restocked = true;
         break;
       }
       default:
@@ -212,6 +237,23 @@ export async function updateOrderStatus(
     },
     "Order status changed",
   );
+
+  if (restocked) {
+    const reason =
+      to === order_status.CANCELLED ? "order_cancel" : "order_refund";
+    for (const line of order.order_items) {
+      logger.info(
+        {
+          actorId: actor.id,
+          orderPublicId,
+          variantPublicId: line.product_variants.public_id,
+          quantity: line.quantity,
+          reason,
+        },
+        "Inventory restocked",
+      );
+    }
+  }
 
   return toAdminOrderResult(updated);
 }
