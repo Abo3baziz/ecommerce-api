@@ -34,7 +34,7 @@ Task backlog derived from the production-readiness review (2026-08-16), `PROJECT
 
 | ID | File | Title | Status |
 |----|------|-------|--------|
-| T-001 | [T-001-csrf-protection.md](./T-001-csrf-protection.md) | Wire CSRF protection for cookie-authenticated writes | todo |
+| T-001 | [T-001-csrf-protection.md](./T-001-csrf-protection.md) | Wire CSRF protection for cookie-authenticated writes | done |
 | T-002 | [T-002-real-payment-gateway.md](./T-002-real-payment-gateway.md) | Real payment gateway (replace mock) | todo |
 | T-003 | [T-003-payment-webhooks-reconciliation.md](./T-003-payment-webhooks-reconciliation.md) | Payment webhooks + reconciliation | todo |
 
