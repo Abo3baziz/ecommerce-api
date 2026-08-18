@@ -1355,13 +1355,13 @@ Authenticated user with role `ADMIN` or `SUPER_ADMIN`. Customers and unauthentic
 4. API validates the transition against the allowed-transition matrix; an illegal transition → **409** (current status conflicts with the requested status).
 5. Inside one `prisma.$transaction`, API applies the transition and its side effects:
    - `pending → confirmed` — marks the payment `paid` (retroactive confirmation for a deferred-provider order) and calls `commitStock` for every line.
-   - `pending → cancelled` — calls `releaseStock` for every line (reservation returned).
-   - `confirmed|processing → cancelled` — a paid payment is marked `refunded`; stock was already committed, so **restocking is a manual admin inventory adjustment** (see **Notes**).
+   - `pending → cancelled` — calls `releaseStock` for every line (reservation returned; no committed stock exists yet, so nothing is restocked).
+   - `confirmed|processing → cancelled` — a paid payment is marked `refunded` and `restockStock` is called for every line, restoring the committed quantities to `quantity_on_hand` (audit reason `order_cancel`).
    - `confirmed → processing` — no side effects.
    - `processing → shipped` — updates the checkout-created `shipments` row (`status = "shipped"`, `carrier`, `tracking_number`, `shipped_at` = now); `carrier` is required.
    - `shipped → delivered` — updates the shipment row (`status = "delivered"`, `delivered_at` = now).
    - `delivered → returned` — no side effects.
-   - `returned → refunded` — marks the payment `refunded`.
+   - `returned → refunded` — marks the payment `refunded` and calls `restockStock` for every line, restoring the returned quantities (audit reason `order_refund`).
    - Any transition to a state with a paid payment and an unreleased reservation performs the appropriate stock side effect.
 6. API updates `orders.updated_at` and returns **200 OK** with the full administrator projection.
 
@@ -1382,7 +1382,8 @@ Authenticated user with role `ADMIN` or `SUPER_ADMIN`. Customers and unauthentic
 | `cancelled`, `refunded` | *(terminal)* |
 
 - Illegal, backwards, or skipped transitions (e.g., `confirmed → shipped`, `delivered → processing`, `shipped → cancelled`) → **409**.
-- An order can be cancelled from `confirmed`/`processing`; because v1 charges at checkout, cancelling a paid order refunds the payment (payment status → `refunded`). Refunding does **not** auto-restock: `commitStock` already decremented `quantity_on_hand` at checkout, so restocking is performed by an admin inventory adjustment (`PATCH /api/v1/admin/inventory/{variant_public_id}` with a positive `quantity_change`) or by a future `restockStock` order operation.
+- An order can be cancelled from `confirmed`/`processing`; because v1 charges at checkout, cancelling a paid order refunds the payment (payment status → `refunded`) **and auto-restocks** the committed quantities: `restockStock` increments `quantity_on_hand` by each line's quantity inside the same status-transition transaction, so operators never need a manual inventory adjustment.
+- Refunding a **returned** order (`returned → refunded`) also auto-restocks the returned quantities (`restockStock` per line, audit reason `order_refund`). v1 always restocks full line quantities on refund — partial returns and destroyed/damaged-return handling are future enhancements.
 - Transitioning to `shipped` requires `carrier`; `tracking_number` is optional.
 - The same status re-applied (no-op) → **409** (the order is already in that state).
 - `orders.updated_at` is refreshed on every successful transition; `placed_at` is immutable.
@@ -1414,7 +1415,7 @@ Authenticated user with role `ADMIN` or `SUPER_ADMIN`. Customers and unauthentic
 ## Notes
 
 - There is no customer-facing cancellation endpoint in v1 (the requirements define checkout, history, and details for customers); cancellation and refunds are administrator actions. A customer cancel endpoint (`POST /api/v1/orders/{order_public_id}/cancel`) with a cancellation window is a documented possible future enhancement.
-- Refund restocking is manual today; adding a `restockStock(variantId, quantity)` operation to the inventory order-operations contract is a possible extension that would make `returned → refunded` fully automatic.
+- Cancelling a committed order (`confirmed|processing → cancelled`) and refunding a returned order (`returned → refunded`) both **auto-restock** committed stock via the `restockStock` order operation (see `docs/api/inventory/inventory.md`); the reason (`order_cancel` / `order_refund`) is audit-logged per line.
 
 ---
 

@@ -14,7 +14,7 @@
 3. **Money invariants**: `Prisma.Decimal` throughout, `.toFixed(2)` at the boundary, `round2` on percentage discounts, `maximum_discount_amount` cap, min-0 guard.
 4. **Coupon redemption is recorded** (`coupon_usages` row + `usage_count` increment) in the same transaction — one coupon per order enforced by the unique `orders_id`.
 5. **Security posture**: foreign orders → 404 (no existence leak), generic coupon rejection message ("invalid or not applicable" — no enumeration), admin routes behind `authentication` + `authorization(ADMIN, SUPER_ADMIN)`, no internal IDs in projections, no `deleted_at` leakage.
-6. **Transition matrix** matches the doc exactly, including the manual-restock note on refunds and the unreachable-but-documented `pending → confirmed` path.
+6. **Transition matrix** matches the doc exactly, including the refund-restock path (implemented via the `restockStock` order operation on `confirmed|processing → cancelled` and `returned → refunded` — see `docs/api/orders/orders.md`) and the unreachable-but-documented `pending → confirmed` path.
 
 ---
 

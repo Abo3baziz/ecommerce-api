@@ -720,13 +720,14 @@ Error responses use the shared project format:
 
 ---
 
-# Orders Integration (Future)
+# Orders Integration
 
-The Inventory API surface is admin-only. The **prevent overselling** requirement is additionally enforced in the order flow through internal, transactional service operations that the Orders module will call — these are **not** REST endpoints:
+The Inventory API surface is admin-only. The **prevent overselling** requirement is additionally enforced in the order flow through internal, transactional service operations that the Orders module calls — these are **not** REST endpoints:
 
 - `reserveStock(variantId, quantity)` — inside the checkout transaction, locks the inventory row and reserves stock; fails when `quantity_available` is insufficient, so orders can never reserve more than what is on hand.
 - `releaseStock(variantId, quantity)` — returns reserved stock on order cancellation or payment failure.
 - `commitStock(variantId, quantity)` — on payment completion or fulfillment, decrements `quantity_on_hand` and releases the reservation.
+- `restockStock(variantId, quantity)` — restores committed stock on cancellation of a fulfilled order or on refund after return: increments `quantity_on_hand` (never below zero by construction) and refreshes `last_stock_update`. Called inside the status-transition transaction with audit reason `order_cancel` / `order_refund` (see `docs/api/orders/orders.md`).
 
 These operations share the same row-locking and non-negative invariants as the admin `PATCH` endpoint and are documented here so the Orders module integrates against them.
 

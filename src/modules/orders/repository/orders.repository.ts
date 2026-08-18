@@ -493,6 +493,19 @@ export const ordersRepository = {
     `;
   },
 
+  restockStock(
+    product_variants_id: number,
+    quantity: number,
+    client: DbClient = prisma,
+  ) {
+    return client.$executeRaw`
+      UPDATE ${inventoryTable}
+      SET quantity_on_hand = quantity_on_hand + ${quantity},
+          last_stock_update = now()
+      WHERE product_variants_id = ${product_variants_id}
+    `;
+  },
+
   updateOrderStatus(
     id: number,
     status: order_status,

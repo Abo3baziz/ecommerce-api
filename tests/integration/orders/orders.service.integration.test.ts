@@ -880,7 +880,7 @@ describe("orders.service", () => {
       expect(payment?.status).toBe(payment_status.PENDING);
     });
 
-    it("transitions confirmed to cancelled, refunding without restocking", async () => {
+    it("transitions confirmed to cancelled, refunding and restocking inventory", async () => {
       const { user, order, variant } = await createOrderInStatus({
         status: order_status.CONFIRMED,
         quantity: 2,
@@ -898,7 +898,7 @@ describe("orders.service", () => {
       const inventory = await prisma.inventory.findUnique({
         where: { product_variants_id: variant.id },
       });
-      expect(inventory?.quantity_on_hand).toBe(98);
+      expect(inventory?.quantity_on_hand).toBe(100);
       expect(inventory?.quantity_reserved).toBe(0);
 
       const payment = await prisma.payments.findFirst({
@@ -906,6 +906,250 @@ describe("orders.service", () => {
       });
       expect(payment?.status).toBe(payment_status.REFUNDED);
       expect(payment?.refunded_at).toBeTruthy();
+    });
+
+    it("transitions processing to cancelled, refunding and restocking inventory", async () => {
+      const { user, order, variant } = await createOrderInStatus({
+        status: order_status.PROCESSING,
+        quantity: 3,
+        onHand: 100,
+      });
+
+      const result = await updateOrderStatus(
+        order.public_id,
+        { status: "cancelled" },
+        { id: user.id },
+      );
+
+      expect(result.status).toBe("cancelled");
+
+      const inventory = await prisma.inventory.findUnique({
+        where: { product_variants_id: variant.id },
+      });
+      expect(inventory?.quantity_on_hand).toBe(100);
+      expect(inventory?.quantity_reserved).toBe(0);
+
+      const payment = await prisma.payments.findFirst({
+        where: { orders_id: order.id },
+      });
+      expect(payment?.status).toBe(payment_status.REFUNDED);
+    });
+
+    it("transitions returned to refunded, restocking the returned quantities", async () => {
+      const { user, order, variant } = await createOrderInStatus({
+        status: order_status.RETURNED,
+        quantity: 2,
+        onHand: 100,
+      });
+
+      const result = await updateOrderStatus(
+        order.public_id,
+        { status: "refunded" },
+        { id: user.id },
+      );
+
+      expect(result.status).toBe("refunded");
+
+      const inventory = await prisma.inventory.findUnique({
+        where: { product_variants_id: variant.id },
+      });
+      expect(inventory?.quantity_on_hand).toBe(100);
+      expect(inventory?.quantity_reserved).toBe(0);
+
+      const payment = await prisma.payments.findFirst({
+        where: { orders_id: order.id },
+      });
+      expect(payment?.status).toBe(payment_status.REFUNDED);
+      expect(payment?.refunded_at).toBeTruthy();
+    });
+
+    it("restocks every line when a confirmed multi-line order is cancelled", async () => {
+      const user = await createUser();
+      const address = await createAddress(user.id);
+      const first = await createProduct();
+      const firstVariant = await createVariant(first.id, {
+        sku: `SKU-${nanoid(8)}`,
+        price: "50.00",
+      });
+      const second = await createProduct();
+      const secondVariant = await createVariant(second.id, {
+        sku: `SKU-${nanoid(8)}`,
+        price: "75.00",
+      });
+      await createInventory(firstVariant.id, {
+        quantity_on_hand: 100,
+        quantity_reserved: 0,
+      });
+      await createInventory(secondVariant.id, {
+        quantity_on_hand: 50,
+        quantity_reserved: 0,
+      });
+      const now = new Date();
+
+      const order = await prisma.orders.create({
+        data: {
+          public_id: generatePublicId(PUBLIC_ID_PREFIXES.ORDER),
+          order_number: `ORD-${nanoid(10)}`,
+          status: order_status.CONFIRMED,
+          shipping_cost: new Prisma.Decimal("10.00"),
+          subtotal: new Prisma.Decimal("125.00"),
+          discount_amount: new Prisma.Decimal("0.00"),
+          shipping_fee: new Prisma.Decimal("10.00"),
+          tax_amount: new Prisma.Decimal("0.00"),
+          total_amount: new Prisma.Decimal("135.00"),
+          notes: null,
+          placed_at: now,
+          created_at: now,
+          updated_at: now,
+          users_id: user.id,
+          coupons_id: null,
+          user_addresses_id: address.id,
+        },
+      });
+
+      await prisma.order_items.createMany({
+        data: [
+          {
+            orders_id: order.id,
+            product_variants_id: firstVariant.id,
+            product_name: first.name,
+            product_slug: first.slug,
+            sku: firstVariant.sku,
+            unit_price: new Prisma.Decimal("50.00"),
+            quantity: 2,
+            total_amount: new Prisma.Decimal("100.00"),
+            created_at: now,
+          },
+          {
+            orders_id: order.id,
+            product_variants_id: secondVariant.id,
+            product_name: second.name,
+            product_slug: second.slug,
+            sku: secondVariant.sku,
+            unit_price: new Prisma.Decimal("75.00"),
+            quantity: 3,
+            total_amount: new Prisma.Decimal("225.00"),
+            created_at: now,
+          },
+        ],
+      });
+
+      await prisma.inventory.update({
+        where: { product_variants_id: firstVariant.id },
+        data: { quantity_on_hand: 98, quantity_reserved: 0 },
+      });
+      await prisma.inventory.update({
+        where: { product_variants_id: secondVariant.id },
+        data: { quantity_on_hand: 47, quantity_reserved: 0 },
+      });
+
+      await prisma.shipments.create({
+        data: {
+          public_id: generatePublicId(PUBLIC_ID_PREFIXES.SHIPMENT),
+          status: "pending",
+          recipient_name: "Test Recipient",
+          phone_number: "+15550000000",
+          country: "Egypt",
+          state: "Cairo",
+          city: "Cairo",
+          address_1: "12 Test Street",
+          address_2: null,
+          postal_code: null,
+          orders_id: order.id,
+          created_at: now,
+          updated_at: now,
+        },
+      });
+
+      await prisma.payments.create({
+        data: {
+          public_id: generatePublicId(PUBLIC_ID_PREFIXES.PAYMENT),
+          amount: new Prisma.Decimal("135.00"),
+          payment_method: "mock",
+          status: payment_status.PAID,
+          transaction_reference: `mock_${nanoid(12)}`,
+          paid_at: now,
+          users_id: user.id,
+          orders_id: order.id,
+          created_at: now,
+          updated_at: now,
+        },
+      });
+
+      const result = await updateOrderStatus(
+        order.public_id,
+        { status: "cancelled" },
+        { id: user.id },
+      );
+
+      expect(result.status).toBe("cancelled");
+
+      const firstInventory = await prisma.inventory.findUnique({
+        where: { product_variants_id: firstVariant.id },
+      });
+      const secondInventory = await prisma.inventory.findUnique({
+        where: { product_variants_id: secondVariant.id },
+      });
+      expect(firstInventory?.quantity_on_hand).toBe(100);
+      expect(secondInventory?.quantity_on_hand).toBe(50);
+    });
+
+    it("does not restock twice when a repeated transition is rejected", async () => {
+      const { user, order, variant } = await createOrderInStatus({
+        status: order_status.CONFIRMED,
+        quantity: 2,
+        onHand: 100,
+      });
+
+      await updateOrderStatus(
+        order.public_id,
+        { status: "cancelled" },
+        { id: user.id },
+      );
+
+      await expect(
+        updateOrderStatus(
+          order.public_id,
+          { status: "confirmed" },
+          { id: user.id },
+        ),
+      ).rejects.toThrow(ConflictError);
+
+      const inventory = await prisma.inventory.findUnique({
+        where: { product_variants_id: variant.id },
+      });
+      expect(inventory?.quantity_on_hand).toBe(100);
+      expect(inventory?.quantity_reserved).toBe(0);
+    });
+
+    it("rolls back the transition when restock finds no inventory record", async () => {
+      const { user, order, variant } = await createOrderInStatus({
+        status: order_status.CONFIRMED,
+        quantity: 2,
+        onHand: 100,
+      });
+
+      await prisma.inventory.delete({
+        where: { product_variants_id: variant.id },
+      });
+
+      await expect(
+        updateOrderStatus(
+          order.public_id,
+          { status: "cancelled" },
+          { id: user.id },
+        ),
+      ).rejects.toThrow(ConflictError);
+
+      const stored = await prisma.orders.findUnique({
+        where: { public_id: order.public_id },
+      });
+      expect(stored?.status).toBe(order_status.CONFIRMED);
+
+      const payment = await prisma.payments.findFirst({
+        where: { orders_id: order.id },
+      });
+      expect(payment?.status).toBe(payment_status.PAID);
     });
 
     it("restores the coupon quota when a confirmed order is cancelled", async () => {
