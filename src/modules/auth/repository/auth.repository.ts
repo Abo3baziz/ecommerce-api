@@ -190,4 +190,24 @@ export const authRepository = {
       data: { revoked_at: new Date() },
     });
   },
+
+  findCleanupEligibleSessionIds(now: Date, revokedBefore: Date, take: number) {
+    return prisma.sessions.findMany({
+      where: {
+        OR: [
+          { expires_at: { lt: now } },
+          { revoked_at: { lt: revokedBefore } },
+        ],
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+      take,
+    });
+  },
+
+  deleteSessionIds(ids: number[]) {
+    return prisma.sessions.deleteMany({
+      where: { id: { in: ids } },
+    });
+  },
 };

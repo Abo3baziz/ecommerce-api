@@ -4,6 +4,77 @@
 
 ---
 
+# Session Cleanup Job
+
+## Purpose
+
+Expired and long-revoked sessions accumulate in the `sessions` table. Authentication rejects them, but the table grows without bound. The session cleanup job removes:
+
+- Sessions whose `expires_at` is in the past (absolute TTL expired).
+- Sessions whose `revoked_at` is older than the revoked-session retention window (`REVOKED_SESSION_RETENTION_MS`, 30 days by default).
+
+Active and recently-revoked sessions are never touched, so the job is safe to re-run (idempotent).
+
+## How to Run
+
+```bash
+npm run sessions:cleanup
+```
+
+The script lives at `scripts/cleanup-sessions.ts` and is executed with `tsx`:
+
+```bash
+tsx scripts/cleanup-sessions.ts
+```
+
+## Options
+
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--dry-run` | off | Report the number of eligible sessions without deleting any rows |
+| `--batch-size=<n>` | `1000` | Delete at most `n` rows per pass (loops until fewer than `n` remain) |
+| `--revoked-retention-days=<n>` | `30` | Delete sessions revoked more than `n` days ago |
+
+### Examples
+
+Dry run (report only):
+
+```bash
+npm run sessions:cleanup -- --dry-run
+```
+
+Non-default batch size and retention:
+
+```bash
+npm run sessions:cleanup -- --batch-size=500 --revoked-retention-days=7
+```
+
+## Scheduling in Production
+
+The job is a one-shot CLI. Schedule it with your platform's cron/cronjob mechanism:
+
+- **Cron** (typical): run `npm run sessions:cleanup` daily, e.g. `0 2 * * *` (02:00 UTC). A dry-run first week is recommended to confirm the retention window.
+- **Kubernetes**: a CronJob that runs the built command in a pod with the required `DATABASE_URL` environment.
+- **App platform (Render/Railway/Fly)**: a scheduled/worker service invoking `npm run sessions:cleanup`.
+
+The job is idempotent and crash-safe: a partial run simply leaves rows for the next invocation. Use `--dry-run` before first deployment to validate the eligibility set.
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0`  | Cleanup (or dry-run) completed successfully |
+| `1`  | Invalid argument or an unexpected/database error |
+
+## Security Considerations
+
+- The command is **operator-only**; run it on the deployed server/environment, never exposed to clients.
+- It reuses the project's Prisma client and database configuration — no credentials are hardcoded.
+- Only counts and deletes session rows; no session tokens, passwords, or sensitive data are logged or printed.
+- Errors are logged through the shared logger without leaking implementation details.
+
+---
+
 # Admin Bootstrap CLI
 
 ## Purpose
