@@ -11,7 +11,13 @@ export const placeOrderSchema = z.object({
   body: z.object({
     address_public_id: z.string().min(1),
     payment_method: z.literal("mock"),
-    coupon_code: z.string().trim().min(1).max(50).optional(),
+    coupon_code: z
+      .string()
+      .trim()
+      .min(1)
+      .max(50)
+      .transform((value) => value.toUpperCase())
+      .optional(),
     notes: z.string().trim().max(1000).optional(),
   }),
 });

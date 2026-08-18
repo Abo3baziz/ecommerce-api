@@ -295,8 +295,11 @@ export const ordersRepository = {
   },
 
   findCouponByCode(code: string, client: DbClient = prisma) {
-    return client.coupons.findUnique({
-      where: { code },
+    const normalizedCode = code.trim().toUpperCase();
+    return client.coupons.findFirst({
+      where: {
+        code: { equals: normalizedCode, mode: "insensitive" },
+      },
     });
   },
 

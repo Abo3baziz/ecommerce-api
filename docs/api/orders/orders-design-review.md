@@ -64,6 +64,12 @@ and treat 0 affected rows as a 409 (moves the limit check into the same statemen
 
 `findCouponByCode` uses `where: { code }` exact match, and the validator doesn't normalize case. Seeded codes are typically uppercase (`WELCOME10`); a user typing `welcome10` gets a 409. Consider case-insensitive lookup (or normalize on write and read). Confirm this is intentional and document it.
 
+**Resolved (T-012, option a — normalize to uppercase)**: coupon codes are now case-insensitive, normalized to uppercase:
+- The checkout validator (`placeOrderSchema.coupon_code`) transforms the input to uppercase (`toUpperCase()`), so the captured code is canonical uppercase on write.
+- `findCouponByCode` trims + uppercases the input and matches case-insensitively (Prisma `mode: "insensitive"`), so existing mixed/lowercase stored rows still resolve.
+
+A user typing `welcome10` now applies `WELCOME10`; genuinely unknown codes still return 409. Covered by integration tests for mixed-case input and an unknown-code rejection.
+
 ### 2.7 🟡 Low — LIKE wildcards in `search`
 
 `orders.repository.ts:242-246` interpolates the raw pattern into `ILIKE`. User input containing `%`/`_` acts as wildcards (parameterized — no SQL injection, but surprising matches). Escape `%`/`_` before building the pattern.

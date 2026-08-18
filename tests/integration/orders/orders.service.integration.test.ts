@@ -376,6 +376,41 @@ describe("orders.service", () => {
       expect(updatedCoupon?.usage_count).toBe(1);
     });
 
+    it("applies a coupon case-insensitively on a mixed-case code input", async () => {
+      const { user, address } = await createCheckoutContext();
+      const coupon = await createCoupon({
+        code: `MIXEDCASE-${nanoid(8)}`,
+        discount_type: discount_type.PERCENTAGE,
+        discount_value: "10.00",
+      });
+
+      const result = await placeOrder(user.id, {
+        address_public_id: address.public_id,
+        payment_method: "mock",
+        coupon_code: coupon.code.toLowerCase(),
+      });
+
+      expect(result.discount_amount).toBe("10.00");
+
+      const storedOrder = await prisma.orders.findUnique({
+        where: { public_id: result.public_id },
+        select: { coupons_id: true },
+      });
+      expect(storedOrder?.coupons_id).toBe(coupon.id);
+    });
+
+    it("rejects a genuinely unknown coupon code regardless of case", async () => {
+      const { user, address } = await createCheckoutContext();
+
+      await expect(
+        placeOrder(user.id, {
+          address_public_id: address.public_id,
+          payment_method: "mock",
+          coupon_code: `DOES-NOT-EXIST-${nanoid(6)}`.toLowerCase(),
+        }),
+      ).rejects.toThrow(ConflictError);
+    });
+
     it("caps a percentage coupon at the maximum discount amount", async () => {
       const { user, address } = await createCheckoutContext({
         quantity: 3,
