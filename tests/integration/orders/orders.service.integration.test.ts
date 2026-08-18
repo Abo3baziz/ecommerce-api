@@ -1404,6 +1404,58 @@ describe("orders.service", () => {
         ),
       ).rejects.toThrow(NotFoundError);
     });
+
+    it("serializes concurrent transitions under a row lock so only one succeeds", async () => {
+      const { user, order } = await createOrderInStatus({
+        status: order_status.CONFIRMED,
+      });
+
+      const first = updateOrderStatus(
+        order.public_id,
+        { status: "processing" },
+        { id: user.id },
+      );
+      const second = updateOrderStatus(
+        order.public_id,
+        { status: "processing" },
+        { id: user.id },
+      );
+
+      const results = await Promise.allSettled([first, second]);
+
+      const fulfilled = results.filter((r) => r.status === "fulfilled");
+      const rejected = results.filter(
+        (r) => r.status === "rejected" && r.reason instanceof ConflictError,
+      );
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+
+      const stored = await prisma.orders.findUnique({
+        where: { public_id: order.public_id },
+      });
+      expect(stored?.status).toBe(order_status.PROCESSING);
+    });
+
+    it("rejects a same-status transition observed after acquiring the row lock", async () => {
+      const { user, order } = await createOrderInStatus({
+        status: order_status.CONFIRMED,
+      });
+
+      await updateOrderStatus(
+        order.public_id,
+        { status: "processing" },
+        { id: user.id },
+      );
+
+      await expect(
+        updateOrderStatus(
+          order.public_id,
+          { status: "processing" },
+          { id: user.id },
+        ),
+      ).rejects.toThrow(ConflictError);
+    });
   });
 
   describe("listAdminOrders", () => {

@@ -612,6 +612,15 @@ export const ordersRepository = {
     });
   },
 
+  lockOrderByPublicId(public_id: string, client: DbClient = prisma) {
+    return client.$queryRaw<{ id: number }[]>`
+      SELECT id
+      FROM ${ordersTable}
+      WHERE public_id = ${public_id}
+      FOR UPDATE
+    `;
+  },
+
   listOrdersByUser(
     users_id: number,
     status: order_status | undefined,

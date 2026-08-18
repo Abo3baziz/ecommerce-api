@@ -52,6 +52,8 @@ and treat 0 affected rows as a 409 (moves the limit check into the same statemen
 
 **Fix**: take the row lock in the read (`SELECT … FOR UPDATE` via `$queryRaw` or re-read inside the transaction) so the matrix check and the update are atomic.
 
+**Resolved (T-006)**: `updateOrderStatus` now runs entirely inside a single `$transaction`. The order row is locked first via the new `lockOrderByPublicId` repository op (`SELECT id … FOR UPDATE`, schema-qualified), then re-read, matrix-validated, side-effected, and updated within the same locked transaction. The `from`/`to` and restock audit logs preserve the original prior status. Covered by an integration test that fires two concurrent `CONFIRMED → PROCESSING` transitions and asserts exactly one succeeds (the second observes `PROCESSING` and is rejected), plus a sequential same-status test.
+
 ### 2.5 🟡 Low — Silent 0-row `updateMany` guards
 
 `markPaymentPaid` (requires `status = PENDING`) and `commitStock` (requires reserved ≥ qty) never check affected-row counts. Today the unreachable `pending → confirmed` admin path would silently "succeed" with a 0-row payment update and a 0-row commit. Cheap hardening: check the row count and throw on mismatch inside the transaction.

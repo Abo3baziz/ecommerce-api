@@ -140,30 +140,38 @@ export async function updateOrderStatus(
   input: UpdateOrderStatusBody,
   actor: OrderStatusActor,
 ): Promise<AdminOrderResult> {
-  const order = await ordersRepository.findOrderByPublicId(orderPublicId);
-
-  if (!order) {
-    throw new NotFoundError("Order not found");
-  }
-
-  const from = order.status;
   const to = toOrderStatusEnum(input.status);
 
-  if (from === to) {
-    throw new ConflictError(
-      `Order ${orderPublicId} is already in status ${input.status}`,
+  const { order: updated, from: priorStatus } =
+    await prisma.$transaction(async (tx) => {
+    const locked = await ordersRepository.lockOrderByPublicId(
+      orderPublicId,
+      tx,
     );
-  }
+    if (locked.length === 0) {
+      throw new NotFoundError("Order not found");
+    }
 
-  if (!ALLOWED_TRANSITIONS[from].includes(to)) {
-    throw new ConflictError(
-      `Order ${orderPublicId} cannot transition from ${from.toLowerCase()} to ${input.status}.`,
-    );
-  }
+    const order = await ordersRepository.findOrderByPublicId(orderPublicId, tx);
 
-  let restocked = false;
+    if (order === null) {
+      throw new NotFoundError("Order not found");
+    }
 
-  const updated = await prisma.$transaction(async (tx) => {
+    const from = order.status;
+
+    if (from === to) {
+      throw new ConflictError(
+        `Order ${orderPublicId} is already in status ${input.status}`,
+      );
+    }
+
+    if (!ALLOWED_TRANSITIONS[from].includes(to)) {
+      throw new ConflictError(
+        `Order ${orderPublicId} cannot transition from ${from.toLowerCase()} to ${input.status}.`,
+      );
+    }
+
     const now = new Date();
 
     switch (to) {
@@ -190,7 +198,6 @@ export async function updateOrderStatus(
         } else {
           await ordersRepository.markPaymentRefunded(order.id, now, tx);
           await restockOrderLines(order, tx);
-          restocked = true;
         }
         await ordersRepository.restoreCouponUsage(order.id, tx);
         break;
@@ -212,7 +219,6 @@ export async function updateOrderStatus(
       case order_status.REFUNDED: {
         await ordersRepository.markPaymentRefunded(order.id, now, tx);
         await restockOrderLines(order, tx);
-        restocked = true;
         break;
       }
       default:
@@ -225,14 +231,17 @@ export async function updateOrderStatus(
       orderPublicId,
       tx,
     );
-    return refreshed!;
+    return { order: refreshed!, from };
   });
+
+  const restocked =
+    to === order_status.CANCELLED || to === order_status.REFUNDED;
 
   logger.info(
     {
       actorId: actor.id,
       orderPublicId,
-      from: from.toLowerCase(),
+      from: priorStatus.toLowerCase(),
       to: to.toLowerCase(),
     },
     "Order status changed",
@@ -241,7 +250,7 @@ export async function updateOrderStatus(
   if (restocked) {
     const reason =
       to === order_status.CANCELLED ? "order_cancel" : "order_refund";
-    for (const line of order.order_items) {
+    for (const line of updated.order_items) {
       logger.info(
         {
           actorId: actor.id,
