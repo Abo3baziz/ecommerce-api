@@ -1456,6 +1456,75 @@ describe("orders.service", () => {
         ),
       ).rejects.toThrow(ConflictError);
     });
+
+    it("rolls back pending-to-confirmed when stock commit affects zero rows", async () => {
+      const { user, order, variant } = await createOrderInStatus({
+        status: order_status.PENDING,
+        quantity: 2,
+        onHand: 100,
+      });
+
+      await prisma.inventory.update({
+        where: { product_variants_id: variant.id },
+        data: { quantity_reserved: 0 },
+      });
+
+      await expect(
+        updateOrderStatus(
+          order.public_id,
+          { status: "confirmed" },
+          { id: user.id },
+        ),
+      ).rejects.toThrow(ConflictError);
+
+      const stored = await prisma.orders.findUnique({
+        where: { public_id: order.public_id },
+      });
+      expect(stored?.status).toBe(order_status.PENDING);
+
+      const inventory = await prisma.inventory.findUnique({
+        where: { product_variants_id: variant.id },
+      });
+      expect(inventory?.quantity_on_hand).toBe(100);
+      expect(inventory?.quantity_reserved).toBe(0);
+
+      const payment = await prisma.payments.findFirst({
+        where: { orders_id: order.id },
+      });
+      expect(payment?.status).toBe(payment_status.PENDING);
+    });
+
+    it("rolls back pending-to-confirmed when payment is not payable (zero rows)", async () => {
+      const { user, order, variant } = await createOrderInStatus({
+        status: order_status.PENDING,
+        quantity: 2,
+        onHand: 100,
+      });
+
+      await prisma.payments.updateMany({
+        where: { orders_id: order.id },
+        data: { status: payment_status.PAID },
+      });
+
+      await expect(
+        updateOrderStatus(
+          order.public_id,
+          { status: "confirmed" },
+          { id: user.id },
+        ),
+      ).rejects.toThrow(ConflictError);
+
+      const stored = await prisma.orders.findUnique({
+        where: { public_id: order.public_id },
+      });
+      expect(stored?.status).toBe(order_status.PENDING);
+
+      const inventory = await prisma.inventory.findUnique({
+        where: { product_variants_id: variant.id },
+      });
+      expect(inventory?.quantity_on_hand).toBe(100);
+      expect(inventory?.quantity_reserved).toBe(2);
+    });
   });
 
   describe("listAdminOrders", () => {

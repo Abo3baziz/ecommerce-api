@@ -135,6 +135,15 @@ async function restockOrderLines(
   }
 }
 
+async function assertAffected(
+  affected: number,
+  message: string,
+): Promise<void> {
+  if (affected === 0) {
+    throw new ConflictError(message);
+  }
+}
+
 export async function updateOrderStatus(
   orderPublicId: string,
   input: UpdateOrderStatusBody,
@@ -176,12 +185,20 @@ export async function updateOrderStatus(
 
     switch (to) {
       case order_status.CONFIRMED: {
-        await ordersRepository.markPaymentPaid(order.id, now, tx);
+        const paid = await ordersRepository.markPaymentPaid(order.id, now, tx);
+        await assertAffected(
+          paid.count,
+          "Payment is not in a payable state",
+        );
         for (const line of order.order_items) {
-          await ordersRepository.commitStock(
+          const committed = await ordersRepository.commitStock(
             line.product_variants_id,
             line.quantity,
             tx,
+          );
+          await assertAffected(
+            committed,
+            "Insufficient reserved stock to commit for an order item",
           );
         }
         break;
@@ -196,28 +213,47 @@ export async function updateOrderStatus(
             );
           }
         } else {
-          await ordersRepository.markPaymentRefunded(order.id, now, tx);
+          const refunded = await ordersRepository.markPaymentRefunded(
+            order.id,
+            now,
+            tx,
+          );
+          await assertAffected(refunded.count, "No payment to refund");
           await restockOrderLines(order, tx);
         }
         await ordersRepository.restoreCouponUsage(order.id, tx);
         break;
       }
       case order_status.SHIPPED: {
-        await ordersRepository.updateShipmentShipped(
+        const shipped = await ordersRepository.updateShipmentShipped(
           order.id,
           input.carrier!,
           input.tracking_number ?? null,
           now,
           tx,
         );
+        await assertAffected(shipped.count, "Shipment not found to mark shipped");
         break;
       }
       case order_status.DELIVERED: {
-        await ordersRepository.updateShipmentDelivered(order.id, now, tx);
+        const delivered = await ordersRepository.updateShipmentDelivered(
+          order.id,
+          now,
+          tx,
+        );
+        await assertAffected(
+          delivered.count,
+          "Shipment not found to mark delivered",
+        );
         break;
       }
       case order_status.REFUNDED: {
-        await ordersRepository.markPaymentRefunded(order.id, now, tx);
+        const refunded = await ordersRepository.markPaymentRefunded(
+          order.id,
+          now,
+          tx,
+        );
+        await assertAffected(refunded.count, "No payment to refund");
         await restockOrderLines(order, tx);
         break;
       }

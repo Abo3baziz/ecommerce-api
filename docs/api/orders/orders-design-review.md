@@ -58,6 +58,8 @@ and treat 0 affected rows as a 409 (moves the limit check into the same statemen
 
 `markPaymentPaid` (requires `status = PENDING`) and `commitStock` (requires reserved ≥ qty) never check affected-row counts. Today the unreachable `pending → confirmed` admin path would silently "succeed" with a 0-row payment update and a 0-row commit. Cheap hardening: check the row count and throw on mismatch inside the transaction.
 
+**Resolved (T-007)**: the admin status-transition side-effect operations in `updateOrderStatus` now assert their affected-row counts and throw `ConflictError` on 0 rows inside the locked transaction, so any mismatched precondition aborts and rolls back. Guarded ops: `markPaymentPaid` (payment not payable), `commitStock` per line (insufficient/absent reserved stock), `markPaymentRefunded` (no payment to refund), and `updateShipmentShipped`/`updateShipmentDelivered` (shipment missing). Covered by integration tests that force each failure and assert the order stays in its prior status, stock is untouched, and the payment is not mutated.
+
 ### 2.6 🟡 Low — `coupon_code` is case-sensitive
 
 `findCouponByCode` uses `where: { code }` exact match, and the validator doesn't normalize case. Seeded codes are typically uppercase (`WELCOME10`); a user typing `welcome10` gets a 409. Consider case-insensitive lookup (or normalize on write and read). Confirm this is intentional and document it.
