@@ -43,7 +43,7 @@ Task backlog derived from the production-readiness review (2026-08-16), `PROJECT
 | ID | File | Title | Status |
 |----|------|-------|--------|
 | T-004 | [T-004-session-idle-timeout.md](./T-004-session-idle-timeout.md) | Session idle-timeout via `last_activity_at` | done |
-| T-005 | [T-005-expired-session-cleanup.md](./T-005-expired-session-cleanup.md) | Expired-session cleanup job | todo |
+| T-005 | [T-005-expired-session-cleanup.md](./T-005-expired-session-cleanup.md) | Expired-session cleanup job | done |
 | T-006 | [T-006-orders-admin-row-lock.md](./T-006-orders-admin-row-lock.md) | Orders §2.4 — row-lock admin status transitions | todo |
 | T-007 | [T-007-orders-updateMany-counts.md](./T-007-orders-updateMany-counts.md) | Orders §2.5 — check `updateMany` affected-row counts | todo |
 | T-008 | [T-008-auto-restock-on-cancel.md](./T-008-auto-restock-on-cancel.md) | Auto-restock inventory on cancel/refund | done |

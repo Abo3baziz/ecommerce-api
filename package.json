@@ -15,6 +15,7 @@
     "db:studio": "prisma studio",
     "db:pull": "prisma db pull",
     "admin:create": "tsx scripts/create-admin.ts",
+    "sessions:cleanup": "tsx scripts/cleanup-sessions.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
