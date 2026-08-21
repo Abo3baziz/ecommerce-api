@@ -362,6 +362,32 @@ Authentication resolves public identifiers into internal IDs where necessary.
 
 ---
 
+# Brute-Force Protection
+
+Login and registration are protected by two complementary layers:
+
+## Per-IP rate limiting
+
+- `POST /auth/login`: **10 requests / 15 min / IP** (`LOGIN_RATE_LIMIT_MAX`, default 10).
+- `POST /auth/register`: **20 requests / 15 min / IP** (`REGISTER_RATE_LIMIT_MAX`, default 20) — lighter because registration cannot verify credentials, only spam accounts.
+- Exceeding a limit returns **429 Too Many Requests** with standard `RateLimit-*` headers and a `{ success: false, message }` body.
+
+## Per-account failed-attempt lockout
+
+On top of the IP limiters, consecutive login failures are tracked per email (SHA-256 hashed key, case-insensitive):
+
+- After **10 consecutive failures** (`LOGIN_MAX_FAILED_ATTEMPTS`) the account is locked for **15 minutes** (`LOGIN_LOCKOUT_MS`), even for the correct password.
+- The lockout is **always temporary**: it expires automatically after 15 minutes and the failure cycle restarts from zero; a successful login clears the counter immediately. A victim can therefore never be locked out permanently — repeated attacks can only extend unavailability in 15-minute windows.
+- Unknown emails are counted identically and the 429 response message never reveals whether an account exists.
+- Failures are recorded only on invalid credentials (401). A valid password always clears the counter, even if the account turns out to be suspended (403).
+- An active lockout absorbs further failures without extending its expiry.
+
+## Store limitation
+
+Both layers use in-memory stores keyed by client IP / hashed email. State is lost on process restart and is **not shared between instances**. Before multi-instance deployment this must be moved to a shared store (e.g., Redis via an `express-rate-limit` compatible store) or delegated to an edge/CDN-level limiter.
+
+---
+
 # Security Requirements
 
 The authentication system must implement:
@@ -392,6 +418,7 @@ Authentication errors:
 - 403 Forbidden
 - 409 Conflict
 - 422 Unprocessable Entity
+- 429 Too Many Requests (login/register brute-force protection)
 
 Responses must never reveal whether an email address exists unless explicitly intended.
 

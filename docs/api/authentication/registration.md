@@ -126,6 +126,7 @@ The user may **not**:
 | 409 Conflict | Email already exists |
 | 409 Conflict | Phone number already exists |
 | 422 Unprocessable Entity | Password does not meet policy |
+| 429 Too Many Requests | IP rate limit exceeded (20 registrations / 15 min; spam defense) |
 | 500 Internal Server Error | Unexpected server error |
 
 ---

@@ -1,4 +1,5 @@
 import rateLimit from "express-rate-limit";
+import { env } from "../config/env.js";
 
 function createRateLimiter(max: number, message: string) {
   return rateLimit({
@@ -41,4 +42,14 @@ export const passwordChangeRateLimiter = createRateLimiter(
 export const passwordResetRateLimiter = createRateLimiter(
   5,
   "Too many password reset requests, please try again later",
+);
+
+export const loginRateLimiter = createRateLimiter(
+  env.LOGIN_RATE_LIMIT_MAX,
+  "Too many login attempts, please try again later",
+);
+
+export const registerRateLimiter = createRateLimiter(
+  env.REGISTER_RATE_LIMIT_MAX,
+  "Too many registration attempts, please try again later",
 );

@@ -96,10 +96,12 @@ If the email is not verified:
 | 400 Bad Request | Invalid request body |
 | 401 Unauthorized | Invalid email or password |
 | 403 Forbidden | Account is suspended or disabled |
+| 429 Too Many Requests | IP rate limit exceeded or account temporarily locked after 10 consecutive failed attempts (15-minute lockout) |
 | 500 Internal Server Error | Unexpected server error |
 
 > **Security Note:** Always return the same `401 Unauthorized` response for an incorrect email or password. Do not reveal whether the email exists.
 > 
+> **Brute-Force Protection:** The endpoint is rate-limited per IP (10 requests / 15 min, `RateLimit-*` headers on 429). Additionally, 10 consecutive failed logins for one email trigger a 15-minute temporary lockout that returns the same generic message regardless of whether the account exists; a successful login resets the counter and the lockout always expires on its own (never permanent).
 
 Example:
 
