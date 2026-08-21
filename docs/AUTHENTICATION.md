@@ -321,6 +321,19 @@ Requirements:
 - Update password
 - Optionally revoke all other sessions
 
+### Credential rotation invalidates pending tokens
+
+Any successful password rotation — **change password** (authenticated) or **password reset verify** (via email token) — runs in one transaction with the password update + session revocation and also marks every unused `verification_tokens` row of these purposes as used:
+
+| Token purpose | Killed on password rotation | Rationale |
+| --- | --- | --- |
+| `PASSWORD_RESET` | Yes (all unused) | An outstanding reset link would re-revoke sessions after rotation |
+| `CHANGE_EMAIL` | Yes (all unused) | Pending contact-change could be abused post-compromise |
+| `CHANGE_PHONE_NUMBER` | Yes (all unused) | Same as above |
+| `REGISTER_EMAIL` | No | Verification-only flag; does not alter credentials or contact info |
+
+A reset link issued before a password change therefore returns 410 after the rotation instead of succeeding.
+
 ---
 
 # Session Management

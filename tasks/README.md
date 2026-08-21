@@ -78,7 +78,7 @@ Task backlog derived from two audits:
 | T-022 | [T-022-imagekit-live-upload-verify.md](./T-022-imagekit-live-upload-verify.md) | Live ImageKit client-side upload verification | todo |
 | T-023 | [T-023-stale-progress-cleanup.md](./T-023-stale-progress-cleanup.md) | Clean stale Next Step entries in PROJECT_PROGRESS | todo |
 | T-035 | [T-035-prisma-error-mapping.md](./T-035-prisma-error-mapping.md) | Global Prisma error mapping (P2002/P2025 → 4xx) | todo |
-| T-036 | [T-036-token-invalidation-on-password-change.md](./T-036-token-invalidation-on-password-change.md) | Invalidate pending tokens on credential rotation | todo |
+| T-036 | [T-036-token-invalidation-on-password-change.md](./T-036-token-invalidation-on-password-change.md) | Invalidate pending tokens on credential rotation | done |
 | T-037 | [T-037-last-admin-race.md](./T-037-last-admin-race.md) | Fix last-admin demotion TOCTOU race | todo |
 | T-038 | [T-038-phone-otp-attempt-limit.md](./T-038-phone-otp-attempt-limit.md) | Phone OTP attempt limiting + failure counter | todo |
 | T-039 | [T-039-admin-contact-edit-guard.md](./T-039-admin-contact-edit-guard.md) | Guard admin edits of customer contact fields | todo |

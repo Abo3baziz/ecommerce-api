@@ -164,8 +164,8 @@ export const usersRepository = {
     });
   },
 
-  revokeAllOtherSessions(users_id: number, exceptId: number) {
-    return prisma.sessions.updateMany({
+  revokeAllOtherSessions(users_id: number, exceptId: number, client: DbClient = prisma) {
+    return client.sessions.updateMany({
       where: {
         users_id,
         id: { not: exceptId },

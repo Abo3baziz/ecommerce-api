@@ -107,11 +107,35 @@ export const authRepository = {
     });
   },
 
-  invalidateUnusedVerificationTokens(users_id: number, purpose: verification_type) {
-    return prisma.verification_tokens.updateMany({
+  invalidateUnusedVerificationTokens(
+    users_id: number,
+    purpose: verification_type,
+    client: DbClient = prisma,
+  ) {
+    return client.verification_tokens.updateMany({
       where: {
         users_id,
         purpose,
+        used_at: null,
+      },
+      data: { used_at: new Date() },
+    });
+  },
+
+  async invalidateUnusedCredentialTokens(
+    users_id: number,
+    client: DbClient = prisma,
+  ) {
+    await client.verification_tokens.updateMany({
+      where: {
+        users_id,
+        purpose: {
+          in: [
+            verification_type.PASSWORD_RESET,
+            verification_type.CHANGE_EMAIL,
+            verification_type.CHANGE_PHONE_NUMBER,
+          ],
+        },
         used_at: null,
       },
       data: { used_at: new Date() },
