@@ -6,9 +6,11 @@ import {
   product_status,
 } from "../../../generated/prisma/enums.js";
 import {
+  ADDRESS_LINE_MAX_LENGTH,
   FLAT_SHIPPING_FEE,
   FREE_SHIPPING_THRESHOLD,
 } from "../../../shared/constants/index.js";
+import { BadRequestError } from "../../../shared/errors/BadRequestError.js";
 import { ConflictError } from "../../../shared/errors/ConflictError.js";
 import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
 import { formatPaginationMeta } from "../../../shared/utils/index.js";
@@ -122,6 +124,14 @@ export async function placeOrder(
     );
     if (!address) {
       throw new NotFoundError("Address not found");
+    }
+    if (
+      address.address_1.length > ADDRESS_LINE_MAX_LENGTH ||
+      (address.address_2?.length ?? 0) > ADDRESS_LINE_MAX_LENGTH
+    ) {
+      throw new BadRequestError(
+        "The selected address exceeds the maximum allowed length. Please update the address before placing the order.",
+      );
     }
 
     const lines: CheckoutLine[] = cart.cart_items.map((line) => {

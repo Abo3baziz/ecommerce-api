@@ -145,8 +145,8 @@ Required
 | country | string | Yes | 1-100 characters |
 | state | string | Yes | 1-100 characters |
 | city | string | Yes | 1-100 characters |
-| address_1 | string | Yes | 1-255 characters |
-| address_2 | string | No | Max 255 characters |
+| address_1 | string | Yes | 1-100 characters |
+| address_2 | string | No | Max 100 characters |
 | zip_code | string | No | Max 20 characters |
 | is_default_shipping | boolean | No | Defaults per rule below |
 | is_default_billing | boolean | No | Defaults per rule below |
@@ -368,7 +368,7 @@ Returned when the address does not exist, is already soft-deleted, or belongs to
 # Design Decisions
 
 - **Resource scope** — Addresses are managed by their owner only, mirroring the `users.md` profile endpoints under `/api/v1/users/me/…`; no admin address-management endpoints are defined (addresses are not part of the documented admin capabilities).
-- **API fields mirror DB columns** — Field names, nullability, and length limits follow the `user_addresses` table so the contract stays traceable to the schema.
+- **API fields mirror DB columns** — Field names, nullability, and length limits follow the `user_addresses` table so the contract stays traceable to the schema. Address lines are additionally capped at 100 characters to match the `shipments` snapshot columns (`address_1`/`address_2` VarChar(100)) that checkout copies into; checkout re-validates this bound and returns 400 (never a 500) for legacy rows saved before the cap.
 - **Soft delete** — `deleted_at` based deletion keeps the `orders → user_addresses` foreign key valid and matches the existing soft-delete pattern used elsewhere in the schema.
 - **Default-flag enforcement** — The `@default(true)` column defaults apply only to the row being inserted; the single-default-per-type invariant is enforced by the service inside a `$transaction`.
 - **Response envelope** — All responses use the shared `{ success: true, data }` wrapper, and list endpoints add the standard `pagination` object, consistent with the implemented `ApiResponse` / `PaginatedResponse` types.
