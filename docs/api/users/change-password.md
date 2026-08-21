@@ -96,6 +96,7 @@ Example:
 - The new password must satisfy the configured password policy.
 - The new password cannot be the same as the current password.
 - All sessions except the current session are invalidated after a successful password change.
+- All unused `PASSWORD_RESET`, `CHANGE_EMAIL`, and `CHANGE_PHONE_NUMBER` tokens are invalidated in the same transaction as the password update; an outstanding reset link returns 410 if used afterwards. Pending `REGISTER_EMAIL` tokens are not affected.
 - Password changes should be recorded in audit logs.
 - Rate limiting should be applied to password change attempts.
 

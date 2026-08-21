@@ -157,6 +157,7 @@ The API validates that:
 - Reset tokens are single-use.
 - Reset tokens expire after a configurable period.
 - Previous unused reset tokens are invalidated when a new one is issued.
+- Completing a reset also invalidates every other unused `PASSWORD_RESET`, `CHANGE_EMAIL`, and `CHANGE_PHONE_NUMBER` token for the account in the same transaction.
 - Password reset emails are sent asynchronously.
 - Rate limiting should be applied to password reset requests.
 - Password reset attempts should be audited.

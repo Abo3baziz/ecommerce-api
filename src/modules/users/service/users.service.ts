@@ -111,8 +111,11 @@ export async function changePassword(
 
   const password_hash = await hash(input.new_password, BCRYPT_ROUNDS);
 
-  await usersRepository.updatePassword(user.id, password_hash);
-  await usersRepository.revokeAllOtherSessions(user.id, currentSessionId);
+  await prisma.$transaction(async (tx) => {
+    await usersRepository.updatePassword(user.id, password_hash, tx);
+    await usersRepository.revokeAllOtherSessions(user.id, currentSessionId, tx);
+    await authRepository.invalidateUnusedCredentialTokens(user.id, tx);
+  });
 }
 
 export async function changeEmail(

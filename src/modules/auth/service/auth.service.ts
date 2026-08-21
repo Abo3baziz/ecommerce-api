@@ -333,6 +333,7 @@ export async function verifyPasswordReset(
     await usersRepository.updatePassword(resetToken.users_id, password_hash, tx);
     await usersRepository.revokeAllSessions(resetToken.users_id, tx);
     await authRepository.invalidateVerificationToken(resetToken.id, tx);
+    await authRepository.invalidateUnusedCredentialTokens(resetToken.users_id, tx);
   });
 
   logger.info({ users_id: resetToken.users_id }, "Password reset completed");
