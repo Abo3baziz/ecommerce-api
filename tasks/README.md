@@ -88,7 +88,7 @@ Task backlog derived from two audits:
 | T-043 | [T-043-duplicate-review-backstop.md](./T-043-duplicate-review-backstop.md) | Duplicate-review DB backstop (partial unique index) | todo |
 | T-044 | [T-044-like-escape-other-modules.md](./T-044-like-escape-other-modules.md) | Escape LIKE wildcards in remaining search endpoints | todo |
 | T-045 | [T-045-rating-summary-filter-bug.md](./T-045-rating-summary-filter-bug.md) | Review summary must ignore the rating filter | todo |
-| T-046 | [T-046-idle-timeout-effective.md](./T-046-idle-timeout-effective.md) | Make session idle timeout effective (constant == TTL) | todo |
+| T-046 | [T-046-idle-timeout-effective.md](./T-046-idle-timeout-effective.md) | Make session idle timeout effective (constant == TTL) | done |
 | T-047 | [T-047-migrations-baseline.md](./T-047-migrations-baseline.md) | Baseline Prisma migrations + migrate deploy | todo |
 | T-048 | [T-048-dependency-audit-vulns.md](./T-048-dependency-audit-vulns.md) | Resolve high-severity npm audit findings | todo |
 | T-049 | [T-049-payments-users-index.md](./T-049-payments-users-index.md) | Add missing index on payments.users_id | todo |

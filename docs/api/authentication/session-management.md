@@ -196,9 +196,9 @@ If any check fails:
 
 Policy:
 
-- Absolute TTL: `SESSION_TTL_MS` (30 days) since creation — never extended.
-- Idle timeout: `SESSION_IDLE_TIMEOUT_MS` (30 days) since last activity — enforced by the authentication middleware.
-- Update the last activity timestamp on authenticated requests.
+- Absolute TTL: `SESSION_TTL_MS` (30 days) since creation — never extended (no sliding expiration).
+- Idle timeout: `SESSION_IDLE_TIMEOUT_MS` (**14 days**) since last activity — enforced by the authentication middleware.
+- Effective lifetime = `min(SESSION_TTL_MS, last_activity_at + SESSION_IDLE_TIMEOUT_MS)`; every authenticated request slides `last_activity_at` forward but never extends `expires_at`.
 - Idle/expired sessions are rejected with 401 and removed by the session cleanup job.
 
 ---

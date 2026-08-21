@@ -131,7 +131,7 @@ If authentication fails:
 
 # Session Idle Timeout
 
-Sessions have an absolute TTL (`SESSION_TTL_MS`, 30 days by default) **and** an idle timeout (`SESSION_IDLE_TIMEOUT_MS`, 30 days by default).
+Sessions have an absolute TTL (`SESSION_TTL_MS`, 30 days by default) **and** an idle timeout (`SESSION_IDLE_TIMEOUT_MS`, **14 days** by default).
 
 The authentication middleware records `last_activity_at` on every authenticated request (`touchSession`). If a session's `last_activity_at` is older than `SESSION_IDLE_TIMEOUT_MS` — i.e. the session has not been used within the idle window — the request is rejected with **401** even if the absolute TTL has not yet elapsed.
 
