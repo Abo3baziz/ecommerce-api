@@ -5,3 +5,4 @@ export { ForbiddenError } from "./ForbiddenError.js";
 export { NotFoundError } from "./NotFoundError.js";
 export { ConflictError } from "./ConflictError.js";
 export { GoneError } from "./GoneError.js";
+export { TooManyRequestsError } from "./TooManyRequestsError.js";

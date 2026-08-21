@@ -15,6 +15,8 @@ const envSchema = z.object({
   IMAGEKIT_PRIVATE_KEY: z.string().min(1),
   IMAGEKIT_URL_ENDPOINT: z.string().url(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+  LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+  REGISTER_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
 });
 
 const parsed = envSchema.safeParse(process.env);

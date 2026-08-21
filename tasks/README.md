@@ -1,4 +1,4 @@
-# Production Readiness Tasks
+﻿# Production Readiness Tasks
 
 Task backlog derived from the production-readiness review (2026-08-16), `PROJECT_PROGRESS.md` pending items, `docs/api/orders/orders-design-review.md`, and `docs/REQUIREMENTS.md`.
 
@@ -49,6 +49,7 @@ Task backlog derived from the production-readiness review (2026-08-16), `PROJECT
 | T-008 | [T-008-auto-restock-on-cancel.md](./T-008-auto-restock-on-cancel.md) | Auto-restock inventory on cancel/refund | done |
 | T-009 | [T-009-real-sms-provider.md](./T-009-real-sms-provider.md) | Real SMS provider for phone OTP | wontfix |
 | T-010 | [T-010-deploy-ops-checklist.md](./T-010-deploy-ops-checklist.md) | Deploy & ops checklist (secrets, monitoring, backups) | todo |
+| T-029 | [T-029-login-brute-force-defense.md](./T-029-login-brute-force-defense.md) | Login/register brute-force defense (IP limits + account lockout) | done |
 
 ### P2 — Quality / DX / polish
 
@@ -82,6 +83,7 @@ Task backlog derived from the production-readiness review (2026-08-16), `PROJECT
 ```text
 Wave 1 (security + money):     T-001 → T-002 → T-003
 Wave 2 (session + orders):     T-004 → T-005 → T-006 → T-007 → T-008
+Wave 2b (auth hardening):      T-029
 Wave 3 (ops):                    T-010
 Wave 4 (quality):              T-011 … T-023 as capacity allows
 Wave 5 (product):              T-024 … T-027 when product needs them

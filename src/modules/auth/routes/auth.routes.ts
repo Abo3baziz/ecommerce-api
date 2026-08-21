@@ -4,7 +4,9 @@ import { authentication } from "../../../middleware/authentication.js";
 import { csrfTokenController } from "../../../middleware/csrf.js";
 import {
   emailVerificationRateLimiter,
+  loginRateLimiter,
   passwordResetRateLimiter,
+  registerRateLimiter,
 } from "../../../middleware/rateLimiter.js";
 import { registerSchema } from "../validators/register.js";
 import { loginSchema } from "../validators/login.js";
@@ -32,8 +34,13 @@ const authRouter = Router();
 
 authRouter.get("/csrf-token", authentication, csrfTokenController);
 
-authRouter.post("/register", validate(registerSchema), registerController);
-authRouter.post("/login", validate(loginSchema), loginController);
+authRouter.post(
+  "/register",
+  registerRateLimiter,
+  validate(registerSchema),
+  registerController,
+);
+authRouter.post("/login", loginRateLimiter, validate(loginSchema), loginController);
 authRouter.get("/session", authentication, getCurrentSessionController);
 authRouter.delete("/session", authentication, logoutController);
 authRouter.get("/sessions", authentication, listSessionsController);

@@ -4,6 +4,7 @@ import { ForbiddenError } from "../../../shared/errors/ForbiddenError.js";
 import { GoneError } from "../../../shared/errors/GoneError.js";
 import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
 import { UnauthorizedError } from "../../../shared/errors/UnauthorizedError.js";
+import { TooManyRequestsError } from "../../../shared/errors/TooManyRequestsError.js";
 import {
   PUBLIC_ID_PREFIXES,
   VERIFICATION_TOKEN_TTL_MS,
@@ -24,6 +25,11 @@ import {
 import { authRepository } from "../repository/auth.repository.js";
 import { generateOpaqueToken, hashToken } from "../utils/tokens.js";
 import { parseDeviceName } from "../utils/userAgent.js";
+import {
+  clearLoginFailures,
+  isLoginLocked,
+  recordLoginFailure,
+} from "../utils/loginAttemptTracker.js";
 import type { users } from "../../../generated/prisma/client.js";
 import type { RegisterInput, RegisterResult } from "../dto/register.js";
 import type { LoginInput, LoginResult } from "../dto/login.js";
@@ -80,17 +86,29 @@ export async function login(
   input: LoginInput,
   context: RequestContext,
 ): Promise<LoginResult & { sessionToken: string }> {
+  const retryAfterSeconds = isLoginLocked(input.email);
+
+  if (retryAfterSeconds > 0) {
+    throw new TooManyRequestsError(
+      "Too many failed login attempts. Please try again later",
+    );
+  }
+
   const user = await authRepository.findUserByEmailWithCredentials(input.email);
 
   if (!user) {
+    recordLoginFailure(input.email);
     throw new UnauthorizedError("Invalid email or password");
   }
 
   const passwordValid = await compare(input.password, user.password_hash);
 
   if (!passwordValid) {
+    recordLoginFailure(input.email);
     throw new UnauthorizedError("Invalid email or password");
   }
+
+  clearLoginFailures(input.email);
 
   if (user.status !== user_status.ACTIVE || user.deleted_at !== null) {
     throw new ForbiddenError("Account is suspended or disabled");

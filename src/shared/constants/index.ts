@@ -61,3 +61,7 @@ export const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 export const PHONE_OTP_TTL_MS = 10 * 60 * 1000;
 
 export const EMAIL_BRAND_NAME = "Ecommerce";
+
+export const LOGIN_MAX_FAILED_ATTEMPTS = 10;
+
+export const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
