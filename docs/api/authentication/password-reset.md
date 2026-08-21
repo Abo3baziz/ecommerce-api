@@ -60,6 +60,8 @@ Example reset link:
 <https://example.com/reset-password?token=><reset_token>
 ```
 
+The link opens the backend-served `/reset-password` page (`public/reset-password.html/.js`), which collects the new password and posts it to the Reset Password endpoint below. The page is served with `Cache-Control: no-store` since it carries a token in the URL.
+
 The reset token is:
 
 - Cryptographically random

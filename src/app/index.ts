@@ -63,6 +63,10 @@ app.get("/verify-email", (_req, res) => {
 app.get("/verify-email-change", (_req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "verify-email-change.html"));
 });
+app.get("/reset-password", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.sendFile(path.join(PUBLIC_DIR, "reset-password.html"));
+});
 
 app.use(errorHandler);
 
