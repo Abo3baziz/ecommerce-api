@@ -17,6 +17,7 @@ import {
   listAdminOrders,
   updateOrderStatus,
 } from "../../../src/modules/orders/service/admin.service.js";
+import { BadRequestError } from "../../../src/shared/errors/BadRequestError.js";
 import { ConflictError } from "../../../src/shared/errors/ConflictError.js";
 import { NotFoundError } from "../../../src/shared/errors/NotFoundError.js";
 import { PUBLIC_ID_PREFIXES } from "../../../src/shared/constants/index.js";
@@ -54,11 +55,13 @@ describe("orders.service", () => {
       variantDeleted?: boolean;
       productDeleted?: boolean;
       addressDeleted?: boolean;
+      addressOverrides?: Parameters<typeof createAddress>[1];
     } = {},
   ): Promise<CheckoutContext> {
     const user = await createUser();
     const address = await createAddress(user.id, {
       deleted_at: overrides.addressDeleted ? new Date() : null,
+      ...overrides.addressOverrides,
     });
     const product = await createProduct({
       deleted_at: overrides.productDeleted ? new Date() : null,
@@ -288,6 +291,51 @@ describe("orders.service", () => {
       });
       expect(shipment?.status).toBe("pending");
       expect(shipment?.recipient_name).toBe("Test Recipient");
+    });
+
+    it("places an order with a 100-character address line at the column boundary", async () => {
+      const { user, address } = await createCheckoutContext({
+        addressOverrides: {
+          address_1: "A".repeat(100),
+          address_2: "B".repeat(100),
+        },
+      });
+
+      const result = await placeOrder(user.id, {
+        address_public_id: address.public_id,
+        payment_method: "mock",
+      });
+
+      expect(result.status).toBe("confirmed");
+      const stored = await prisma.orders.findUnique({
+        where: { public_id: result.public_id },
+      });
+      const shipment = await prisma.shipments.findFirst({
+        where: { orders_id: stored!.id },
+      });
+      expect(shipment?.address_1).toHaveLength(100);
+      expect(shipment?.address_2).toHaveLength(100);
+    });
+
+    it("rejects checkout with 400 when a legacy saved address exceeds the shipment column width", async () => {
+      const { user, address, variant } = await createCheckoutContext({
+        addressOverrides: { address_1: "A".repeat(101) },
+      });
+
+      await expect(
+        placeOrder(user.id, {
+          address_public_id: address.public_id,
+          payment_method: "mock",
+        }),
+      ).rejects.toThrow(BadRequestError);
+
+      const variantInventory = await prisma.inventory.findUnique({
+        where: { product_variants_id: variant.id },
+      });
+      expect(variantInventory?.quantity_reserved ?? 0).toBe(0);
+      expect(variantInventory?.quantity_on_hand).toBe(100);
+      const order = await prisma.orders.findFirst({ where: { users_id: user.id } });
+      expect(order).toBeNull();
     });
 
     it("snapshots live pricing including a percentage discount", async () => {

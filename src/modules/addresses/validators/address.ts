@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ADDRESS_LINE_MAX_LENGTH } from "../../../shared/constants/index.js";
 
 const recipientName = z.string().trim().min(1).max(100);
 const phoneNumber = z.string().trim().min(1).max(20);
@@ -6,8 +7,12 @@ const label = z.string().trim().max(50);
 const country = z.string().trim().min(1).max(100);
 const state = z.string().trim().min(1).max(100);
 const city = z.string().trim().min(1).max(100);
-const address1 = z.string().trim().min(1).max(255);
-const address2 = z.string().trim().max(255);
+const address1 = z
+  .string()
+  .trim()
+  .min(1)
+  .max(ADDRESS_LINE_MAX_LENGTH);
+const address2 = z.string().trim().max(ADDRESS_LINE_MAX_LENGTH);
 const zipCode = z.string().trim().max(20);
 const isDefaultShipping = z.boolean();
 const isDefaultBilling = z.boolean();
