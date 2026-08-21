@@ -1,10 +1,10 @@
-# T-031 — Build the missing reset-password page
+﻿# T-031 — Build the missing reset-password page
 
 | Field | Value |
 |-------|-------|
 | **ID** | T-031 |
 | **Priority** | P1 |
-| **Status** | in_progress |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/reset-password-page` |
 | **Depends on** | — |

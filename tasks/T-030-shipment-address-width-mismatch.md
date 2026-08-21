@@ -1,10 +1,10 @@
-# T-030 — Fix checkout 500 from shipment address column-width mismatch
+﻿# T-030 — Fix checkout 500 from shipment address column-width mismatch
 
 | Field | Value |
 |-------|-------|
 | **ID** | T-030 |
 | **Priority** | P1 |
-| **Status** | in_progress |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/shipment-address-width` |
 | **Depends on** | — |

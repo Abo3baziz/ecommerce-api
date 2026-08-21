@@ -1,10 +1,10 @@
-# T-028 — Fix production build boot failure (extensionless ESM import)
+﻿# T-028 — Fix production build boot failure (extensionless ESM import)
 
 | Field | Value |
 |-------|-------|
 | **ID** | T-028 |
 | **Priority** | P0 |
-| **Status** | in_progress |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/build-esm-extensions` |
 | **Depends on** | — |
