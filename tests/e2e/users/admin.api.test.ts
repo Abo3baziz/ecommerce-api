@@ -166,7 +166,7 @@ describe("admin users API", () => {
   });
 
   describe("PATCH /api/v1/admin/users/:user_public_id", () => {
-    it("updates a customer (200)", async () => {
+    it("updates a customer's names as a regular admin (200)", async () => {
       const { cookie, csrf } = await createAdminUser(app);
       const customer = await createUser();
 
@@ -181,8 +181,35 @@ describe("admin users API", () => {
       expect(response.body.data).not.toHaveProperty("password_hash");
     });
 
-    it("returns 409 for an email conflict", async () => {
+    it("rejects contact-field edits by a regular admin (403)", async () => {
       const { cookie, csrf } = await createAdminUser(app);
+      const customer = await createUser();
+
+      const response = await request(app)
+        .patch(`${ADMIN_BASE_URL}/${customer.public_id}`)
+        .set(csrfHeaders(cookie!, csrf!))
+        .send({ email: `test-hijack-${nanoid(8)}@example.com` });
+
+      expect(response.status).toBe(403);
+    });
+
+    it("lets a super admin change the email and resets verification (200)", async () => {
+      const { cookie, csrf } = await createSuperAdminUser(app);
+      const customer = await createUser({ email_verified_at: new Date() });
+      const newEmail = `test-moved-${nanoid(8)}@example.com`;
+
+      const response = await request(app)
+        .patch(`${ADMIN_BASE_URL}/${customer.public_id}`)
+        .set(csrfHeaders(cookie!, csrf!))
+        .send({ email: newEmail });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.email).toBe(newEmail);
+      expect(response.body.data.email_verified).toBe(false);
+    });
+
+    it("returns 409 for an email conflict", async () => {
+      const { cookie, csrf } = await createSuperAdminUser(app);
       const first = await createUser({ email: `test-taken-${nanoid(8)}@example.com` });
       const second = await createUser();
 

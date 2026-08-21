@@ -65,6 +65,7 @@ export async function updateAdminUserController(
   try {
     const { user_public_id } = req.params as AdminUserParams;
     const data = await updateAdminUser(
+      req.user!,
       user_public_id,
       req.body as UpdateAdminUserBody,
     );

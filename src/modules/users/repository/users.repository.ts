@@ -226,7 +226,16 @@ export const usersRepository = {
         role: user_role.CUSTOMER,
         deleted_at: null,
       },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        phone_number: true,
+        email_verified_at: true,
+        phone_verified_at: true,
+      },
     });
   },
 
@@ -240,7 +249,17 @@ export const usersRepository = {
     });
   },
 
-  updateAdminUser(id: number, data: { first_name?: string; last_name?: string; email?: string; phone_number?: string }) {
+  updateAdminUser(
+    id: number,
+    data: {
+      first_name?: string;
+      last_name?: string;
+      email?: string;
+      phone_number?: string;
+      email_verified_at?: Date | null;
+      phone_verified_at?: Date | null;
+    },
+  ) {
     return prisma.users.update({
       where: { id },
       data: {

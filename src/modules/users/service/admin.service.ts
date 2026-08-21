@@ -5,6 +5,7 @@ import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
 import { formatPaginationMeta } from "../../../shared/utils/index.js";
 import { logger } from "../../../shared/logger/index.js";
 import { prisma } from "../../../config/database.js";
+import { sendContactDetailsChangedEmail } from "../../../shared/mailer/contactChange.js";
 import { user_role, user_status } from "../../../generated/prisma/enums.js";
 import type { Prisma } from "../../../generated/prisma/client.js";
 import {
@@ -82,6 +83,7 @@ export async function getAdminUser(userPublicId: string): Promise<AdminUserResul
 }
 
 export async function updateAdminUser(
+  actor: { id: number; role: user_role },
   userPublicId: string,
   input: UpdateAdminUserInput,
 ): Promise<AdminUserResult> {
@@ -89,6 +91,15 @@ export async function updateAdminUser(
 
   if (!existing) {
     throw new NotFoundError("User not found");
+  }
+
+  const contactEditRequested =
+    input.email !== undefined || input.phone_number !== undefined;
+
+  if (contactEditRequested && actor.role !== user_role.SUPER_ADMIN) {
+    throw new ForbiddenError(
+      "Only a super admin can change customer contact details",
+    );
   }
 
   if (input.email) {
@@ -105,7 +116,59 @@ export async function updateAdminUser(
     }
   }
 
-  const updated = await usersRepository.updateAdminUser(existing.id, input);
+  const data: Parameters<typeof usersRepository.updateAdminUser>[1] = {};
+
+  const changedContactFields: string[] = [];
+
+  if (input.email !== undefined) {
+    data.email = input.email;
+
+    if (input.email !== existing.email) {
+      data.email_verified_at = null;
+      changedContactFields.push("email");
+    }
+  }
+
+  if (input.phone_number !== undefined) {
+    data.phone_number = input.phone_number;
+
+    if (input.phone_number !== existing.phone_number) {
+      data.phone_verified_at = null;
+      changedContactFields.push("phone_number");
+    }
+  }
+
+  if (input.first_name !== undefined) {
+    data.first_name = input.first_name;
+  }
+
+  if (input.last_name !== undefined) {
+    data.last_name = input.last_name;
+  }
+
+  const updated = await usersRepository.updateAdminUser(existing.id, data);
+
+  if (changedContactFields.length > 0) {
+    logger.info(
+      {
+        actorId: actor.id,
+        targetUserId: existing.id,
+        changedFields: changedContactFields,
+      },
+      "Admin updated customer contact details",
+    );
+
+    sendContactDetailsChangedEmail(
+      existing.email,
+      existing.first_name,
+      changedContactFields,
+    ).catch((error) => {
+      logger.error(
+        { err: error, targetUserId: existing.id },
+        "Failed to send contact-change notification",
+      );
+    });
+  }
 
   return toAdminUserResult(updated);
 }

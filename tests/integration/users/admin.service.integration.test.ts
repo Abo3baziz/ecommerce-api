@@ -20,6 +20,12 @@ import { createUser } from "../../factories/user.factory.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { randomPhoneNumber } from "../../helpers/random.js";
 
+vi.mock("../../../src/shared/mailer/contactChange.js", () => ({
+  sendContactDetailsChangedEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { sendContactDetailsChangedEmail } from "../../../src/shared/mailer/contactChange.js";
+
 function uniqueEmail(prefix = "email"): string {
   return `test-admin-${prefix}-${nanoid(8)}@example.com`;
 }
@@ -189,44 +195,140 @@ describe("admin.service", () => {
   });
 
   describe("updateAdminUser", () => {
-    it("updates names, email, and phone number", async () => {
-      const user = await createUser();
-      const newPhone = randomPhoneNumber();
+    beforeEach(() => {
+      vi.mocked(sendContactDetailsChangedEmail).mockClear();
+    });
 
-      const result = await updateAdminUser(user.public_id, {
-        first_name: "Updated",
-        last_name: "Name",
-        email: uniqueEmail("updated"),
-        phone_number: newPhone,
-      });
+    it("lets a regular admin update names only", async () => {
+      const actorAdmin = await createUser({ role: user_role.ADMIN });
+      const user = await createUser();
+
+      const result = await updateAdminUser(
+        { id: actorAdmin.id, role: actorAdmin.role },
+        user.public_id,
+        { first_name: "Updated", last_name: "Name" },
+      );
 
       expect(result.first_name).toBe("Updated");
       expect(result.last_name).toBe("Name");
-      expect(result.email.startsWith("test-admin-updated-")).toBe(true);
+      expect(sendContactDetailsChangedEmail).not.toHaveBeenCalled();
+    });
+
+    it("rejects contact-field edits by a regular admin with 403", async () => {
+      const actorAdmin = await createUser({ role: user_role.ADMIN });
+      const user = await createUser();
+
+      await expect(
+        updateAdminUser(
+          { id: actorAdmin.id, role: actorAdmin.role },
+          user.public_id,
+          { email: uniqueEmail("hijack") },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+
+      await expect(
+        updateAdminUser(
+          { id: actorAdmin.id, role: actorAdmin.role },
+          user.public_id,
+          { phone_number: randomPhoneNumber() },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+
+    it("lets a super admin change contact details, resets verification, and notifies the previous address", async () => {
+      const actorSuperAdmin = await createUser({
+        role: user_role.SUPER_ADMIN,
+        email_verified_at: new Date(),
+      });
+      const newEmail = uniqueEmail("moved");
+      const newPhone = randomPhoneNumber();
+      const user = await createUser({
+        email_verified_at: new Date(),
+        phone_verified_at: null,
+      });
+      const oldEmail = user.email;
+
+      const result = await updateAdminUser(
+        { id: actorSuperAdmin.id, role: actorSuperAdmin.role },
+        user.public_id,
+        { email: newEmail, phone_number: newPhone },
+      );
+
+      expect(result.email).toBe(newEmail);
       expect(result.phone_number).toBe(newPhone);
+      expect(result.email_verified).toBe(false);
+
+      const stored = await prisma.users.findUnique({ where: { id: user.id } });
+      expect(stored!.email_verified_at).toBeNull();
+      expect(stored!.phone_verified_at).toBeNull();
+
+      expect(sendContactDetailsChangedEmail).toHaveBeenCalledTimes(1);
+      expect(sendContactDetailsChangedEmail).toHaveBeenCalledWith(
+        oldEmail,
+        user.first_name,
+        ["email", "phone_number"],
+      );
+    });
+
+    it("does not reset verification when a super admin submits unchanged values or edits names only", async () => {
+      const actorSuperAdmin = await createUser({ role: user_role.SUPER_ADMIN });
+      const user = await createUser({
+        email_verified_at: new Date(),
+        phone_verified_at: null,
+      });
+
+      const result = await updateAdminUser(
+        { id: actorSuperAdmin.id, role: actorSuperAdmin.role },
+        user.public_id,
+        {
+          first_name: "Same",
+          email: user.email,
+          phone_number: user.phone_number,
+        },
+      );
+
+      expect(result.first_name).toBe("Same");
+      expect(result.email_verified).toBe(true);
+      expect(sendContactDetailsChangedEmail).not.toHaveBeenCalled();
     });
 
     it("throws 404 for an unknown user", async () => {
+      const actorSuperAdmin = await createUser({ role: user_role.SUPER_ADMIN });
+
       await expect(
-        updateAdminUser("usr_does_not_exist", { first_name: "X" }),
+        updateAdminUser(
+          { id: actorSuperAdmin.id, role: actorSuperAdmin.role },
+          "usr_does_not_exist",
+          { first_name: "X" },
+        ),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it("throws 409 when the email is already in use", async () => {
+      const actorSuperAdmin = await createUser({ role: user_role.SUPER_ADMIN });
       const first = await createUser({ email: uniqueEmail("taken") });
       const second = await createUser();
 
       await expect(
-        updateAdminUser(second.public_id, { email: first.email }),
+        updateAdminUser(
+          { id: actorSuperAdmin.id, role: actorSuperAdmin.role },
+          second.public_id,
+          { email: first.email },
+        ),
       ).rejects.toBeInstanceOf(ConflictError);
     });
 
     it("throws 409 when the phone number is already in use", async () => {
+      const actorSuperAdmin = await createUser({ role: user_role.SUPER_ADMIN });
       const first = await createUser({ phone_number: "+15551234567" });
       const second = await createUser();
 
       await expect(
-        updateAdminUser(second.public_id, { phone_number: first.phone_number }),
+        updateAdminUser(
+          { id: actorSuperAdmin.id, role: actorSuperAdmin.role },
+          second.public_id,
+          { phone_number: first.phone_number },
+        ),
       ).rejects.toBeInstanceOf(ConflictError);
     });
   });

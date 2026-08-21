@@ -1,10 +1,10 @@
-# T-039 — Guard admin edits of customer contact fields
+﻿# T-039 — Guard admin edits of customer contact fields
 
 | Field | Value |
 |-------|-------|
 | **ID** | T-039 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/admin-contact-edit-guard` |
 | **Depends on** | — |
@@ -26,10 +26,24 @@ Admin contact-field edits cannot become a silent account-takeover primitive.
 
 ## Acceptance criteria
 
-- [ ] Regular admin editing email/phone → 403 (or field rejected).
-- [ ] Changed contact fields start unverified; user notified.
-- [ ] Docs (`docs/api/admin/admin.md`) updated; tests green.
+- [x] Regular admin editing email/phone → 403 (or field rejected).
+- [x] Changed contact fields start unverified; user notified.
+- [x] Docs (`docs/api/admin/admin.md`) updated; tests green.
 
 ## References
 
 - Audit: `tasks/AUDIT-2026-08-21.md` §4.2
+
+## Implementation
+
+- `updateAdminUser` now receives the acting admin (`{ id, role }`) from `req.user`; when the body contains `email` or `phone_number` and the actor is not `SUPER_ADMIN`, it throws 403 before any write.
+- When a contact value actually changes, the service clears `email_verified_at` / `phone_verified_at` in the same update (submitting an unchanged value or name-only edits never touches flags).
+- The affected customer is notified at their **previous** email address via a new fire-and-forget mailer (`src/shared/mailer/contactChange.ts` + `templates/contactChange.ts`, shared layout helpers); failures are logged, never thrown.
+- Audit trail via structured logger (`actorId`, `targetUserId`, `changedFields`).
+- Repository: `findAdminUserStatusByPublicId` select widened for diffing/notification; `updateAdminUser` data type accepts the two verification timestamps.
+
+## Decisions
+
+- Chose **SUPER_ADMIN gating** over dropping contact fields from the PATCH body: preserves legitimate support workflows while confining takeover risk to the single permanent CLI-created super admin; consistent with the `/role` endpoint precedent.
+- Gate is presence-based (any attempt to *write* contact fields requires super admin) but verification flags reset only on actual value change — predictable authorization semantics with minimal surprise.
+- Notification targets the previous address so the real owner learns of the change even if the new address is attacker-controlled.
