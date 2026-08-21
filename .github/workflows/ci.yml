@@ -78,5 +78,30 @@ jobs:
           REGISTER_RATE_LIMIT_MAX=100000
           EOF
 
+      - name: Smoke boot compiled artifact
+        run: |
+          set -a
+          source .env.test
+          set +a
+          export DATABASE_URL
+          node dist/index.js &
+          APP_PID=$!
+          ok=0
+          for i in $(seq 1 20); do
+            if curl -fsS http://localhost:3000/health >/dev/null 2>&1; then
+              ok=1
+              break
+            fi
+            sleep 0.5
+          done
+          kill $APP_PID 2>/dev/null || true
+          wait $APP_PID 2>/dev/null || true
+          if [ "$ok" = "1" ]; then
+            echo "Compiled artifact booted and served /health"
+          else
+            echo "::error::Compiled artifact failed to boot or serve /health"
+            exit 1
+          fi
+
       - name: Test
         run: npm test
