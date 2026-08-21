@@ -120,19 +120,26 @@ PATCH /api/v1/admin/users/{user_public_id}
 
 Allows administrators to update customer information.
 
+### Contact-field policy (account-takeover guard)
+
+- `email` / `phone_number` edits are **restricted to `SUPER_ADMIN`**; a regular admin attempting them receives **403**. Name fields are editable by any admin.
+- When a contact value actually changes, its verification flag is cleared (`email_verified_at` / `phone_verified_at` → null), so the customer must re-verify through the normal self-service flows.
+- The affected customer is notified by email at their **previous** address (fire-and-forget); the change is audit-logged with actor, target, and changed fields.
+
 ### Request body (all fields optional; at least one required)
 
 | Field | Type | Constraints |
 | --- | --- | --- |
 | `first_name` | string | 1–100 chars |
 | `last_name` | string | 1–100 chars |
-| `email` | string | Valid email |
-| `phone_number` | string | E.164, e.g. `+15551234567` |
+| `email` | string | Valid email — **SUPER_ADMIN only** |
+| `phone_number` | string | E.164, e.g. `+15551234567` — **SUPER_ADMIN only** |
 
 ### Errors
 
 | Status | Condition |
 | --- | --- |
+| 403 | A regular admin attempted an `email`/`phone_number` edit |
 | 404 | Customer not found (or the target is an admin) |
 | 409 | `email` or `phone_number` is already used by another account |
 
