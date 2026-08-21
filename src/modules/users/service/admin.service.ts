@@ -172,14 +172,36 @@ export async function changeUserRole(
     return { public_id: target.public_id, role: target.role };
   }
 
-  if (target.role === user_role.ADMIN && input.role === user_role.CUSTOMER) {
-    const adminCount = await usersRepository.countAdmins();
-    if (adminCount <= 1) {
-      throw new ConflictError("Cannot remove the last administrator");
-    }
-  }
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext('users:role-change')::bigint)) AS lock`;
 
-  const updated = await usersRepository.updateUserRole(target.id, input.role);
+    const current = await usersRepository.findUserRoleByPublicId(targetPublicId, tx);
+
+    if (!current || current.role !== target.role) {
+      throw new ConflictError("User role was changed concurrently");
+    }
+
+    if (current.role === user_role.ADMIN && input.role === user_role.CUSTOMER) {
+      const adminCount = await usersRepository.countAdmins(tx);
+
+      if (adminCount <= 1) {
+        throw new ConflictError("Cannot remove the last administrator");
+      }
+    }
+
+    const affected = await usersRepository.updateUserRole(
+      current.id,
+      current.role,
+      input.role,
+      tx,
+    );
+
+    if (affected === 0) {
+      throw new ConflictError("User role was changed concurrently");
+    }
+
+    return { public_id: current.public_id, role: input.role };
+  });
 
   logger.info(
     {

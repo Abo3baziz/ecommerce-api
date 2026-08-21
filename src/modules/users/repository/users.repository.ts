@@ -230,8 +230,8 @@ export const usersRepository = {
     });
   },
 
-  findUserRoleByPublicId(public_id: string) {
-    return prisma.users.findFirst({
+  findUserRoleByPublicId(public_id: string, client: DbClient = prisma) {
+    return client.users.findFirst({
       where: {
         public_id,
         deleted_at: null,
@@ -273,19 +273,25 @@ export const usersRepository = {
     });
   },
 
-  updateUserRole(id: number, role: user_role, client: DbClient = prisma) {
-    return client.users.update({
-      where: { id },
+  async updateUserRole(
+    id: number,
+    expectedCurrentRole: user_role,
+    role: user_role,
+    client: DbClient = prisma,
+  ) {
+    const result = await client.users.updateMany({
+      where: { id, role: expectedCurrentRole },
       data: {
         role,
         updated_at: new Date(),
       },
-      select: { public_id: true, role: true },
     });
+
+    return result.count;
   },
 
-  countAdmins() {
-    return prisma.users.count({
+  countAdmins(client: DbClient = prisma) {
+    return client.users.count({
       where: {
         role: { in: [user_role.ADMIN, user_role.SUPER_ADMIN] },
         deleted_at: null,
