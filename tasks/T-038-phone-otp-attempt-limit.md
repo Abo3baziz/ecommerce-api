@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-038 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | wontfix |
 | **Type** | `feature` |
 | **Branch** | `feature/otp-attempt-limit` |
 | **Depends on** | — |
@@ -33,3 +33,7 @@ OTP guessing is computationally infeasible within the TTL.
 ## References
 
 - Audit: `tasks/AUDIT-2026-08-21.md` §4.2
+
+## Resolution
+
+**Wontfix (2026-08-21, user decision):** phone-number change via SMS OTP will not be used — a real SMS provider is too expensive for this project. This follows the earlier `wontfix` on T-009 (real SMS provider): the phone flow remains wired to the dev SMS stub that logs codes, so hardening OTP guessing has no production value here. If a paid SMS provider is ever adopted, revisit this task together with T-009.

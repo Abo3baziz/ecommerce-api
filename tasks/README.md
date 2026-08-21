@@ -80,7 +80,7 @@ Task backlog derived from two audits:
 | T-035 | [T-035-prisma-error-mapping.md](./T-035-prisma-error-mapping.md) | Global Prisma error mapping (P2002/P2025 → 4xx) | todo |
 | T-036 | [T-036-token-invalidation-on-password-change.md](./T-036-token-invalidation-on-password-change.md) | Invalidate pending tokens on credential rotation | done |
 | T-037 | [T-037-last-admin-race.md](./T-037-last-admin-race.md) | Fix last-admin demotion TOCTOU race | done |
-| T-038 | [T-038-phone-otp-attempt-limit.md](./T-038-phone-otp-attempt-limit.md) | Phone OTP attempt limiting + failure counter | todo |
+| T-038 | [T-038-phone-otp-attempt-limit.md](./T-038-phone-otp-attempt-limit.md) | Phone OTP attempt limiting + failure counter | wontfix |
 | T-039 | [T-039-admin-contact-edit-guard.md](./T-039-admin-contact-edit-guard.md) | Guard admin edits of customer contact fields | todo |
 | T-040 | [T-040-cart-advisory-lock-coverage.md](./T-040-cart-advisory-lock-coverage.md) | Cart mutations must respect the per-user advisory lock | todo |
 | T-041 | [T-041-primary-image-invariant.md](./T-041-primary-image-invariant.md) | Primary-image invariant via partial unique index | todo |
@@ -137,7 +137,7 @@ Task backlog derived from two audits:
 
 ```text
 Wave 0 (unblock production):   T-028 → T-030 → T-031
-Wave 1 (security):             T-029 → T-036 → T-037 → T-038 → T-039 → T-046
+Wave 1 (security):             T-029 → T-036 → T-037 → T-039 → T-046
 Wave 2 (data integrity):       T-035 → T-040 → T-041 → T-042 → T-043 → T-045
 Wave 3 (ops/platform):         T-032 → T-033 → T-034 → T-047 → T-048 → T-049 → T-050 → T-051 → T-052 → T-053
 Wave 4 (quality/docs):         T-010 → T-011 → T-013 … T-023, T-044, T-054 … T-063 as capacity allows
