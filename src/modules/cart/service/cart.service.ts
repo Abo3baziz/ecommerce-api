@@ -84,6 +84,16 @@ export async function getCart(userId: number): Promise<CartResult> {
   return toCartResult(row);
 }
 
+async function withUserCartLock<T>(
+  userId: number,
+  run: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(${userId})) AS lock`;
+    return run(tx);
+  });
+}
+
 export async function addCartItem(
   userId: number,
   input: AddCartItemInput,
@@ -96,9 +106,7 @@ export async function addCartItem(
     throw new NotFoundError("Variant not found");
   }
 
-  const cart = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(${userId})) AS lock`;
-
+  const cart = await withUserCartLock(userId, async (tx) => {
     let cartId = (await cartRepository.findCartIdByUserId(userId, tx))?.id;
     if (cartId === undefined) {
       cartId = (await cartRepository.createCart(userId, tx)).id;
@@ -139,61 +147,73 @@ export async function updateCartItemQuantity(
   variantPublicId: string,
   input: UpdateCartItemInput,
 ): Promise<CartResult> {
-  const cart = await cartRepository.findCartIdByUserId(userId);
+  return withUserCartLock(userId, async (tx) => {
+    const cart = await cartRepository.findCartIdByUserId(userId, tx);
 
-  if (!cart) {
-    throw new NotFoundError("Cart not found for this user");
-  }
+    if (!cart) {
+      throw new NotFoundError("Cart not found for this user");
+    }
 
-  const line = await cartRepository.findCartLineByVariantPublicId(
-    cart.id,
-    variantPublicId,
-  );
+    const line = await cartRepository.findCartLineByVariantPublicId(
+      cart.id,
+      variantPublicId,
+      tx,
+    );
 
-  if (!line) {
-    throw new NotFoundError(`Variant ${variantPublicId} is not in the cart`);
-  }
+    if (!line) {
+      throw new NotFoundError(`Variant ${variantPublicId} is not in the cart`);
+    }
 
-  await cartRepository.updateLineQuantity(
-    cart.id,
-    line.product_variants_id,
-    input.quantity,
-  );
+    await cartRepository.updateLineQuantity(
+      cart.id,
+      line.product_variants_id,
+      input.quantity,
+      tx,
+    );
 
-  const row = await cartRepository.findCartWithLinesByCartId(cart.id);
-  return toCartResult(row!);
+    const row = await cartRepository.findCartWithLinesByCartId(cart.id, tx);
+
+    if (!row) {
+      throw new NotFoundError("Cart not found for this user");
+    }
+
+    return toCartResult(row);
+  });
 }
 
 export async function removeCartItem(
   userId: number,
   variantPublicId: string,
 ): Promise<void> {
-  const cart = await cartRepository.findCartIdByUserId(userId);
+  return withUserCartLock(userId, async (tx) => {
+    const cart = await cartRepository.findCartIdByUserId(userId, tx);
 
-  if (!cart) {
-    throw new NotFoundError("Cart not found for this user");
-  }
+    if (!cart) {
+      throw new NotFoundError("Cart not found for this user");
+    }
 
-  const line = await cartRepository.findCartLineByVariantPublicId(
-    cart.id,
-    variantPublicId,
-  );
+    const line = await cartRepository.findCartLineByVariantPublicId(
+      cart.id,
+      variantPublicId,
+      tx,
+    );
 
-  if (!line) {
-    throw new NotFoundError(`Variant ${variantPublicId} is not in the cart`);
-  }
+    if (!line) {
+      throw new NotFoundError(`Variant ${variantPublicId} is not in the cart`);
+    }
 
-  await cartRepository.deleteCartLine(cart.id, line.product_variants_id);
+    await cartRepository.deleteCartLine(cart.id, line.product_variants_id, tx);
+  });
 }
 
 export async function clearCart(userId: number): Promise<void> {
-  const cart = await cartRepository.findCartIdByUserId(userId);
+  return withUserCartLock(userId, async (tx) => {
+    const cart = await cartRepository.findCartIdByUserId(userId, tx);
 
-  if (!cart) {
-    throw new NotFoundError("Cart not found for this user");
-  }
+    if (!cart) {
+      throw new NotFoundError("Cart not found for this user");
+    }
 
-  await prisma.$transaction(async (tx) => {
     await cartRepository.deleteCartLines(cart.id, tx);
     await cartRepository.deleteCart(cart.id, tx);
   });

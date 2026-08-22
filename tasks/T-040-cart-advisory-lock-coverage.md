@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-040 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/cart-advisory-lock-coverage` |
 | **Depends on** | — |
@@ -26,8 +26,17 @@ All mutating cart operations serialize against checkout and each other; races de
 
 ## Acceptance criteria
 
-- [ ] Concurrency test: checkout vs clear/update interleavings never yield 500; final state consistent.
-- [ ] Existing cart suite green.
+- [x] Concurrency test: checkout vs clear/update interleavings never yield 500; final state consistent.
+- [x] Existing cart suite green.
+
+## Implementation notes (2026-08-22)
+
+- Extracted `withUserCartLock(userId, run)` in `cart.service.ts` — a transaction-scoped `pg_advisory_xact_lock(userId)` wrapper — and routed **all** cart mutations through it: `addCartItem` (deduplicated), `updateCartItemQuantity`, `removeCartItem`, and `clearCart`.
+- All reads/writes now happen inside the locked transaction (lock-first ordering, mirroring checkout at `orders.service.ts:110`), so a mutation racing checkout either runs entirely before it or re-validates state after it committed.
+- "Cart vanished" degrades to the documented 404s ("Cart not found for this user" / "Variant … is not in the cart") — per the documented non-idempotent removal semantics in `docs/api/cart/cart.md`; no behavior change for serial callers.
+- Removed the `toCartResult(row!)` null-deref: the final read is checked and maps to `NotFoundError`.
+- Residual P2025s are covered by the T-035 global mapper as a backstop.
+- Tests: new `tests/integration/cart/cart.race.integration.test.ts` (checkout vs clearCart → exactly one side succeeds across 4 rounds; checkout vs update → order reflects winning quantity, loser gets clean NotFoundError; concurrent duplicate removes → one success + one clean 404) and `tests/e2e/cart/cartConcurrency.api.test.ts` (HTTP-level duplicate line deletions → `[204, 404]`, never 500). Full suite 74 files / 1088 tests green; typecheck + build pass.
 
 ## References
 

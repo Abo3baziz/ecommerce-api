@@ -82,7 +82,7 @@ Task backlog derived from two audits:
 | T-037 | [T-037-last-admin-race.md](./T-037-last-admin-race.md) | Fix last-admin demotion TOCTOU race | done |
 | T-038 | [T-038-phone-otp-attempt-limit.md](./T-038-phone-otp-attempt-limit.md) | Phone OTP attempt limiting + failure counter | wontfix |
 | T-039 | [T-039-admin-contact-edit-guard.md](./T-039-admin-contact-edit-guard.md) | Guard admin edits of customer contact fields | done |
-| T-040 | [T-040-cart-advisory-lock-coverage.md](./T-040-cart-advisory-lock-coverage.md) | Cart mutations must respect the per-user advisory lock | todo |
+| T-040 | [T-040-cart-advisory-lock-coverage.md](./T-040-cart-advisory-lock-coverage.md) | Cart mutations must respect the per-user advisory lock | done |
 | T-041 | [T-041-primary-image-invariant.md](./T-041-primary-image-invariant.md) | Primary-image invariant via partial unique index | todo |
 | T-042 | [T-042-address-default-invariant.md](./T-042-address-default-invariant.md) | Fix address default-flag invariant (zero/multi defaults) | todo |
 | T-043 | [T-043-duplicate-review-backstop.md](./T-043-duplicate-review-backstop.md) | Duplicate-review DB backstop (partial unique index) | todo |
