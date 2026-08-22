@@ -14,6 +14,7 @@ import { verifyEmailSchema } from "../validators/verifyEmail.js";
 import { sessionParamsSchema } from "../validators/sessionParams.js";
 import {
   requestPasswordResetSchema,
+  verifyOtpPasswordResetSchema,
   verifyPasswordResetSchema,
 } from "../validators/passwordReset.js";
 import {
@@ -27,6 +28,7 @@ import {
   revokeAllOtherSessionsController,
   revokeSessionController,
   verifyEmailController,
+  verifyOtpPasswordResetController,
   verifyPasswordResetController,
 } from "../controller/auth.controller.js";
 
@@ -67,6 +69,12 @@ authRouter.post(
   passwordResetRateLimiter,
   validate(requestPasswordResetSchema),
   requestPasswordResetController,
+);
+authRouter.post(
+  "/password-reset/otp/verify",
+  passwordResetRateLimiter,
+  validate(verifyOtpPasswordResetSchema),
+  verifyOtpPasswordResetController,
 );
 authRouter.post(
   "/password-reset/verify",

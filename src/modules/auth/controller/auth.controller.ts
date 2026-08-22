@@ -8,6 +8,7 @@ import {
   revokeAllOtherSessions,
   revokeSession,
   verifyEmail,
+  verifyOtpPasswordReset,
   verifyPasswordReset,
 } from "../service/auth.service.js";
 import { authRepository } from "../repository/auth.repository.js";
@@ -18,6 +19,7 @@ import type { LoginInput } from "../dto/login.js";
 import type { VerifyEmailInput } from "../dto/verifyEmail.js";
 import type {
   RequestPasswordResetInput,
+  VerifyOtpPasswordResetInput,
   VerifyPasswordResetInput,
 } from "../dto/passwordReset.js";
 import type { SessionParams } from "../validators/sessionParams.js";
@@ -264,6 +266,24 @@ export async function verifyPasswordResetController(
   try {
     await verifyPasswordReset(req.body as VerifyPasswordResetInput);
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function verifyOtpPasswordResetController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const data = await verifyOtpPasswordReset(
+      req.body as VerifyOtpPasswordResetInput,
+    );
+    res.status(200).json({
+      success: true,
+      data,
+    });
   } catch (error) {
     next(error);
   }

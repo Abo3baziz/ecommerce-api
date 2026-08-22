@@ -466,17 +466,21 @@ model users {
 }
 
 model verification_tokens {
-  id          Int                @id(map: "verification_tokens_pk") @default(autoincrement())
-  public_id   String             @unique(map: "verification_tokens_public_id_unique_key") @db.VarChar(32)
-  token_hash  String             @db.VarChar(255)
-  used_at     DateTime?          @db.Timestamptz(6)
-  created_at  DateTime           @db.Timestamptz(6)
-  expires_at  DateTime           @db.Timestamptz(6)
-  target      String             @db.VarChar(100)
-  purpose     verification_type?
-  verified_at DateTime?          @db.Timestamptz(6)
-  users_id    Int
-  users       users              @relation(fields: [users_id], references: [id], map: "fk_verification_tokens_users")
+  id              Int                @id(map: "verification_tokens_pk") @default(autoincrement())
+  public_id       String             @unique(map: "verification_tokens_public_id_unique_key") @db.VarChar(32)
+  token_hash      String             @db.VarChar(255)
+  used_at         DateTime?          @db.Timestamptz(6)
+  created_at      DateTime           @db.Timestamptz(6)
+  expires_at      DateTime           @db.Timestamptz(6)
+  target          String             @db.VarChar(100)
+  purpose         verification_type?
+  verified_at     DateTime?          @db.Timestamptz(6)
+  users_id        Int
+  failed_attempts Int                @default(0)
+  /// Distinguishes OTP-code rows ("otp") from link rows (null) within the
+  /// same purpose, so both can be active for one account simultaneously.
+  channel         String?            @db.VarChar(10)
+  users           users              @relation(fields: [users_id], references: [id], map: "fk_verification_tokens_users")
 
   @@index([expires_at], map: "idx_verification_tokens_expires_at")
   @@index([public_id], map: "idx_verification_tokens_public_id")

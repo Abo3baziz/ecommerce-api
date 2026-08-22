@@ -6,6 +6,8 @@ import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
 import { UnauthorizedError } from "../../../shared/errors/UnauthorizedError.js";
 import { TooManyRequestsError } from "../../../shared/errors/TooManyRequestsError.js";
 import {
+  PASSWORD_RESET_OTP_MAX_ATTEMPTS,
+  PASSWORD_RESET_RESEND_COOLDOWN_MS,
   PUBLIC_ID_PREFIXES,
   VERIFICATION_TOKEN_TTL_MS,
   PASSWORD_RESET_TOKEN_TTL_MS,
@@ -23,6 +25,7 @@ import {
   verification_type,
 } from "../../../generated/prisma/enums.js";
 import { authRepository } from "../repository/auth.repository.js";
+import { generateOtp } from "../../users/utils/otp.js";
 import { recordAuditEvent } from "../../audit/service/audit.service.js";
 import { generateOpaqueToken, hashToken } from "../utils/tokens.js";
 import { parseDeviceName } from "../utils/userAgent.js";
@@ -40,6 +43,8 @@ import type { RequestContext } from "../types/context.js";
 import type {
   RequestPasswordResetInput,
   RequestPasswordResetResult,
+  VerifyOtpPasswordResetInput,
+  VerifyOtpPasswordResetResult,
   VerifyPasswordResetInput,
 } from "../dto/passwordReset.js";
 
@@ -292,17 +297,32 @@ async function issuePasswordResetToken(
   user: Pick<users, "id" | "email" | "first_name">,
 ): Promise<void> {
   const resetToken = generateOpaqueToken();
+  const code = generateOtp(6);
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
 
-  await authRepository.createVerificationToken({
-    public_id: generatePublicId(PUBLIC_ID_PREFIXES.VERIFICATION),
-    token_hash: hashToken(resetToken),
-    target: user.email,
-    purpose: verification_type.PASSWORD_RESET,
-    expires_at: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
-    users_id: user.id,
-  });
+  // Two single-use rows for one reset: a link token (channel null, consumed
+  // by the static /reset-password page) and an OTP code (channel "otp").
+  await prisma.$transaction([
+    authRepository.createVerificationToken({
+      public_id: generatePublicId(PUBLIC_ID_PREFIXES.VERIFICATION),
+      token_hash: hashToken(resetToken),
+      target: user.email,
+      purpose: verification_type.PASSWORD_RESET,
+      expires_at: expiresAt,
+      users_id: user.id,
+    }),
+    authRepository.createVerificationToken({
+      public_id: generatePublicId(PUBLIC_ID_PREFIXES.VERIFICATION),
+      token_hash: hashToken(code),
+      target: user.email,
+      purpose: verification_type.PASSWORD_RESET,
+      expires_at: expiresAt,
+      users_id: user.id,
+      channel: "otp",
+    }),
+  ]);
 
-  sendPasswordResetEmail(user.email, user.first_name, resetToken).catch((error) => {
+  sendPasswordResetEmail(user.email, user.first_name, resetToken, code).catch((error) => {
     logger.error(
       { err: error, email: user.email },
       "Failed to send password reset email",
@@ -320,6 +340,17 @@ export async function requestPasswordReset(
     user.status === user_status.ACTIVE &&
     user.deleted_at === null
   ) {
+    const latest = await authRepository.findLatestPasswordResetToken(user.id);
+    if (
+      latest &&
+      Date.now() - latest.created_at.getTime() <
+        PASSWORD_RESET_RESEND_COOLDOWN_MS
+    ) {
+      throw new TooManyRequestsError(
+        "Please wait a minute before requesting another code",
+      );
+    }
+
     await authRepository.invalidateUnusedVerificationTokens(
       user.id,
       verification_type.PASSWORD_RESET,
@@ -339,6 +370,63 @@ export async function requestPasswordReset(
     message:
       "If an account exists for the provided email, a password reset email has been sent.",
   };
+}
+
+export async function verifyOtpPasswordReset(
+  input: VerifyOtpPasswordResetInput,
+): Promise<VerifyOtpPasswordResetResult> {
+  const user = await authRepository.findUserByEmailWithCredentials(input.email);
+
+  if (!user || user.status !== user_status.ACTIVE || user.deleted_at !== null) {
+    throw new UnauthorizedError("Invalid or expired verification code");
+  }
+
+  const otpRow = await authRepository.findActiveResetOtpRow(user.id);
+
+  if (!otpRow) {
+    throw new GoneError("This code has expired. Request a new one.");
+  }
+
+  if (otpRow.token_hash !== hashToken(input.code)) {
+    const failedAttempts =
+      await authRepository.incrementOtpFailedAttempts(otpRow.id);
+
+    if (failedAttempts >= PASSWORD_RESET_OTP_MAX_ATTEMPTS) {
+      await authRepository.invalidateVerificationToken(otpRow.id);
+      throw new GoneError(
+        "Too many incorrect attempts. Request a new code and try again.",
+      );
+    }
+
+    throw new UnauthorizedError(
+      `Incorrect code. ${PASSWORD_RESET_OTP_MAX_ATTEMPTS - failedAttempts} attempt(s) remaining.`,
+    );
+  }
+
+  // Code accepted: exchange it for a fresh single-use opaque reset token so
+  // the final password step reuses the unchanged verify endpoint (and its
+  // session-revocation + credential-token sweep side effects).
+  const resetToken = generateOpaqueToken();
+
+  await prisma.$transaction([
+    authRepository.invalidateVerificationToken(otpRow.id),
+    authRepository.invalidateUnusedVerificationTokens(
+      user.id,
+      verification_type.PASSWORD_RESET,
+    ),
+    authRepository.createVerificationToken({
+      public_id: generatePublicId(PUBLIC_ID_PREFIXES.VERIFICATION),
+      token_hash: hashToken(resetToken),
+      target: user.email,
+      purpose: verification_type.PASSWORD_RESET,
+      expires_at: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+      users_id: user.id,
+    }),
+  ]);
+
+  logger.info({ users_id: user.id }, "Password reset OTP verified");
+
+  return { reset_token: resetToken };
 }
 
 export async function verifyPasswordReset(

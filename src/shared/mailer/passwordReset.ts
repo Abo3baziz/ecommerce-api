@@ -3,8 +3,6 @@ import { PASSWORD_RESET_TOKEN_TTL_MS } from "../constants/index.js";
 import { sendEmail } from "./index.js";
 import { renderPasswordResetEmail } from "./templates/passwordReset.js";
 
-const HOURS_PER_MS = 60 * 60 * 1000;
-
 export function buildPasswordResetUrl(token: string): string {
   return `${env.CORS_ORIGIN}/reset-password?token=${token}`;
 }
@@ -13,6 +11,7 @@ export async function sendPasswordResetEmail(
   to: string,
   recipientName: string,
   token: string,
+  code: string,
 ): Promise<void> {
   const resetUrl = buildPasswordResetUrl(token);
 
@@ -21,8 +20,9 @@ export async function sendPasswordResetEmail(
     subject: "Reset your password",
     html: renderPasswordResetEmail({
       recipientName,
+      code,
       resetUrl,
-      expiresInHours: PASSWORD_RESET_TOKEN_TTL_MS / HOURS_PER_MS,
+      expiresInMinutes: Math.round(PASSWORD_RESET_TOKEN_TTL_MS / 60_000),
     }),
   });
 }

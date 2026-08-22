@@ -26,6 +26,8 @@ export interface CreateVerificationTokenData {
   purpose: verification_type;
   expires_at: Date;
   users_id: number;
+  /** "otp" for OTP-code rows; null/omitted for link rows. */
+  channel?: string | null;
 }
 
 export interface CreateSessionData {
@@ -75,6 +77,7 @@ export const authRepository = {
     return prisma.verification_tokens.create({
       data: {
         ...data,
+        channel: data.channel ?? null,
         created_at: new Date(),
       },
     });
@@ -120,6 +123,39 @@ export const authRepository = {
       },
       data: { used_at: new Date() },
     });
+  },
+
+  // Latest PASSWORD_RESET row regardless of use state — drives the per-email
+  // resend cooldown without leaking account existence (caller decides).
+  findLatestPasswordResetToken(users_id: number) {
+    return prisma.verification_tokens.findFirst({
+      where: { users_id, purpose: verification_type.PASSWORD_RESET },
+      orderBy: { created_at: "desc" },
+      select: { created_at: true },
+    });
+  },
+
+  findActiveResetOtpRow(users_id: number) {
+    return prisma.verification_tokens.findFirst({
+      where: {
+        users_id,
+        purpose: verification_type.PASSWORD_RESET,
+        channel: "otp",
+        used_at: null,
+        expires_at: { gt: new Date() },
+      },
+      orderBy: { created_at: "desc" },
+    });
+  },
+
+  incrementOtpFailedAttempts(id: number): Promise<number> {
+    return prisma.verification_tokens
+      .update({
+        where: { id },
+        data: { failed_attempts: { increment: 1 } },
+        select: { failed_attempts: true },
+      })
+      .then((row) => row.failed_attempts);
   },
 
   async invalidateUnusedCredentialTokens(

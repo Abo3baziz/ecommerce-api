@@ -7,7 +7,17 @@ The Password Reset flow allows users who have forgotten their password to regain
 The flow consists of two steps:
 
 1. Request a password reset email.
-2. Verify the reset token and set a new password.
+2. Complete the reset with **either** the emailed **6-digit code** or the emailed **link**, then set a new password.
+
+The email carries both channels; they complete the same reset. The OTP path
+exchanges the code for an opaque reset token via
+`POST /auth/password-reset/otp/verify` (below), so the final
+`/password-reset/verify` call is identical for both paths.
+
+Security parameters: 6-digit numeric code · 15-minute expiry (code and link) ·
+max 5 wrong code attempts kill the code · 60-second per-email resend cooldown ·
+a new request invalidates all previously issued reset tokens · completing a
+reset revokes all sessions and sweeps pending credential tokens.
 
 ---
 
@@ -54,6 +64,9 @@ Not Required
 
 # Password Reset Email
 
+The email shows a prominent 6-digit code (for the app wizard) above the
+one-click link fallback.
+
 Example reset link:
 
 ```
@@ -62,12 +75,55 @@ Example reset link:
 
 The link opens the backend-served `/reset-password` page (`public/reset-password.html/.js`), which collects the new password and posts it to the Reset Password endpoint below. The page is served with `Cache-Control: no-store` since it carries a token in the URL.
 
-The reset token is:
+Both the code and the reset token are:
 
 - Cryptographically random
 - Single-use
-- Time-limited
+- Time-limited (15 minutes)
 - Stored as a hash in the database
+
+---
+
+# Verify Reset OTP
+
+Exchanges a correct emailed code for an opaque single-use reset token, which
+is then submitted to `/password-reset/verify` together with the new password.
+
+## Endpoint
+
+```
+POST /api/v1/auth/password-reset/otp/verify
+```
+
+## Authentication
+
+Not Required
+
+## Request Body
+
+```json
+{ "email": "ahmed@example.com", "code": "482913" }
+```
+
+## Successful Response
+
+**200 OK**
+
+```json
+{ "success": true, "data": { "reset_token": "<reset_token>" } }
+```
+
+## Errors
+
+| Status | Condition |
+| --- | --- |
+| 401 | Unknown email, wrong code (`message` includes remaining attempts), or inactive account — identical generic wording for unknown emails |
+| 404 | No reset was requested for this email |
+| 410 | Code expired, already used, or killed by too many wrong attempts |
+| 429 | Resend cooldown active on `POST /auth/password-reset` |
+
+Wrong codes increment a persisted attempt counter; the 5th wrong attempt
+invalidates the code.
 
 ---
 
