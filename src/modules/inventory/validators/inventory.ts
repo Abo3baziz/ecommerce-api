@@ -69,6 +69,20 @@ export const updateInventorySchema = z.object({
 
 export type UpdateInventoryBody = z.infer<typeof updateInventorySchema.shape.body>;
 
+export const reserveInventorySchema = z.object({
+  params: z.object({
+    variant_public_id: publicIdParam,
+  }),
+  body: z.object({
+    change: quantityChangeField,
+    reason: z.string().trim().max(255).optional(),
+  }),
+});
+
+export type ReserveInventoryBody = z.infer<
+  typeof reserveInventorySchema.shape.body
+>;
+
 export const listInventorySchema = z.object({
   query: z.object({
     ...paginationQuery,

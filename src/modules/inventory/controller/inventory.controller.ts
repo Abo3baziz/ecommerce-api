@@ -3,12 +3,14 @@ import {
   createInventory,
   getInventory,
   listInventory,
+  reserveInventory,
   updateInventory,
 } from "../service/inventory.service.js";
 import type {
   CreateInventoryBody,
   InventoryParams,
   ListInventoryQuery,
+  ReserveInventoryBody,
   UpdateInventoryBody,
 } from "../validators/inventory.js";
 
@@ -81,6 +83,27 @@ export async function updateInventoryController(
     const data = await updateInventory(
       variant_public_id,
       req.body as UpdateInventoryBody,
+      { id: req.user!.id, role: req.user!.role },
+    );
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function reserveInventoryController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { variant_public_id } = req.params as InventoryParams;
+    const data = await reserveInventory(
+      variant_public_id,
+      req.body as ReserveInventoryBody,
       { id: req.user!.id, role: req.user!.role },
     );
     res.status(200).json({

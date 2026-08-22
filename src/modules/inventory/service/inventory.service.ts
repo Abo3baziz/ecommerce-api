@@ -9,6 +9,7 @@ import type {
   CreateInventoryInput,
   InventoryResult,
   ListInventoryResult,
+  ReserveInventoryInput,
   UpdateInventoryInput,
 } from "../dto/inventory.js";
 import {
@@ -227,4 +228,50 @@ export async function updateInventory(
   );
 
   return toInventoryResult(updated);
+}
+
+export async function reserveInventory(
+  variantPublicId: string,
+  input: ReserveInventoryInput,
+  actor: InventoryActor,
+): Promise<InventoryResult> {
+  const row = await inventoryRepository.findWithVariantByPublicId(
+    variantPublicId,
+  );
+
+  if (!row) {
+    throw new NotFoundError("Inventory record not found");
+  }
+
+  const previousReserved = row.quantity_reserved ?? 0;
+  const result = await inventoryRepository.reserveQuantity(
+    row.product_variants_id,
+    input.change,
+  );
+
+  if (result === 0) {
+    throw new ConflictError(
+      input.change > 0
+        ? "Not enough available stock to reserve that quantity"
+        : "Cannot release more than the currently reserved quantity",
+    );
+  }
+
+  const updated = await inventoryRepository.findWithVariantByVariantId(
+    row.product_variants_id,
+  );
+
+  logger.info(
+    {
+      actorId: actor.id,
+      variantPublicId,
+      change: input.change,
+      previousReserved,
+      newReserved: (updated?.quantity_reserved ?? 0),
+      reason: input.reason ?? null,
+    },
+    "Inventory reserve changed",
+  );
+
+  return toInventoryResult(updated!);
 }

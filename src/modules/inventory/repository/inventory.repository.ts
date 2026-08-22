@@ -209,6 +209,33 @@ export const inventoryRepository = {
     });
   },
 
+  // Guarded manual reserve change. The availability invariant mirrors the
+  // order flow's reserveStock/releaseStock exactly (see
+  // src/modules/orders/repository/orders.repository.ts): reserving may not
+  // exceed available stock; releasing may not exceed what is reserved.
+  reserveQuantity(
+    variants_id: number,
+    change: number,
+    client: DbClient = prisma,
+  ) {
+    if (change > 0) {
+      return client.$executeRaw`
+        UPDATE ${inventoryTable}
+        SET quantity_reserved = COALESCE(quantity_reserved, 0) + ${change},
+            last_stock_update = now()
+        WHERE product_variants_id = ${variants_id}
+          AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) >= ${change}
+      `;
+    }
+    return client.$executeRaw`
+      UPDATE ${inventoryTable}
+      SET quantity_reserved = COALESCE(quantity_reserved, 0) + ${change},
+          last_stock_update = now()
+      WHERE product_variants_id = ${variants_id}
+        AND COALESCE(quantity_reserved, 0) >= ${-change}
+    `;
+  },
+
   async listInventory(
     filters: InventoryListFilters,
     sortField: InventorySortField,

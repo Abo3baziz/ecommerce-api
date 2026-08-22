@@ -1,5 +1,6 @@
 import type {
   CreateInventoryBody,
+  ReserveInventoryBody,
   UpdateInventoryBody,
 } from "../validators/inventory.js";
 import type { PaginationMeta } from "./common.js";
@@ -9,6 +10,7 @@ export type { StockStatus } from "../utils/stock.js";
 
 export type CreateInventoryInput = CreateInventoryBody;
 export type UpdateInventoryInput = UpdateInventoryBody;
+export type ReserveInventoryInput = ReserveInventoryBody;
 
 export interface InventoryResult {
   public_id: string;

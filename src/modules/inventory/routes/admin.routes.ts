@@ -7,12 +7,14 @@ import {
   createInventorySchema,
   inventoryParamsSchema,
   listInventorySchema,
+  reserveInventorySchema,
   updateInventorySchema,
 } from "../validators/inventory.js";
 import {
   createInventoryController,
   getInventoryController,
   listInventoryController,
+  reserveInventoryController,
   updateInventoryController,
 } from "../controller/inventory.controller.js";
 
@@ -40,6 +42,11 @@ adminInventoryRouter.patch(
   "/:variant_public_id",
   validate(updateInventorySchema),
   updateInventoryController,
+);
+adminInventoryRouter.patch(
+  "/:variant_public_id/reserve",
+  validate(reserveInventorySchema),
+  reserveInventoryController,
 );
 
 export { adminInventoryRouter };

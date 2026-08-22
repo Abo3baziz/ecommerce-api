@@ -243,7 +243,7 @@ Authenticated user with role `ADMIN` or `SUPER_ADMIN`. Customers and unauthentic
 ## Notes
 
 - An inventory record only exists once stock has been created for a variant; variants without a record are absent from the list.
-- `quantity_reserved` is never editable through this API; it is managed by the order flow.
+- `quantity_reserved` is managed by the order flow and is not editable through the generic adjust endpoint; admins can change it manually only via the dedicated Reserve Change endpoint below.
 
 ---
 
@@ -686,6 +686,80 @@ At least one field is required. `quantity_on_hand` and `quantity_change` are mut
 
 - The update endpoint is intentionally idempotent-capable: absolute `quantity_on_hand` sets are idempotent, while `quantity_change` deltas are race-safe within the transaction.
 - Inventory adjustments are not persisted as separate ledger rows; for a full adjustment audit trail, extend the structured-logger entry with a future `inventory_adjustments` table (see Design Decisions).
+
+---
+
+# Reserve Change
+
+## Overview
+
+Manually reserves or releases units of a variant: applies a **signed delta** to
+`quantity_reserved`. Intended for operational holds (damaged stock, offline
+sales, inspections). The order flow continues to mutate reservations through
+checkout; this endpoint is additive and uses the same availability invariant.
+
+---
+
+## Endpoint
+
+```http
+PATCH /api/v1/admin/inventory/{variant_public_id}/reserve
+```
+
+---
+
+## Request Body
+
+| Field | Type | Constraints |
+| --- | --- | --- |
+| `change` | integer | Non-zero signed delta. Positive reserves units, negative releases them |
+| `reason` | string | Optional, ≤255 chars, audit-only (written to logs) |
+
+```json
+{ "change": -3, "reason": "released after damaged-unit inspection" }
+```
+
+At least `change` is required.
+
+### Behavior
+
+Single atomic guarded UPDATE (same invariants as checkout):
+
+- `change > 0` → allowed only while
+  `(quantity_on_hand - COALESCE(quantity_reserved, 0)) >= change`
+- `change < 0` → allowed only while `COALESCE(quantity_reserved, 0) >= |change|`
+- Sets `last_stock_update = now()` on success
+- Success is logged with `{ actorId, variantPublicId, change,
+  previousReserved, newReserved, reason }`
+
+### Response
+
+`200` with the updated Inventory Object (see Public Key → shape above).
+
+### Errors
+
+| Status | Condition |
+| --- | --- |
+| 400 Bad Request | `change` missing/zero/non-integer, over-long `reason` |
+| 401 Unauthorized | Missing or invalid session |
+| 403 Forbidden | Authenticated user is not an `ADMIN` or `SUPER_ADMIN` |
+| 404 Not Found | Variant does not exist, is soft-deleted, or has no inventory record |
+| 409 Conflict | Reserving more than currently available, or releasing more than currently reserved |
+
+---
+
+## Security Considerations
+
+- Endpoint is behind `authentication` + `authorization(user_role.ADMIN, user_role.SUPER_ADMIN)` middleware.
+- The guard and update run in one statement, so concurrent checkouts cannot race past the invariant.
+- `reason` is length-limited and treated as untrusted input; it is only ever written to logs.
+
+---
+
+## Notes
+
+- Deliberately delta-only: absolute sets could clobber reservations created by
+  in-flight orders between read and write.
 
 ---
 
