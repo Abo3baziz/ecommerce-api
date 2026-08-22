@@ -17,6 +17,7 @@ export const PUBLIC_ID_PREFIXES = {
   VERIFICATION: "vrf",
   SESSION: "ses",
   AUDIT: "aud",
+  EXPENSE: "exp",
 } as const;
 
 export const ROLES = {
