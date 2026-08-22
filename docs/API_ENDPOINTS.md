@@ -3371,10 +3371,50 @@ Documented error codes (if/when implemented): `400` invalid request · `404` res
 
 ---
 
+## 20. Uploads
+
+### GET /api/v1/uploads/imagekit-auth
+
+**Overview:** Returns short-lived signed parameters (`token`, `expire`, `signature`) plus the ImageKit public key and URL endpoint, authorizing a client-side upload to ImageKit without exposing the private key. Customer-accessible counterpart of `GET /admin/products/uploads/imagekit-auth` — used by review photo uploads; any authenticated role may call it.
+
+**Authentication:** Session required (any role)
+
+**Request**
+
+- Method: `GET` · URL: `/api/v1/uploads/imagekit-auth`
+- Headers: `Cookie: session=<SESSION_TOKEN>`
+- Path params: None · Query params: None · Body: None
+
+**Response**
+
+- Success: `200 OK`
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "token": "03b057f3-7dd9-4689-b16a-bcd0176bfc65",
+      "expire": 1786240129,
+      "signature": "c593fd35ccb285b290b4f838d6f51053a3426cf2",
+      "publicKey": "public_JP5I0TzT4ZAdJMgOCbgY9Ogv6Kk=",
+      "urlEndpoint": "https://ik.imagekit.io/ecommerceImages"
+    }
+  }
+  ```
+
+- Errors: `401` missing/invalid session · `429` rate limited (global limiter) · `500` unexpected error
+
+**Example Request**
+
+```bash
+curl -H "Cookie: session=<SESSION_TOKEN>" "https://api.example.com/api/v1/uploads/imagekit-auth"
+```
+
+---
+
 ## Endpoint Index
 
-**86 implemented endpoints + 2 documented-but-not-implemented.**
-
+**87 implemented endpoints + 2 documented-but-not-implemented.**
 - **Authentication (9):** `POST /auth/register` · `POST /auth/login` · `GET /auth/session` · `GET /auth/sessions` · `DELETE /auth/session` · `DELETE /auth/sessions` · `DELETE /auth/sessions/{session_public_id}` · `POST /auth/email-verification/verify` · `POST /auth/email-verification/resend`
 - **Users (8):** `GET /users/me` · `PATCH /users/me` · `DELETE /users/me` · `PATCH /users/me/password` · `POST /users/me/email` · `POST /users/me/email/verify` · `POST /users/me/phone-number` · `POST /users/me/phone-number/verify`
 - **Addresses (5):** `GET|POST /users/me/addresses` · `GET|PATCH|DELETE /users/me/addresses/{address_public_id}`
@@ -3393,3 +3433,4 @@ Documented error codes (if/when implemented): `400` invalid request · `404` res
 - **Reviews — authenticated (4):** `POST /reviews` · `PATCH /reviews/{review_public_id}` · `DELETE /reviews/{review_public_id}` · `GET /users/me/reviews`
 - **Reviews — admin (4):** `GET /admin/reviews` · `GET /admin/reviews/{review_public_id}` · `PATCH /admin/reviews/{review_public_id}` · `DELETE /admin/reviews/{review_public_id}`
 - **Users — admin (6):** `GET /admin/users` · `GET /admin/users/{user_public_id}` · `PATCH /admin/users/{user_public_id}` · `PATCH /admin/users/{user_public_id}/suspend` · `PATCH /admin/users/{user_public_id}/activate` · `PATCH /admin/users/{user_public_id}/role`
+- **Uploads (1):** `GET /uploads/imagekit-auth`

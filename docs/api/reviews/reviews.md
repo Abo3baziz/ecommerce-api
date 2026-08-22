@@ -523,7 +523,7 @@ Each image item:
 ## Security Considerations
 
 - Body `product_public_id` is owner-agnostic (any user can review any visible product), but the review is always attributed to the session user - the `users_id` comes from `req.user`, never from the body.
-- `image_url` validation reuses the shared image-URL field rule (absolute http/https); the ImageKit signed-upload flow used by product images is not re-exposed here in v1.
+- `image_url` validation reuses the shared image-URL field rule (absolute http/https). Client photo uploads use `GET /uploads/imagekit-auth` (any authenticated role), the customer-accessible counterpart of the admin product-image upload flow.
 
 ---
 

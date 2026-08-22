@@ -85,7 +85,7 @@ Adopt the **client-side signed upload** pattern for all image uploads (product i
 
 ### Negative
 
-- The upload signature is not scoped to a specific ImageKit folder by default; the API cannot cryptographically bind an uploaded file to a particular product. Mitigation: only admin-authenticated clients can obtain credentials, and the API only persists URLs that pass URL-shape validation; the caller is responsible for uploading into the intended ImageKit folder.
+- The upload signature is not scoped to a specific ImageKit folder by default; the API cannot cryptographically bind an uploaded file to a particular product. Mitigation: only authenticated clients can obtain credentials (admin via `GET /api/v1/admin/products/uploads/imagekit-auth`, any signed-in user via `GET /api/v1/uploads/imagekit-auth`, added for customer review-photo uploads), and the API only persists URLs that pass URL-shape validation; the caller is responsible for uploading into the intended ImageKit folder.
 - The API trusts the URL the client submits as `image_url`. It validates the URL is an absolute `http`/`https` URL (preventing protocol smuggling such as `javascript:` or `file:`) but cannot verify the URL actually corresponds to a file uploaded by this session. This is an accepted trust trade-off for the admin surface.
 - Deleting an image record (hard delete) does not delete the file in ImageKit; orphan-file cleanup in the media library is the caller's responsibility. This matches the documented API behavior.
 - The signature expires (`expire`), so clients must complete the upload within the validity window; a failed/expired upload requires fetching fresh credentials.

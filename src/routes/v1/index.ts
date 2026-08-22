@@ -23,6 +23,7 @@ import {
   reviewsRouter,
   userReviewsRouter,
 } from "../../modules/reviews/index.js";
+import { uploadsRouter } from "../../modules/uploads/index.js";
 
 const v1Router = Router();
 
@@ -44,5 +45,6 @@ v1Router.use("/products", productReviewsRouter);
 v1Router.use("/reviews", reviewsRouter);
 v1Router.use("/users", userReviewsRouter);
 v1Router.use("/admin/reviews", adminReviewsRouter);
+v1Router.use("/uploads", uploadsRouter);
 
 export { v1Router };

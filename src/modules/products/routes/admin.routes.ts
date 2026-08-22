@@ -35,7 +35,7 @@ import {
   listAdminProductsController,
   updateProductController,
 } from "../controller/product.controller.js";
-import { getImageKitAuthParamsController } from "../controller/upload.controller.js";
+import { getImageKitAuthParamsController } from "../../uploads/controller/upload.controller.js";
 import {
   createVariantController,
   deleteVariantController,
