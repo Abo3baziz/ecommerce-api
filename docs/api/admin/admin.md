@@ -298,6 +298,59 @@ DELETE /api/v1/admin/reviews/{review_public_id}
 
 ---
 
+# Statistics
+
+## Get Dashboard Stats
+
+```
+GET /api/v1/admin/stats?period=today|7d|30d
+```
+
+`period` defaults to `7d`. All time bounds are computed server-side in UTC:
+`today` buckets hourly (UTC day start → now); `7d`/`30d` bucket daily
+(UTC day start of `now − 6d|29d` → now).
+
+### Response
+
+```
+{
+  "success": true,
+  "data": {
+    "period": { "preset": "7d", "from": "...", "to": "...", "bucket": "day" },
+    "revenue": {
+      "gross_total": "126.99",
+      "net_total": "126.99",
+      "refunded_total": "0",
+      "order_count": 1,
+      "avg_order_value": "126.99"
+    },
+    "series": [ { "bucket_start": "...", "gross": "...", "net": "..." } ],
+    "orders_by_status": { "PENDING": 0, "CONFIRMED": 0, "PROCESSING": 0, "SHIPPED": 0, "DELIVERED": 1, "CANCELLED": 0, "RETURNED": 0, "REFUNDED": 0 },
+    "top_products": [ { "product_public_id": "prd_…", "name": "…", "slug": "…", "units": 3, "revenue": "350.97" } ],
+    "stock_health": { "low_stock_count": 0, "out_of_stock_count": 0 },
+    "customers": { "total_active": 7, "new_in_period": 7 },
+    "reviews": { "pending_moderation_count": 0 }
+  }
+}
+```
+
+### Definitions
+
+- Money fields are decimal-as-string. `series` is zero-filled for every bucket
+  in the window.
+- `gross_total` = Σ `total_amount` of non-cancelled orders placed in the period;
+  `refunded_total` = Σ where status `REFUNDED`; `net_total` = gross − refunded;
+  `avg_order_value` = gross ÷ `order_count`.
+- `top_products` aggregates `order_items` of non-cancelled in-period orders
+  (soft-deleted items excluded), ranked by revenue; at most 5 rows.
+- `stock_health` uses the inventory module's derived stock statuses over
+  non-deleted variants.
+- `customers.total_active` = role `CUSTOMER`, status `ACTIVE`, not deleted;
+  `new_in_period` counts by `created_at` within the window.
+- `reviews.pending_moderation_count` = `is_approved = false`, not deleted.
+
+---
+
 # Error Responses
 
 | Status | Reason |
