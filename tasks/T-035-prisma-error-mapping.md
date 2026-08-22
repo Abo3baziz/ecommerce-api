@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-035 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `refactor` |
 | **Branch** | `refactor/prisma-error-mapping` |
 | **Depends on** | — |
@@ -32,8 +32,18 @@ Recoverable conflicts never surface as 500; one central mapping.
 
 ## Acceptance criteria
 
-- [ ] Concurrency tests for register/slug/assign paths return 4xx, not 500.
-- [ ] No duplicated P2002 catch blocks left behind except where messages differ deliberately.
+- [x] Concurrency tests for register/slug/assign paths return 4xx, not 500.
+- [x] No duplicated P2002 catch blocks left behind except where messages differ deliberately.
+
+## Implementation notes (2026-08-22)
+
+- New `src/middleware/prismaErrorMapper.ts` — pure `mapPrismaError(error): AppError | null`:
+  - `PrismaClientKnownRequestError` P2002 → `ConflictError` ("Resource already exists", 409); P2025 → `NotFoundError` ("Resource not found", 404); other P-codes → null (stay 500).
+  - Postgres `22001` string-too-long detected by walking the error `cause` chain (max depth 5) → `BadRequestError` ("A provided value is too long", 400).
+- `errorHandler` now tries the mapper for non-`AppError` errors; the original error stays on `res.locals.error`, so request logs keep the full Prisma context while clients get the mapped status.
+- Category assign (`category.service.ts`) keeps a **deliberate local P2002 catch**: losing a concurrent duplicate-assign race resolves to the idempotent no-op success instead of 409, per the PUT contract.
+- Inventory create keeps its ad-hoc P2002 catch (deliberate specific message "A variant with this public ID already has an inventory record."), permitted by scope.
+- Tests: unit suite for the mapper (6) + three e2e concurrency suites — register duplicate-email race (exactly one 201, loser 409), admin product duplicate-slug create race (one 201 / one 409), category concurrent duplicate assign (both 204, exactly one link). Full suite 72 files / 1084 tests green; typecheck + build pass.
 
 ## References
 
