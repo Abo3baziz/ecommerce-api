@@ -4,7 +4,7 @@ import { BadRequestError } from "../../../shared/errors/BadRequestError.js";
 import { ConflictError } from "../../../shared/errors/ConflictError.js";
 import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
 import { formatPaginationMeta, generatePublicId } from "../../../shared/utils/index.js";
-import type { Prisma } from "../../../generated/prisma/client.js";
+import { Prisma } from "../../../generated/prisma/client.js";
 import {
   categoryRepository,
   type CategoryFilters,
@@ -301,7 +301,17 @@ export async function assignProductToCategory(
     return;
   }
 
-  await categoryRepository.createCategoryLink(category.id, product.id);
+  try {
+    await categoryRepository.createCategoryLink(category.id, product.id);
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function unassignProductFromCategory(
