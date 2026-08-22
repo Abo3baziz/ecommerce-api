@@ -459,6 +459,7 @@ model users {
   sessions              sessions[]
   user_addresses        user_addresses[]
   verification_tokens   verification_tokens[]
+  audit_logs            audit_logs[]
 
   @@index([email], map: "idx_users_email")
   @@index([public_id], map: "idx_users_public_id")
@@ -482,6 +483,30 @@ model verification_tokens {
   @@index([token_hash], map: "idx_verification_tokens_token_hash")
   @@index([users_id], map: "idx_verification_tokens_user_id")
   @@index([purpose], map: "idx_verification_tokens_verification_type")
+}
+
+/// Append-only audit trail for privileged actions. Rows are never updated or
+/// deleted by the application.
+model audit_logs {
+  id               Int      @id(map: "audit_logs_pk") @default(autoincrement())
+  public_id        String   @unique(map: "audit_logs_public_id_unique_key") @db.VarChar(32)
+  actor_users_id   Int?
+  action           String   @db.VarChar(100)
+  entity_type      String?  @db.VarChar(50)
+  entity_public_id String?  @db.VarChar(50)
+  method           String?  @db.VarChar(10)
+  path             String?  @db.VarChar(255)
+  status_code      Int
+  request_body     Json?
+  ip_address       String?  @db.Inet
+  user_agent       String?
+  created_at       DateTime @db.Timestamptz(6)
+  users            users?   @relation(fields: [actor_users_id], references: [id], map: "fk_audit_logs_users")
+
+  @@index([created_at], map: "idx_audit_logs_created_at")
+  @@index([actor_users_id, created_at], map: "idx_audit_logs_actor_created_at")
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([entity_type, entity_public_id], map: "idx_audit_logs_entity")
 }
 
 enum discount_type {

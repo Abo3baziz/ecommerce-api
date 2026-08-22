@@ -23,6 +23,7 @@ import {
   verification_type,
 } from "../../../generated/prisma/enums.js";
 import { authRepository } from "../repository/auth.repository.js";
+import { recordAuditEvent } from "../../audit/service/audit.service.js";
 import { generateOpaqueToken, hashToken } from "../utils/tokens.js";
 import { parseDeviceName } from "../utils/userAgent.js";
 import {
@@ -43,6 +44,12 @@ import type {
 } from "../dto/passwordReset.js";
 
 const BCRYPT_ROUNDS = 12;
+
+// Auditing covers admin accounts only; customer auth noise stays out of the
+// trail. Unknown emails are recorded (no actor) to expose probing.
+function isAdminRole(role: user_role): boolean {
+  return role === user_role.ADMIN || role === user_role.SUPER_ADMIN;
+}
 
 export async function register(
   input: RegisterInput,
@@ -98,6 +105,13 @@ export async function login(
 
   if (!user) {
     recordLoginFailure(input.email);
+    void recordAuditEvent({
+      action: "auth.admin.login_failed",
+      statusCode: 401,
+      requestBody: { email: input.email },
+      ipAddress: context.ip ?? null,
+      userAgent: context.userAgent ?? null,
+    });
     throw new UnauthorizedError("Invalid email or password");
   }
 
@@ -105,6 +119,16 @@ export async function login(
 
   if (!passwordValid) {
     recordLoginFailure(input.email);
+    if (isAdminRole(user.role)) {
+      void recordAuditEvent({
+        actorUsersId: user.id,
+        action: "auth.admin.login_failed",
+        statusCode: 401,
+        requestBody: { email: input.email },
+        ipAddress: context.ip ?? null,
+        userAgent: context.userAgent ?? null,
+      });
+    }
     throw new UnauthorizedError("Invalid email or password");
   }
 
@@ -115,6 +139,18 @@ export async function login(
   }
 
   const sessionToken = await createSession(user.id, user.public_id, context);
+
+  if (isAdminRole(user.role)) {
+    void recordAuditEvent({
+      actorUsersId: user.id,
+      action: "auth.admin.login",
+      entityType: "session",
+      statusCode: 200,
+      requestBody: { email: input.email },
+      ipAddress: context.ip ?? null,
+      userAgent: context.userAgent ?? null,
+    });
+  }
 
   return {
     public_id: user.public_id,

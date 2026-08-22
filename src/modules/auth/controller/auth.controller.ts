@@ -11,6 +11,7 @@ import {
   verifyPasswordReset,
 } from "../service/auth.service.js";
 import { authRepository } from "../repository/auth.repository.js";
+import { recordAuditEvent } from "../../audit/service/audit.service.js";
 import { setSessionCookie, clearSessionCookie } from "../utils/sessionCookie.js";
 import type { RegisterInput } from "../dto/register.js";
 import type { LoginInput } from "../dto/login.js";
@@ -21,6 +22,15 @@ import type {
 } from "../dto/passwordReset.js";
 import type { SessionParams } from "../validators/sessionParams.js";
 import type { RequestContext } from "../types/context.js";
+import type { users } from "../../../generated/prisma/client.js";
+import { user_role } from "../../../generated/prisma/enums.js";
+
+function isAdminActor(user: users | undefined): boolean {
+  return (
+    user !== undefined &&
+    (user.role === user_role.ADMIN || user.role === user_role.SUPER_ADMIN)
+  );
+}
 
 function buildRequestContext(req: Request): RequestContext {
   return {
@@ -105,6 +115,17 @@ export async function logoutController(
   try {
     if (req.authSession) {
       await authRepository.revokeSession(req.authSession.id);
+      if (isAdminActor(req.user)) {
+        void recordAuditEvent({
+          actorUsersId: req.user!.id,
+          action: "auth.admin.logout",
+          entityType: "session",
+          entityPublicId: req.authSession.public_id,
+          statusCode: 204,
+          ipAddress: req.ip ?? null,
+          userAgent: req.get("user-agent") ?? null,
+        });
+      }
     }
     clearSessionCookie(res);
     res.status(204).send();
@@ -141,6 +162,17 @@ export async function revokeSessionController(
       session_public_id,
       req.authSession!.id,
     );
+    if (isAdminActor(req.user)) {
+      void recordAuditEvent({
+        actorUsersId: req.user!.id,
+        action: "auth.admin.session_revoked",
+        entityType: "session",
+        entityPublicId: session_public_id,
+        statusCode: 204,
+        ipAddress: req.ip ?? null,
+        userAgent: req.get("user-agent") ?? null,
+      });
+    }
     if (revokedCurrent) {
       clearSessionCookie(res);
     }
@@ -157,6 +189,17 @@ export async function revokeAllOtherSessionsController(
 ): Promise<void> {
   try {
     await revokeAllOtherSessions(req.user!.id, req.authSession!.id);
+    if (isAdminActor(req.user)) {
+      void recordAuditEvent({
+        actorUsersId: req.user!.id,
+        action: "auth.admin.sessions_revoked",
+        entityType: "session",
+        statusCode: 204,
+        requestBody: { except_current: true },
+        ipAddress: req.ip ?? null,
+        userAgent: req.get("user-agent") ?? null,
+      });
+    }
     res.status(204).send();
   } catch (error) {
     next(error);
