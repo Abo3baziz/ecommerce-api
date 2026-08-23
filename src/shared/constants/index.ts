@@ -21,6 +21,10 @@ export const PUBLIC_ID_PREFIXES = {
   COUPON: "cpn",
 } as const;
 
+/** An admin with no login and no audit-logged action within this many days
+ *  shows as INACTIVE in the Admin Management surface. */
+export const ADMIN_INACTIVE_AFTER_DAYS = 2;
+
 export const ROLES = {
   CUSTOMER: "customer",
   ADMIN: "admin",

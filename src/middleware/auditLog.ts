@@ -13,6 +13,7 @@ const SEGMENT_TO_ENTITY: Record<string, string> = {
   orders: "order",
   reviews: "review",
   users: "customer",
+  admins: "admin",
 };
 
 interface ClassifiedRequest {
@@ -55,6 +56,15 @@ export function classifyAdminMutation(
     if (parts[2] === "role") {
       return { action: `${base}.role_change`, entityType, entityPublicId };
     }
+    if (parts[2] === "suspend") {
+      return { action: `${base}.suspend`, entityType, entityPublicId };
+    }
+    if (parts[2] === "activate") {
+      return { action: `${base}.activate`, entityType, entityPublicId };
+    }
+  }
+
+  if (segment === "admins" && parts[2] !== undefined) {
     if (parts[2] === "suspend") {
       return { action: `${base}.suspend`, entityType, entityPublicId };
     }
