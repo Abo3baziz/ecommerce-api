@@ -244,6 +244,10 @@ The env schema (`src/config/env.ts`) is validated by zod and calls `process.exit
 - `RESEND_FROM_EMAIL` (optional, defaults to `onboarding@resend.dev`)
 - `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT` (dummy values; real requests must fail in tests)
 - `PORT`, `NODE_ENV`
+- `ENABLE_CSRF` (optional, defaults to `true`). Leave unset so suites keep
+  exercising real CSRF flows; setting `ENABLE_CSRF=false` disables token
+  validation entirely as an escape hatch when writing new integration tests
+  (see `.env.test.example` and `docs/api/authentication/csrf.md`)
 
 Current setup:
 

@@ -4,6 +4,15 @@ import { env } from "./config/env.js";
 import { logger } from "./shared/logger/index.js";
 
 export function createServer(): Server {
+  if (!env.ENABLE_CSRF) {
+    if (env.NODE_ENV === "production") {
+      // Fail-closed: CSRF protection must never be disabled in production.
+      logger.fatal("ENABLE_CSRF=false is not allowed in production");
+      process.exit(1);
+    }
+    logger.warn("CSRF protection is DISABLED — development use only");
+  }
+
   const server = app.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
   });

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { csrfProtection } from "../../middleware/csrf.js";
+import { env } from "../../config/env.js";
 import { authRouter } from "../../modules/auth/index.js";
 import { addressesRouter } from "../../modules/addresses/index.js";
 import { adminUsersRouter, usersRouter } from "../../modules/users/index.js";
@@ -31,7 +32,12 @@ import { auditAdminMutations } from "../../middleware/auditLog.js";
 
 const v1Router = Router();
 
-v1Router.use(csrfProtection);
+// CSRF validation is environment-toggled (ENABLE_CSRF, default true).
+// Token GENERATION (/auth/csrf-token) stays available in every mode so the
+// frontend flow is identical either way.
+if (env.ENABLE_CSRF) {
+  v1Router.use(csrfProtection);
+}
 // Mounted before the admin routers: snapshots the request body pre-validation
 // and writes one audit row per authenticated mutating /admin/* request.
 v1Router.use("/admin", auditAdminMutations);

@@ -51,6 +51,25 @@ The `x-csrf-token` cookie is set with:
 
 The token is read from the response body (not from `document.cookie`), so keeping the cookie `httpOnly` does not break legitimate clients.
 
+## Environment toggle (`ENABLE_CSRF`)
+
+CSRF validation is environment-configurable via the `ENABLE_CSRF` variable
+(see `src/config/env.ts`):
+
+| Value | Behavior |
+|-------|----------|
+| unset / `true` | **Protection enabled** — the default and the only supported production setting |
+| `false` | Validation middleware is not registered; authenticated writes succeed without a token. Intended for local development convenience only |
+
+Guarantees:
+
+- The default (unset) is **enabled** — security cannot be lost by omission.
+- With `ENABLE_CSRF=false` and `NODE_ENV=production` the server **refuses to
+  start**; production must always run with CSRF protection on.
+- Token generation (`GET /auth/csrf-token`) stays available in both modes, so
+  clients need no changes when toggling.
+- Session authentication, cookies, and rate limiting are unaffected.
+
 ## Troubleshooting
 
 | Symptom | Meaning |
