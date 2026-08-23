@@ -117,3 +117,41 @@ export interface ListExpensesResult {
   expenses: OperatingExpenseResult[];
   pagination: PaginationMeta;
 }
+
+export interface CouponAnalyticsTotals {
+  total_coupons: number;
+  active_coupons: number;
+  inactive_coupons: number;
+  expired_coupons: number;
+  usage_limit_reached: number;
+  lifetime_redemptions: number;
+  range_redemptions: number;
+  discounts_given_in_range: string;
+  coupon_orders_count: number;
+  coupon_orders_revenue: string;
+  coupon_orders_share_pct: string;
+}
+
+export interface CouponAnalyticsMostUsed {
+  coupon_public_id: string;
+  code: string;
+  discount_type: "FIXED_AMOUNT" | "PERCENTAGE";
+  discount_value: string;
+  is_active: boolean;
+  lifetime_uses: number;
+  range_redemptions: number;
+  discounts_given_in_range: string;
+}
+
+export interface CouponAnalyticsTrendPoint {
+  date: string;
+  redemptions: number;
+  discount_amount: string;
+}
+
+export interface CouponAnalyticsPayload {
+  range: AnalyticsRange;
+  totals: CouponAnalyticsTotals;
+  most_used: CouponAnalyticsMostUsed[];
+  trend: CouponAnalyticsTrendPoint[];
+}

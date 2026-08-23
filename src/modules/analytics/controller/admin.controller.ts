@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getAnalyticsOverview } from "../service/overview.service.js";
+import { getCouponAnalytics } from "../service/coupon-analytics.service.js";
 import {
   createExpense,
   deleteExpense,
@@ -8,10 +9,28 @@ import {
 } from "../service/expenses.service.js";
 import type {
   CreateAnalyticsExpenseBody,
+  CouponAnalyticsQuery,
   ListAnalyticsExpensesQuery,
   OverviewQuery,
   UpdateAnalyticsExpenseBody,
 } from "../validators/admin.js";
+
+export async function getCouponAnalyticsController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { date_from, date_to } = req.query as unknown as CouponAnalyticsQuery;
+    const data = await getCouponAnalytics(date_from, date_to);
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
 
 export async function getAnalyticsOverviewController(
   req: Request,
