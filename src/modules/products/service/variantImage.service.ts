@@ -1,6 +1,8 @@
 import { PUBLIC_ID_PREFIXES } from "../../../shared/constants/index.js";
+import { env } from "../../../config/env.js";
 import { ConflictError } from "../../../shared/errors/ConflictError.js";
 import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
+import { validateUploadedImageUrl } from "../../../shared/imagekit/index.js";
 import { formatPaginationMeta, generatePublicId } from "../../../shared/utils/index.js";
 import { productRepository } from "../repository/product.repository.js";
 import { variantRepository } from "../repository/variant.repository.js";
@@ -98,6 +100,7 @@ export async function createVariantImage(
   input: CreateVariantImageInput,
 ): Promise<VariantImageResult> {
   const { variant } = await requireVariant(productPublicId, variantPublicId);
+  validateUploadedImageUrl(input.image_url, "products", env.IMAGEKIT_URL_ENDPOINT);
 
   const displayOrder = await resolveDisplayOrder(variant.id, input.display_order);
 
@@ -146,6 +149,10 @@ export async function updateVariantImage(
 
   if (!image) {
     throw new NotFoundError("Variant image not found");
+  }
+
+  if (input.image_url !== undefined) {
+    validateUploadedImageUrl(input.image_url, "products", env.IMAGEKIT_URL_ENDPOINT);
   }
 
   if (input.display_order !== undefined) {

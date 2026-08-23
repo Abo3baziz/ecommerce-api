@@ -1,4 +1,5 @@
 import { prisma } from "../../../config/database.js";
+import { env } from "../../../config/env.js";
 import {
   PUBLIC_ID_PREFIXES,
   REVIEWS_REQUIRE_PURCHASE,
@@ -6,6 +7,10 @@ import {
 import { ConflictError } from "../../../shared/errors/ConflictError.js";
 import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
 import { formatPaginationMeta, generatePublicId } from "../../../shared/utils/index.js";
+import {
+  validateUploadedImageUrl,
+} from "../../../shared/imagekit/index.js";
+import { recordAuditEvent } from "../../audit/service/audit.service.js";
 import type { Prisma } from "../../../generated/prisma/client.js";
 import {
   newReviewImagePublicId,
@@ -142,6 +147,9 @@ export async function createReview(
   }
 
   const images = input.images ?? [];
+  for (const image of images) {
+    validateUploadedImageUrl(image.image_url, "reviews", env.IMAGEKIT_URL_ENDPOINT);
+  }
 
   const row = await prisma.$transaction(async (tx) => {
     const created = await reviewRepository.createReview(
@@ -177,6 +185,19 @@ export async function createReview(
     return refreshed!;
   });
 
+  // Customer-side uploads are outside the /admin/* audit scope, so the
+  // review module emits its own events (fire-and-forget, one per file).
+  for (const image of images) {
+    void recordAuditEvent({
+      actorUsersId: userId,
+      action: "review.image_added",
+      entityType: "review",
+      entityPublicId: row.public_id,
+      statusCode: 201,
+      requestBody: { url: image.image_url },
+    });
+  }
+
   return toReviewResult(row);
 }
 
@@ -194,6 +215,12 @@ export async function updateReview(
     throw new NotFoundError("Review not found");
   }
 
+  if (input.images !== undefined) {
+    for (const image of input.images) {
+      validateUploadedImageUrl(image.image_url, "reviews", env.IMAGEKIT_URL_ENDPOINT);
+    }
+  }
+
   const row = await prisma.$transaction(async (tx) => {
     const updated = await reviewRepository.updateReview(
       existing.id,
@@ -206,6 +233,9 @@ export async function updateReview(
     );
 
     if (input.images !== undefined) {
+      const previousUrls = new Set(existing.review_images.map((image) => image.image_url));
+      const nextUrls = new Set(input.images.map((image) => image.image_url));
+
       await reviewRepository.deleteReviewImages(existing.id, tx);
       if (input.images.length > 0) {
         await reviewRepository.createReviewImages(
@@ -218,6 +248,31 @@ export async function updateReview(
           })),
           tx,
         );
+      }
+
+      for (const url of nextUrls) {
+        if (!previousUrls.has(url)) {
+          void recordAuditEvent({
+            actorUsersId: userId,
+            action: "review.image_added",
+            entityType: "review",
+            entityPublicId: existing.public_id,
+            statusCode: 200,
+            requestBody: { url },
+          });
+        }
+      }
+      for (const url of previousUrls) {
+        if (!nextUrls.has(url)) {
+          void recordAuditEvent({
+            actorUsersId: userId,
+            action: "review.image_removed",
+            entityType: "review",
+            entityPublicId: existing.public_id,
+            statusCode: 200,
+            requestBody: { url },
+          });
+        }
       }
     }
 
