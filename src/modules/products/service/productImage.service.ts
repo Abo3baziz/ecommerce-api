@@ -1,8 +1,10 @@
 import { prisma } from "../../../config/database.js";
+import { env } from "../../../config/env.js";
 import { PUBLIC_ID_PREFIXES } from "../../../shared/constants/index.js";
 import { BadRequestError } from "../../../shared/errors/BadRequestError.js";
 import { ConflictError } from "../../../shared/errors/ConflictError.js";
 import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
+import { validateUploadedImageUrl } from "../../../shared/imagekit/index.js";
 import { formatPaginationMeta, generatePublicId } from "../../../shared/utils/index.js";
 import { productRepository } from "../repository/product.repository.js";
 import {
@@ -88,6 +90,7 @@ export async function createProductImage(
   input: CreateProductImageInput,
 ): Promise<ProductImageResult> {
   const product = await requireProduct(productPublicId);
+  validateUploadedImageUrl(input.image_url, "products", env.IMAGEKIT_URL_ENDPOINT);
 
   const displayOrder = await resolveDisplayOrder(product.id, input.display_order);
   const imageCount = await productImageRepository.countByProduct(product.id);
@@ -146,6 +149,10 @@ export async function updateProductImage(
 
   if (!image) {
     throw new NotFoundError("Product image not found");
+  }
+
+  if (input.image_url !== undefined) {
+    validateUploadedImageUrl(input.image_url, "products", env.IMAGEKIT_URL_ENDPOINT);
   }
 
   if (input.is_primary === false && image.is_primary) {
