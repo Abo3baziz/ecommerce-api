@@ -503,6 +503,8 @@ model audit_logs {
   path             String?  @db.VarChar(255)
   status_code      Int
   request_body     Json?
+  previous_values  Json?
+  changes          Json?
   ip_address       String?  @db.Inet
   user_agent       String?
   created_at       DateTime @db.Timestamptz(6)

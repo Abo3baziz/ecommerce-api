@@ -1,3 +1,4 @@
+import { Prisma } from "../../../generated/prisma/client.js";
 import { PUBLIC_ID_PREFIXES } from "../../../shared/constants/index.js";
 import { logger } from "../../../shared/logger/index.js";
 import {
@@ -30,12 +31,43 @@ export async function recordAuditEvent(input: AuditRecordInput): Promise<void> {
       path: input.path ?? null,
       status_code: input.statusCode,
       request_body: input.requestBody,
+      previous_values: input.previousValues,
+      changes: input.changes,
       ip_address: input.ipAddress ?? null,
       user_agent: input.userAgent ?? null,
     });
   } catch (error) {
     logger.error({ err: error, action: input.action }, "Failed to write audit log");
   }
+}
+
+/**
+ * Transactional variant: writes the audit row through the caller's
+ * transaction client and THROWS on failure, so a business action that must
+ * not happen without an audit record rolls back together with it.
+ */
+export async function recordAuditEventInTx(
+  tx: Prisma.TransactionClient,
+  input: AuditRecordInput & { previousValues?: unknown; changes?: unknown },
+): Promise<void> {
+  await auditRepository.createAuditLog(
+    {
+      public_id: generatePublicId(PUBLIC_ID_PREFIXES.AUDIT),
+      actor_users_id: input.actorUsersId ?? null,
+      action: input.action,
+      entity_type: input.entityType ?? null,
+      entity_public_id: input.entityPublicId ?? null,
+      method: input.method ?? null,
+      path: input.path ?? null,
+      status_code: input.statusCode,
+      request_body: input.requestBody,
+      previous_values: input.previousValues,
+      changes: input.changes,
+      ip_address: input.ipAddress ?? null,
+      user_agent: input.userAgent ?? null,
+    },
+    tx,
+  );
 }
 
 export function toAuditEntryResult(row: Awaited<ReturnType<typeof auditRepository.listAuditLogs>>[number]): AuditEntryResult {

@@ -14,6 +14,7 @@ import {
   type OrderListFilters,
 } from "../repository/orders.repository.js";
 import { parseSort } from "../utils/sort.js";
+import { recordAuditEventInTx } from "../../audit/service/audit.service.js";
 import { toOrderResult, toOrderStatusEnum } from "./orders.service.js";
 import type {
   AdminOrderResult,
@@ -221,7 +222,25 @@ export async function updateOrderStatus(
           await assertAffected(refunded.count, "No payment to refund");
           await restockOrderLines(order, tx);
         }
-        await ordersRepository.restoreCouponUsage(order.id, tx);
+        await ordersRepository.restoreCouponUsage(order.id, tx).then((released) => {
+          if (released) {
+            return recordAuditEventInTx(tx, {
+              actorUsersId: actor.id,
+              action: "coupon.released",
+              entityType: "coupon",
+              entityPublicId: released.coupon_public_id,
+              statusCode: 200,
+              requestBody: {
+                code: released.code,
+                order_public_id: order.public_id,
+                discount_amount: new Prisma.Decimal(
+                  released.discount_amount,
+                ).toString(),
+              },
+            });
+          }
+          return undefined;
+        });
         break;
       }
       case order_status.SHIPPED: {

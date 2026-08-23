@@ -36,6 +36,8 @@ export interface AuditRecordInput {
   path?: string | null;
   statusCode: number;
   requestBody?: unknown;
+  previousValues?: unknown;
+  changes?: unknown;
   ipAddress?: string | null;
   userAgent?: string | null;
 }

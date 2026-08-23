@@ -347,11 +347,11 @@ export const ordersRepository = {
   async restoreCouponUsage(orders_id: number, client: DbClient = prisma) {
     const usage = await client.coupon_usages.findUnique({
       where: { orders_id },
-      select: { coupons_id: true },
+      select: { coupons_id: true, discount_amount: true },
     });
 
     if (!usage) {
-      return false;
+      return null;
     }
 
     await client.coupon_usages.delete({ where: { orders_id } });
@@ -363,7 +363,18 @@ export const ordersRepository = {
         AND usage_count > 0
     `;
 
-    return true;
+    const coupon = await client.coupons.findUnique({
+      where: { id: usage.coupons_id },
+      select: { public_id: true, code: true },
+    });
+
+    return coupon
+      ? {
+          coupon_public_id: coupon.public_id,
+          code: coupon.code,
+          discount_amount: usage.discount_amount,
+        }
+      : null;
   },
 
   createOrder(data: CreateOrderData, client: DbClient = prisma) {

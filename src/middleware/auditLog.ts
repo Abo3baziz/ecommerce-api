@@ -106,6 +106,11 @@ function redact(value: unknown, depth = 0): unknown {
   return value;
 }
 
+// Coupons emit their own richer transactional audit rows (per-field diffs,
+// previous values) inside the coupons module — the generic middleware must
+// skip them to avoid duplicate entries.
+const AUDIT_EXCLUDED_PREFIXES = ["/api/v1/admin/coupons"];
+
 /**
  * Records one audit row for every authenticated mutating request under
  * /admin/*. Mounted before the admin routers so the body snapshot is taken
@@ -119,6 +124,10 @@ export function auditAdminMutations(
   next: NextFunction,
 ): void {
   if (!MUTATION_METHODS.has(req.method)) {
+    next();
+    return;
+  }
+  if (AUDIT_EXCLUDED_PREFIXES.some((prefix) => req.originalUrl.startsWith(prefix))) {
     next();
     return;
   }

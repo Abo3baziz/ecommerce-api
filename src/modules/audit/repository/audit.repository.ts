@@ -15,6 +15,8 @@ export interface AuditLogCreateData {
   path?: string | null;
   status_code: number;
   request_body?: unknown;
+  previous_values?: unknown;
+  changes?: unknown;
   ip_address?: string | null;
   user_agent?: string | null;
 }
@@ -77,8 +79,11 @@ function buildListWhere(filters: AuditListFilters): Prisma.Sql {
 }
 
 export const auditRepository = {
-  createAuditLog(data: AuditLogCreateData): Promise<unknown> {
-    return prisma.audit_logs.create({
+  createAuditLog(
+    data: AuditLogCreateData,
+    client: Prisma.TransactionClient | typeof prisma = prisma,
+  ): Promise<unknown> {
+    return client.audit_logs.create({
       data: {
         public_id: data.public_id,
         actor_users_id: data.actor_users_id ?? null,
@@ -92,6 +97,14 @@ export const auditRepository = {
           data.request_body === undefined
             ? Prisma.JsonNull
             : (data.request_body as Prisma.InputJsonValue),
+        previous_values:
+          data.previous_values === undefined
+            ? Prisma.JsonNull
+            : (data.previous_values as Prisma.InputJsonValue),
+        changes:
+          data.changes === undefined
+            ? Prisma.JsonNull
+            : (data.changes as Prisma.InputJsonValue),
         ip_address: data.ip_address ?? null,
         user_agent: data.user_agent ?? null,
         created_at: new Date(),

@@ -18,6 +18,7 @@ export const PUBLIC_ID_PREFIXES = {
   SESSION: "ses",
   AUDIT: "aud",
   EXPENSE: "exp",
+  COUPON: "cpn",
 } as const;
 
 export const ROLES = {

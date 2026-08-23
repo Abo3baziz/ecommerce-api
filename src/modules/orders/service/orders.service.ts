@@ -19,6 +19,7 @@ import {
   decimalToFixed,
 } from "../../products/utils/format.js";
 import { getPaymentGateway } from "../payment/index.js";
+import { recordAuditEventInTx } from "../../audit/service/audit.service.js";
 import {
   ordersRepository,
   type CheckoutCartRow,
@@ -182,6 +183,7 @@ export async function placeOrder(
 
     let discountAmount = new Prisma.Decimal(0);
     let couponsId: number | null = null;
+    let redeemedCoupon: { public_id: string; code: string } | null = null;
 
     if (input.coupon_code) {
       const coupon = await ordersRepository.findCouponByCode(
@@ -235,6 +237,7 @@ export async function placeOrder(
       discountAmount = Prisma.Decimal.min(discountAmount, subtotal);
       discountAmount = discountAmount.toDecimalPlaces(2);
       couponsId = coupon.id;
+      redeemedCoupon = { public_id: coupon.public_id, code: coupon.code };
     }
 
     const shippingFee = subtotal.gte(
@@ -325,6 +328,18 @@ export async function placeOrder(
         },
         tx,
       );
+      await recordAuditEventInTx(tx, {
+        actorUsersId: userId,
+        action: "coupon.redeemed",
+        entityType: "coupon",
+        entityPublicId: redeemedCoupon!.public_id,
+        statusCode: 201,
+        requestBody: {
+          code: redeemedCoupon!.code,
+          order_public_id: order.public_id,
+          discount_amount: discountAmount.toString(),
+        },
+      });
     }
 
     const paymentGateway = getPaymentGateway(input.payment_method);

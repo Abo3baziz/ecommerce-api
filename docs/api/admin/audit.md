@@ -29,6 +29,13 @@ retention is forever.
 | `PUT/DELETE /admin/categories/{c}/products/{p}` | `admin.categories.assign_product` / `.remove_product` |
 | any other mutation | `admin.<segment>.<create\|update\|delete>` |
 
+**Exception — coupons:** `/api/v1/admin/coupons/*` mutations are excluded
+from the generic middleware and emit their own richer transactional rows
+(`admin.coupons.create`, `.update`, `.status_change`, `.delete`) carrying
+per-field diffs and the previous row image. Checkout redemptions and
+cancel/refund restorations additionally write customer-side
+`coupon.redeemed` / `coupon.released` events.
+
 Entity fields resolve from the deepest id-bearing segment
 (`product`, `category`, `inventory`, `order`, `review`, `customer`,
 `session`). Request bodies are deep-redacted: any key matching
