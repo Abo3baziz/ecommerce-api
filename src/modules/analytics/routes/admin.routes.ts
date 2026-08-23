@@ -5,6 +5,7 @@ import { authorization } from "../../../middleware/authorization.js";
 import { user_role } from "../../../generated/prisma/enums.js";
 import {
   analyticsExpenseParamsSchema,
+  couponAnalyticsQuerySchema,
   createAnalyticsExpenseSchema,
   listAnalyticsExpensesSchema,
   overviewQuerySchema,
@@ -14,6 +15,7 @@ import {
   createAnalyticsExpenseController,
   deleteAnalyticsExpenseController,
   getAnalyticsOverviewController,
+  getCouponAnalyticsController,
   listAnalyticsExpensesController,
   updateAnalyticsExpenseController,
 } from "../controller/admin.controller.js";
@@ -29,6 +31,11 @@ adminAnalyticsRouter.get(
   "/overview",
   validate(overviewQuerySchema),
   getAnalyticsOverviewController,
+);
+adminAnalyticsRouter.get(
+  "/coupons",
+  validate(couponAnalyticsQuerySchema),
+  getCouponAnalyticsController,
 );
 
 adminAnalyticsRouter.get(

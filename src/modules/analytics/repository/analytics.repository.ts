@@ -12,6 +12,7 @@ const productsTable = Prisma.raw(`"${dbSchema}"."products"`);
 const productCategoriesTable = Prisma.raw(`"${dbSchema}"."product_categories"`);
 const categoriesTable = Prisma.raw(`"${dbSchema}"."categories"`);
 const usersTable = Prisma.raw(`"${dbSchema}"."users"`);
+const couponsTable = Prisma.raw(`"${dbSchema}"."coupons"`);
 const couponUsagesTable = Prisma.raw(`"${dbSchema}"."coupon_usages"`);
 const operatingExpensesTable = Prisma.raw(
   `"${dbSchema}"."operating_expenses"`,
@@ -249,6 +250,172 @@ export const analyticsRepository = {
       WHERE ${rangeFilter(window)} AND ${qualifyingStatuses}
     `;
     return row.count;
+  },
+
+  async findQualifyingOrderCount(window: RangeWindow): Promise<number> {
+    const [row] = await prisma.$queryRaw<CountRow[]>`
+      SELECT COUNT(*)::int AS count
+      FROM ${ordersTable} o
+      WHERE ${rangeFilter(window)} AND ${qualifyingStatuses}
+    `;
+    return row.count;
+  },
+};
+
+export const couponAnalyticsRepository = {
+  async findStatusCounts(now: Date): Promise<{
+    total_coupons: number;
+    active_coupons: number;
+    inactive_coupons: number;
+    expired_coupons: number;
+    usage_limit_reached: number;
+    lifetime_redemptions: number;
+  }> {
+    const [row] = await prisma.$queryRaw<
+      {
+        total_coupons: number;
+        active_coupons: number;
+        inactive_coupons: number;
+        expired_coupons: number;
+        usage_limit_reached: number;
+        lifetime_redemptions: number;
+      }[]
+    >`
+      SELECT
+        COUNT(*)::int AS total_coupons,
+        COUNT(*) FILTER (
+          WHERE c.is_active
+            AND (c.starts_at IS NULL OR c.starts_at <= ${now})
+            AND (c.expires_at IS NULL OR c.expires_at > ${now})
+            AND c.usage_count < c.usage_limit
+        )::int AS active_coupons,
+        COUNT(*) FILTER (
+          WHERE (NOT c.is_active OR (c.starts_at IS NOT NULL AND c.starts_at > ${now}))
+            AND NOT (c.expires_at IS NOT NULL AND c.expires_at <= ${now})
+            AND NOT (c.usage_count >= c.usage_limit)
+        )::int AS inactive_coupons,
+        COUNT(*) FILTER (WHERE c.expires_at IS NOT NULL AND c.expires_at <= ${now})::int AS expired_coupons,
+        COUNT(*) FILTER (WHERE c.usage_count >= c.usage_limit)::int AS usage_limit_reached,
+        COALESCE(SUM(c.usage_count), 0)::int AS lifetime_redemptions
+      FROM ${couponsTable} c
+      WHERE c.deleted_at IS NULL
+    `;
+    return (
+      row ?? {
+        total_coupons: 0,
+        active_coupons: 0,
+        inactive_coupons: 0,
+        expired_coupons: 0,
+        usage_limit_reached: 0,
+        lifetime_redemptions: 0,
+      }
+    );
+  },
+
+  async findRangeUsage(window: { from: Date; to: Date }): Promise<{
+    range_redemptions: number;
+    discounts_given_in_range: Prisma.Decimal;
+    coupon_orders_count: number;
+  }> {
+    const [row] = await prisma.$queryRaw<
+      {
+        range_redemptions: number;
+        discounts_given_in_range: Prisma.Decimal;
+        coupon_orders_count: number;
+      }[]
+    >`
+      SELECT
+        COUNT(*)::int AS range_redemptions,
+        COALESCE(SUM(cu.discount_amount), 0) AS discounts_given_in_range,
+        COUNT(DISTINCT cu.orders_id)::int AS coupon_orders_count
+      FROM ${couponUsagesTable} cu
+      WHERE cu.redeemed_at >= ${window.from} AND cu.redeemed_at < ${window.to}
+    `;
+    return row;
+  },
+
+  async findCouponOrderRevenue(
+    window: RangeWindow,
+  ): Promise<{ revenue: Prisma.Decimal; orders: number }> {
+    const [row] = await prisma.$queryRaw<{ revenue: Prisma.Decimal; orders: number }[]>`
+      SELECT
+        COALESCE(SUM(o.total_amount), 0) AS revenue,
+        COUNT(DISTINCT o.id)::int AS orders
+      FROM ${ordersTable} o
+      JOIN ${couponUsagesTable} cu ON cu.orders_id = o.id
+      WHERE ${rangeFilter(window)} AND ${qualifyingStatuses}
+    `;
+    return { revenue: row?.revenue ?? new Prisma.Decimal(0), orders: row?.orders ?? 0 };
+  },
+
+  async findMostUsed(
+    window: RangeWindow,
+    limit: number,
+  ): Promise<
+    {
+      coupon_public_id: string;
+      code: string;
+      discount_type: string;
+      discount_value: Prisma.Decimal;
+      is_active: boolean;
+      lifetime_uses: number;
+      range_redemptions: number;
+      discounts_given_in_range: Prisma.Decimal;
+    }[]
+  > {
+    return prisma.$queryRaw<
+      {
+        coupon_public_id: string;
+        code: string;
+        discount_type: string;
+        discount_value: Prisma.Decimal;
+        is_active: boolean;
+        lifetime_uses: number;
+        range_redemptions: number;
+        discounts_given_in_range: Prisma.Decimal;
+      }[]
+    >`
+      SELECT
+        c.public_id AS coupon_public_id,
+        c.code,
+        c.discount_type::text AS discount_type,
+        c.discount_value,
+        c.is_active,
+        c.usage_count::int AS lifetime_uses,
+        COUNT(cu.id) FILTER (
+          WHERE cu.redeemed_at >= ${window.from} AND cu.redeemed_at < ${window.to}
+        )::int AS range_redemptions,
+        COALESCE(SUM(cu.discount_amount) FILTER (
+          WHERE cu.redeemed_at >= ${window.from} AND cu.redeemed_at < ${window.to}
+        ), 0) AS discounts_given_in_range
+      FROM ${couponsTable} c
+      LEFT JOIN ${couponUsagesTable} cu ON cu.coupons_id = c.id
+      WHERE c.deleted_at IS NULL
+      GROUP BY c.id, c.public_id, c.code, c.discount_type, c.discount_value, c.is_active, c.usage_count
+      HAVING COUNT(cu.id) FILTER (
+        WHERE cu.redeemed_at >= ${window.from} AND cu.redeemed_at < ${window.to}
+      ) > 0
+         OR c.usage_count > 0
+      ORDER BY lifetime_uses DESC, range_redemptions DESC
+      LIMIT ${limit}
+    `;
+  },
+
+  async findUsageTrend(window: RangeWindow): Promise<
+    { date: Date; redemptions: number; discount_amount: Prisma.Decimal }[]
+  > {
+    return prisma.$queryRaw<
+      { date: Date; redemptions: number; discount_amount: Prisma.Decimal }[]
+    >`
+      SELECT
+        cu.redeemed_at::date AS date,
+        COUNT(*)::int AS redemptions,
+        COALESCE(SUM(cu.discount_amount), 0) AS discount_amount
+      FROM ${couponUsagesTable} cu
+      WHERE cu.redeemed_at >= ${window.from} AND cu.redeemed_at < ${window.to}
+      GROUP BY 1
+      ORDER BY 1
+    `;
   },
 };
 

@@ -25,6 +25,17 @@ export const overviewQuerySchema = z.object({
 
 export type OverviewQuery = z.infer<typeof overviewQuerySchema.shape.query>;
 
+export const couponAnalyticsQuerySchema = z.object({
+  query: z.object({
+    date_from: z.coerce.date().optional(),
+    date_to: z.coerce.date().optional(),
+  }),
+});
+
+export type CouponAnalyticsQuery = z.infer<
+  typeof couponAnalyticsQuerySchema.shape.query
+>;
+
 export const listAnalyticsExpensesSchema = z.object({
   query: z.object({
     page: z.coerce.number().int().min(1).default(1),

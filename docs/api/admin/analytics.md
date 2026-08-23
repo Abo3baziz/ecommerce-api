@@ -12,6 +12,29 @@ All endpoints require a `SUPER_ADMIN` session; regular admins receive `403`.
 
 ---
 
+# Coupon Analytics
+
+```
+GET /api/v1/admin/analytics/coupons?date_from=&date_to=
+```
+
+Same window semantics as Overview (defaults to last 30 days UTC). Redemptions
+are counted from `coupon_usages.redeemed_at`; revenue attribution excludes
+CANCELLED/REFUNDED orders.
+
+Response `data`:
+
+- `range { from, to }`
+- `totals`: total/active/inactive/expired/usage_limit_reached coupon counts
+  (derived status at "now", non-deleted), lifetime_redemptions,
+  range_redemptions, discounts_given_in_range, coupon_orders_count,
+  coupon_orders_revenue, coupon_orders_share_pct
+- `most_used` (max 8, lifetime ranking): code, discount_type/value, is_active,
+  lifetime_uses, range_redemptions, discounts_given_in_range
+- `trend`: zero-filled daily `{ date, redemptions, discount_amount }`
+
+---
+
 # Get Analytics Overview
 
 ```
