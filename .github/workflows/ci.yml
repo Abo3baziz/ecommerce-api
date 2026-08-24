@@ -75,24 +75,33 @@ jobs:
           SESSION_SECRET=$SESSION_SECRET
           CORS_ORIGIN=http://localhost:3000
           RESEND_API_KEY=$RESEND_API_KEY
-          RESEND_FROM_EMAIL=$RESEND_FROM_EMAIL
+          RESEND_FROM_EMAIL="$RESEND_FROM_EMAIL"
           IMAGEKIT_PUBLIC_KEY=$IMAGEKIT_PUBLIC_KEY
           IMAGEKIT_PRIVATE_KEY=$IMAGEKIT_PRIVATE_KEY
           IMAGEKIT_URL_ENDPOINT=$IMAGEKIT_URL_ENDPOINT
+          ENABLE_CSRF=true
           LOGIN_RATE_LIMIT_MAX=100000
           REGISTER_RATE_LIMIT_MAX=100000
           EOF
 
       - name: Smoke boot compiled artifact
+        env:
+          NODE_ENV: production
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          CORS_ORIGIN: http://localhost:3000
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          IMAGEKIT_PUBLIC_KEY: ${{ secrets.IMAGEKIT_PUBLIC_KEY }}
+          IMAGEKIT_PRIVATE_KEY: ${{ secrets.IMAGEKIT_PRIVATE_KEY }}
+          IMAGEKIT_URL_ENDPOINT: ${{ secrets.IMAGEKIT_URL_ENDPOINT }}
+          ENABLE_CSRF: "true"
+          LOGIN_RATE_LIMIT_MAX: 100000
+          REGISTER_RATE_LIMIT_MAX: 100000
         run: |
-          set -a
-          source .env.test
-          set +a
-          export DATABASE_URL
           node dist/index.js &
           APP_PID=$!
           ok=0
-          for i in $(seq 1 20); do
+          for i in $(seq 1 40); do
             if curl -fsS http://localhost:3000/health >/dev/null 2>&1; then
               ok=1
               break
