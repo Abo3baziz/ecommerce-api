@@ -53,12 +53,16 @@ export function validateUploadedImageUrl(
   }
 
   const base = new URL(urlEndpoint);
-  if (parsed.host !== base.host || !parsed.pathname.startsWith(base.pathname)) {
+  const basePathname = base.pathname.replace(/\/+$/, "");
+  if (
+    parsed.host !== base.host ||
+    !parsed.pathname.startsWith(`${basePathname}/`)
+  ) {
     throw new BadRequestError("Upload URL must point to the configured ImageKit endpoint");
   }
 
   const expectedFolder = IMAGEKIT_UPLOAD_FOLDERS[context];
-  if (!parsed.pathname.startsWith(`${base.pathname}${expectedFolder}/`)) {
+  if (!parsed.pathname.startsWith(`${basePathname}/${expectedFolder}/`)) {
     throw new BadRequestError(
       `Upload URL must live inside the ${expectedFolder} folder`,
     );
