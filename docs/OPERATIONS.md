@@ -4,6 +4,32 @@
 
 ---
 
+# SUPER_ADMIN Transfer CLI
+
+## Purpose
+
+The system keeps exactly one `SUPER_ADMIN`. If that account is lost or compromised, recovery previously required manual SQL. This CLI moves the role atomically: the successor becomes `SUPER_ADMIN` and the previous holder is demoted to `ADMIN` in a single transaction with an audit record.
+
+## How to Run
+
+```bash
+npm run superadmin:transfer
+```
+
+Prompts:
+
+1. Current SUPER_ADMIN email
+2. New SUPER_ADMIN email (must be an existing user)
+3. Confirmation word (`TRANSFER`) — aborts otherwise
+
+## Guarantees
+
+- **No lockout:** both updates commit together, so the count of super admins never drops to zero.
+- **Audited:** writes `auth.super_admin.transferred` inside the same transaction; a failed audit write rolls the transfer back.
+- **No secrets printed** — output contains emails and roles only.
+- Refuses: unknown successor, successor already SUPER_ADMIN, current holder not actually a SUPER_ADMIN, same-email transfer.
+
+---
 # Reverse Proxy / Trust Proxy
 
 ## Purpose

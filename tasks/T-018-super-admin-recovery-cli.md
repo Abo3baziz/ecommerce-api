@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-018 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `feature` / ops |
 | **Branch** | `feature/super-admin-recovery-cli` |
 | **Depends on** | — |
@@ -28,14 +28,14 @@ Operator CLI to safely transfer or recover super-admin privilege with guardrails
 
 ## Decisions needed
 
-- [ ] Allow at most one SUPER_ADMIN always?
-- [ ] Can SUPER_ADMIN be demoted only when another exists?
+- [x] Decision: at most one SUPER_ADMIN at all times (matches API docs).
+- [x] Decision: demotion happens only as an atomic transfer to a confirmed successor.
 
 ## Acceptance criteria
 
-- [ ] Documented recovery path without raw SQL.
-- [ ] Guards prevent lockout (zero super admins).
-- [ ] Tests + ops docs.
+- [x] Documented recovery path without raw SQL.
+- [x] Guards prevent lockout (zero super admins).
+- [x] Tests + ops docs.
 
 ## References
 

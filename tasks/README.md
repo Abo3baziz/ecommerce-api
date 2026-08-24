@@ -71,7 +71,7 @@ Task backlog derived from two audits:
 | T-015 | [T-015-admin-audit-table.md](./T-015-admin-audit-table.md) | Dedicated admin audit-log table | todo |
 | T-016 | [T-016-typecheck-tests.md](./T-016-typecheck-tests.md) | Typecheck `tests/` in CI | todo |
 | T-017 | [T-017-repository-unit-tests.md](./T-017-repository-unit-tests.md) | Repository-layer unit tests | todo |
-| T-018 | [T-018-super-admin-recovery-cli.md](./T-018-super-admin-recovery-cli.md) | SUPER_ADMIN recovery / demotion CLI | todo |
+| T-018 | [T-018-super-admin-recovery-cli.md](./T-018-super-admin-recovery-cli.md) | SUPER_ADMIN recovery / demotion CLI | done |
 | T-019 | [T-019-payment-refund-status-guard.md](./T-019-payment-refund-status-guard.md) | Scope `markPaymentRefunded` to `PAID` only | todo |
 | T-020 | [T-020-shipment-null-guards.md](./T-020-shipment-null-guards.md) | Defensive shipment null guards | todo |
 | T-021 | [T-021-orders-composite-index.md](./T-021-orders-composite-index.md) | Composite index `(users_id, placed_at)` on orders | done |

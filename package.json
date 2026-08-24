@@ -16,6 +16,7 @@
     "db:studio": "prisma studio",
     "db:pull": "prisma db pull",
     "admin:create": "tsx scripts/create-admin.ts",
+    "superadmin:transfer": "tsx scripts/transfer-super-admin.ts",
     "sessions:cleanup": "tsx scripts/cleanup-sessions.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
