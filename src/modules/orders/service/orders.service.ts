@@ -13,6 +13,7 @@ import {
 import { BadRequestError } from "../../../shared/errors/BadRequestError.js";
 import { ConflictError } from "../../../shared/errors/ConflictError.js";
 import { NotFoundError } from "../../../shared/errors/NotFoundError.js";
+import { logger } from "../../../shared/logger/index.js";
 import { formatPaginationMeta } from "../../../shared/utils/index.js";
 import {
   computeFinalPrice,
@@ -350,7 +351,7 @@ export async function placeOrder(
     const paymentGateway = getPaymentGateway(input.payment_method);
     const payment = paymentGateway.process(totalAmount, input.payment_method);
 
-    await ordersRepository.createPayment(
+    const createdPayment = await ordersRepository.createPayment(
       {
         orders_id: order.id,
         users_id: userId,
@@ -361,6 +362,19 @@ export async function placeOrder(
       },
       tx,
     );
+
+    // The most important commercial event gets its own audit record (T-014).
+    await recordAuditEventInTx(tx, {
+      actorUsersId: userId,
+      action: "order.placed",
+      entityType: "order",
+      entityPublicId: order.public_id,
+      statusCode: 201,
+      requestBody: {
+        total_amount: totalAmount.toString(),
+        payment_method: input.payment_method,
+      },
+    });
 
     for (const line of lines) {
       await ordersRepository.commitStock(line.variantId, line.quantity, tx);
@@ -377,8 +391,20 @@ export async function placeOrder(
     await ordersRepository.deleteCart(cart.id, tx);
 
     const created = await ordersRepository.findOrderById(order.id, tx);
+
     return created!;
   });
+
+  // Structured audit line on the success path (T-014).
+  logger.info(
+    {
+      actorId: userId,
+      orderPublicId: row.public_id,
+      orderNumber: row.order_number,
+      totalAmount: row.total_amount.toString(),
+    },
+    "Order placed",
+  );
 
   return toOrderResult(row);
 }

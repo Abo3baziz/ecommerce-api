@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-014 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `chore` |
 | **Branch** | `chore/checkout-audit-log` |
 | **Depends on** | — |
@@ -27,8 +27,8 @@ Emit a structured `logger.info` on successful checkout with actor, order public 
 
 ## Acceptance criteria
 
-- [ ] Successful checkout produces a structured audit log line.
-- [ ] No password/token leakage.
+- [x] Successful checkout produces a structured audit log line.
+- [x] No password/token leakage.
 
 ## References
 
