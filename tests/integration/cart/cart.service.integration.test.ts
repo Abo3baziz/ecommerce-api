@@ -205,7 +205,7 @@ describe("cart.service", () => {
       const user = await createUser();
 
       await expect(
-        addCartItem(user.id, { variant_public_id: "var_unknown" }),
+        addCartItem(user.id, { variant_public_id: "var_unknown", quantity: 1 }),
       ).rejects.toThrow(NotFoundError);
     });
 
@@ -215,7 +215,7 @@ describe("cart.service", () => {
       const variant = await createVariant(product.id, { deleted_at: new Date() });
 
       await expect(
-        addCartItem(user.id, { variant_public_id: variant.public_id }),
+        addCartItem(user.id, { variant_public_id: variant.public_id, quantity: 1 }),
       ).rejects.toThrow(NotFoundError);
     });
 
@@ -225,7 +225,7 @@ describe("cart.service", () => {
       const variant = await createVariant(product.id, { status: product_status.DRAFT });
 
       await expect(
-        addCartItem(user.id, { variant_public_id: variant.public_id }),
+        addCartItem(user.id, { variant_public_id: variant.public_id, quantity: 1 }),
       ).rejects.toThrow(NotFoundError);
     });
   });

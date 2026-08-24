@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-016 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `chore` |
 | **Branch** | `chore/typecheck-tests` |
 | **Depends on** | — |
@@ -27,9 +27,9 @@ Typecheck tests in CI (separate project reference or expanded include).
 
 ## Acceptance criteria
 
-- [ ] CI fails on test type errors.
-- [ ] Documented in TESTING.md if needed.
-- [ ] Suite still green.
+- [x] CI fails on test type errors.
+- [x] Documented in TESTING.md if needed.
+- [x] Suite still green.
 
 ## References
 

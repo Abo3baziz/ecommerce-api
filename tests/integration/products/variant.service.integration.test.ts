@@ -28,7 +28,7 @@ function variantPayload(overrides: Record<string, unknown> = {}) {
     length: "18.00",
     width: "16.00",
     height: "8.00",
-    status: "ACTIVE",
+    status: "ACTIVE" as const,
     ...overrides,
   };
 }

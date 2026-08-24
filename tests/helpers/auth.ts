@@ -25,14 +25,11 @@ export function validRegisterPayload(overrides: Record<string, unknown> = {}) {
 }
 
 export function extractCookieFromSetCookie(
-  setCookie: string[] | undefined,
+  setCookie: string | string[] | undefined,
   name: string,
 ): string | null {
-  if (!setCookie) {
-    return null;
-  }
-
-  const cookie = setCookie.find((cookie) => cookie.startsWith(`${name}=`));
+  const cookies = setCookie === undefined ? [] : Array.isArray(setCookie) ? setCookie : [setCookie];
+  const cookie = cookies.find((cookie) => cookie.startsWith(`${name}=`));
   if (!cookie) {
     return null;
   }
@@ -40,7 +37,9 @@ export function extractCookieFromSetCookie(
   return cookie.split(";")[0];
 }
 
-export function extractSessionCookie(setCookie: string[] | undefined): string | null {
+export function extractSessionCookie(
+  setCookie: string | string[] | undefined,
+): string | null {
   return extractCookieFromSetCookie(setCookie, "session");
 }
 

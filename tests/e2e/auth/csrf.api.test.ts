@@ -44,9 +44,9 @@ describe("CSRF protection", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.csrf_token).toMatch(/^[0-9a-f]+\.\w+$/);
 
-      const setCookie = response.headers["set-cookie"];
-      const csrfCookie = setCookie.find((c: string) =>
-        c.startsWith(`${CSRF_COOKIE_NAME}=`),
+      const setCookie: unknown = response.headers["set-cookie"];
+      const csrfCookie = (Array.isArray(setCookie) ? setCookie : [setCookie]).find(
+        (c: string) => c.startsWith(`${CSRF_COOKIE_NAME}=`),
       );
       expect(csrfCookie).toBeDefined();
       expect(csrfCookie).toContain("HttpOnly");

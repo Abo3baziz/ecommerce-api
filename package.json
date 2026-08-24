@@ -18,6 +18,7 @@
     "admin:create": "tsx scripts/create-admin.ts",
     "sessions:cleanup": "tsx scripts/cleanup-sessions.ts",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run tests/integration",

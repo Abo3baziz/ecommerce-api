@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-050 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `chore` |
 | **Branch** | `chore/ci-push-trigger` |
 | **Depends on** | — |
@@ -25,8 +25,8 @@ Every commit on `main` has passed typecheck + build + tests.
 
 ## Acceptance criteria
 
-- [ ] A push to main runs the full pipeline.
-- [ ] Chosen policy documented in AGENTS.md workflow section if it changes rules.
+- [x] A push to main runs the full pipeline.
+- [x] Chosen policy documented in AGENTS.md workflow section if it changes rules.
 
 ## References
 
