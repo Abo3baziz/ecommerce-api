@@ -95,7 +95,11 @@ Take a fresh backup immediately before running migrations. `migrate dev` is a de
 
 ## Liveness
 
-`GET /health` → `{"status":"ok"}` (no DB probe yet — T-052 tracks adding readiness).
+
+Two probes, both outside the rate limiter:
+
+- `GET /health` — liveness: static `{ "status": "ok" }`; process is up.
+- `GET /health/ready` — readiness: runs a 2s-timeout `SELECT 1`; returns 200 when the DB answers and **503** `{ "status": "degraded", "db": "down" }` on outage. Point load-balancer removal and alerts at this one.
 
 Configure:
 
