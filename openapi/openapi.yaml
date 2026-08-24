@@ -26,6 +26,10 @@ tags:
     description: Customer address book with per-type default flags.
   - name: Catalog
     description: Public product and category browsing.
+  - name: Cart
+    description: The customer's single, lazily created cart.
+  - name: Orders
+    description: Checkout and customer order history.
 security:
   - sessionCookie: []
 
@@ -568,6 +572,152 @@ paths:
           schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
       responses:
         "200": { description: Paginated products in the category. }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /cart:
+    get:
+      tags: [Cart]
+      summary: Get the current cart (created lazily on first add).
+      operationId: getCart
+      responses:
+        "200": { description: The cart with line items and totals. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Cart not found for this user (no cart created yet).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    delete:
+      tags: [Cart]
+      summary: Clear all cart lines.
+      operationId: clearCart
+      responses:
+        "200": { description: Emptied cart. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /cart/items:
+    post:
+      tags: [Cart]
+      summary: Add a variant to the cart (merge-on-add per variant).
+      operationId: addCartItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variant_public_id, quantity]
+              properties:
+                variant_public_id: { type: string, pattern: "^var_" }
+                quantity: { type: integer, minimum: 1 }
+      responses:
+        "201": { description: Line added or quantity merged. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Insufficient stock. content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+  /cart/items/{variant_public_id}:
+    patch:
+      tags: [Cart]
+      summary: Set the quantity of one cart line.
+      operationId: updateCartItemQuantity
+      parameters:
+        - name: variant_public_id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^var_" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity: { type: integer, minimum: 1 }
+      responses:
+        "200": { description: Updated line. }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Insufficient stock. content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    delete:
+      tags: [Cart]
+      summary: Remove one cart line.
+      operationId: removeCartItem
+      parameters:
+        - name: variant_public_id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^var_" }
+      responses:
+        "204": { description: Line removed. }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Place an order from the current cart.
+      operationId: placeOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address_public_id, payment_method]
+              properties:
+                address_public_id: { type: string, pattern: "^adr_" }
+                payment_method:
+                  type: string
+                  enum: [mock]
+                  description: Only the mock gateway in v1.
+                coupon_code: { type: string, maxLength: 50 }
+                notes: { type: string, maxLength: 1000 }
+      responses:
+        "201":
+          description: Order placed and confirmed; cart cleared.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Empty cart, inactive items, insufficient stock or invalid coupon.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    get:
+      tags: [Orders]
+      summary: List the customer's orders (paginated).
+      operationId: listMyOrders
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, processing, shipped, delivered, cancelled, returned, refunded]
+        - name: sort
+          in: query
+          schema: { type: string, enum: [placed_at, "-placed_at", total_amount, "-total_amount"] }
+      responses:
+        "200": { description: Paginated order summaries. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /orders/{order_public_id}:
+    get:
+      tags: [Orders]
+      summary: Get one owned order with items, shipment snapshot and payment.
+      operationId: getOrder
+      parameters:
+        - name: order_public_id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^ord_" }
+      responses:
+        "200": { description: Full order detail. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
 components:
