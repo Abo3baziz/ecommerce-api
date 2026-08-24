@@ -66,7 +66,7 @@ Task backlog derived from two audits:
 |----|------|-------|--------|
 | T-011 | [T-011-openapi-spec.md](./T-011-openapi-spec.md) | Generate OpenAPI 3.1 from `docs/api/**` | todo |
 | T-012 | [T-012-coupon-code-case.md](./T-012-coupon-code-case.md) | Orders §2.6 — coupon code case-insensitivity | done |
-| T-013 | [T-013-orders-search-like-escape.md](./T-013-orders-search-like-escape.md) | Orders §2.7 — escape LIKE wildcards in search | todo |
+| T-013 | [T-013-orders-search-like-escape.md](./T-013-orders-search-like-escape.md) | Orders §2.7 — escape LIKE wildcards in search | done |
 | T-014 | [T-014-checkout-audit-log.md](./T-014-checkout-audit-log.md) | Audit-log order placement | todo |
 | T-015 | [T-015-admin-audit-table.md](./T-015-admin-audit-table.md) | Dedicated admin audit-log table | todo |
 | T-016 | [T-016-typecheck-tests.md](./T-016-typecheck-tests.md) | Typecheck `tests/` in CI | todo |
@@ -86,15 +86,15 @@ Task backlog derived from two audits:
 | T-041 | [T-041-primary-image-invariant.md](./T-041-primary-image-invariant.md) | Primary-image invariant via partial unique index | todo |
 | T-042 | [T-042-address-default-invariant.md](./T-042-address-default-invariant.md) | Fix address default-flag invariant (zero/multi defaults) | todo |
 | T-043 | [T-043-duplicate-review-backstop.md](./T-043-duplicate-review-backstop.md) | Duplicate-review DB backstop (partial unique index) | todo |
-| T-044 | [T-044-like-escape-other-modules.md](./T-044-like-escape-other-modules.md) | Escape LIKE wildcards in remaining search endpoints | todo |
+| T-044 | [T-044-like-escape-other-modules.md](./T-044-like-escape-other-modules.md) | Escape LIKE wildcards in remaining search endpoints | done |
 | T-045 | [T-045-rating-summary-filter-bug.md](./T-045-rating-summary-filter-bug.md) | Review summary must ignore the rating filter | todo |
 | T-046 | [T-046-idle-timeout-effective.md](./T-046-idle-timeout-effective.md) | Make session idle timeout effective (constant == TTL) | done |
-| T-047 | [T-047-migrations-baseline.md](./T-047-migrations-baseline.md) | Baseline Prisma migrations + migrate deploy | todo |
+| T-047 | [T-047-migrations-baseline.md](./T-047-migrations-baseline.md) | Baseline Prisma migrations + migrate deploy | done |
 | T-048 | [T-048-dependency-audit-vulns.md](./T-048-dependency-audit-vulns.md) | Resolve high-severity npm audit findings | todo |
 | T-049 | [T-049-payments-users-index.md](./T-049-payments-users-index.md) | Add missing index on payments.users_id | todo |
 | T-050 | [T-050-ci-push-trigger.md](./T-050-ci-push-trigger.md) | Run CI on pushes to main (close direct-push bypass) | todo |
-| T-051 | [T-051-api-404-envelope.md](./T-051-api-404-envelope.md) | JSON 404 envelope for unknown /api routes | todo |
-| T-052 | [T-052-health-readiness.md](./T-052-health-readiness.md) | Health/readiness endpoint with DB probe, above limiter | todo |
+| T-051 | [T-051-api-404-envelope.md](./T-051-api-404-envelope.md) | JSON 404 envelope for unknown /api routes | done |
+| T-052 | [T-052-health-readiness.md](./T-052-health-readiness.md) | Health/readiness endpoint with DB probe, above limiter | done |
 | T-053 | [T-053-graceful-shutdown.md](./T-053-graceful-shutdown.md) | Complete graceful shutdown (sockets, Prisma, log flush) | todo |
 | T-054 | [T-054-docs-contract-drift.md](./T-054-docs-contract-drift.md) | Fix documented-vs-implemented contract drift (API_ENDPOINTS.md) | todo |
 
