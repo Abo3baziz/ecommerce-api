@@ -1,0 +1,334 @@
+openapi: 3.1.0
+info:
+  title: Ecommerce Backend API
+  summary: Production-level e-commerce API (storefront + admin console).
+  description: |
+    Session-cookie authenticated API. Money values are decimal strings with two
+    decimal places; timestamps are ISO 8601 UTC; only public IDs (`usr_`, `prd_`,
+    …) are exposed.
+
+    **Source of truth:** the hand-maintained contracts in `docs/api/**` remain
+    authoritative for semantics; this file is a machine-importable projection of
+    them (kept in sync manually — see openapi/README.md). Markdown wins on any
+    conflict until this note is reversed.
+  version: 1.0.0
+  license:
+    name: UNLICENSED
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development
+tags:
+  - name: Auth
+    description: Registration, login, sessions, email verification, password reset.
+security:
+  - sessionCookie: []
+
+paths:
+  /auth/csrf-token:
+    get:
+      tags: [Auth]
+      summary: Issue a CSRF token bound to the current session.
+      description: |
+        Required before any cookie-authenticated write when CSRF is enabled.
+        Returns the token in the body and sets it in an HttpOnly cookie.
+      operationId: getCsrfToken
+      responses:
+        "200":
+          description: Token issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, const: true }
+                  data:
+                    type: object
+                    required: [csrf_token]
+                    properties:
+                      csrf_token: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a customer account.
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, last_name, phone_number, email, password]
+              properties:
+                first_name: { type: string, maxLength: 100 }
+                last_name: { type: string, maxLength: 100 }
+                phone_number:
+                  type: string
+                  description: E.164 format.
+                  pattern: '^\+[1-9]\d{1,14}$'
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201":
+          description: Account created; session cookie set; verification email queued.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [public_id, email_verified]
+                        properties:
+                          public_id: { $ref: "#/components/schemas/UserPublicId" }
+                          email_verified: { type: boolean }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email and password.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Session cookie set.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [public_id, email_verified]
+                        properties:
+                          public_id: { $ref: "#/components/schemas/UserPublicId" }
+                          email_verified: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /auth/session:
+    get:
+      tags: [Auth]
+      summary: Get the current session and user summary.
+      operationId: getCurrentSession
+      responses:
+        "200":
+          description: Current session details.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [Auth]
+      summary: Revoke the current session (logout).
+      operationId: logout
+      responses:
+        "204": { description: Session revoked; cookie cleared. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/sessions:
+    get:
+      tags: [Auth]
+      summary: List active sessions for the current user.
+      operationId: listSessions
+      responses:
+        "200":
+          description: Active sessions, newest first.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [Auth]
+      summary: Revoke every other active session.
+      operationId: revokeAllOtherSessions
+      responses:
+        "200":
+          description: Remaining sessions revoked.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/sessions/{session_public_id}:
+    delete:
+      tags: [Auth]
+      summary: Revoke one specific session.
+      operationId: revokeSession
+      parameters:
+        - name: session_public_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Revoked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /auth/email-verification/verify:
+    post:
+      tags: [Auth]
+      summary: Verify a registration email token.
+      operationId: verifyEmail
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200": { description: Email verified. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/Gone" }
+  /auth/email-verification/resend:
+    post:
+      tags: [Auth]
+      summary: Resend the verification email.
+      operationId: resendVerificationEmail
+      responses:
+        "202": { description: Verification email queued. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /auth/password-reset:
+    post:
+      tags: [Auth]
+      summary: Request a password reset (always returns the same message).
+      operationId: requestPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "202":
+          description: Accepted. Identical for unknown emails (no enumeration).
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /auth/password-reset/otp/verify:
+    post:
+      tags: [Auth]
+      summary: Verify the emailed OTP and receive a reset token.
+      operationId: verifyPasswordResetOtp
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp]
+              properties:
+                email: { type: string, format: email }
+                otp: { type: string }
+      responses:
+        "200": { description: Reset token issued. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/Gone" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /auth/password-reset/verify:
+    post:
+      tags: [Auth]
+      summary: Complete the reset — set a new password (revokes all sessions).
+      operationId: verifyPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token: { type: string }
+                new_password: { type: string, minLength: 8 }
+      responses:
+        "204": { description: Password updated; all sessions revoked. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/Gone" }
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Opaque DB-backed session token (HttpOnly, SameSite=Lax).
+  schemas:
+    UserPublicId:
+      type: string
+      pattern: "^usr_"
+    SuccessEnvelope:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean, const: true }
+    ErrorEnvelope:
+      type: object
+      required: [success, message]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string }
+    PaginationMeta:
+      type: object
+      required: [page, limit, total]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+        hasNext: { type: boolean }
+        hasPrev: { type: boolean }
+  responses:
+    BadRequest:
+      description: Invalid body, query or path parameter.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Unauthorized:
+      description: Missing, invalid or expired session.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Forbidden:
+      description: Authenticated but insufficient role, or account suspended.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    NotFound:
+      description: Resource does not exist (or is deliberately hidden).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Conflict:
+      description: State conflict or unique-constraint violation.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Gone:
+      description: Token used or expired.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    TooManyRequests:
+      description: Rate limit exceeded.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }

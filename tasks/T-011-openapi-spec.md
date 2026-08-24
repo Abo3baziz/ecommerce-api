@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-011 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | in_progress |
 | **Type** | `docs` / `chore` |
 | **Branch** | `docs/openapi-spec` |
 | **Depends on** | — |
@@ -38,3 +38,8 @@ Produce and maintain an OpenAPI 3.1 specification covering implemented endpoints
 
 - `docs/APIDOG_TESTING.md` — OpenAPI follow-up
 - `docs/API_DESIGN.md`
+
+## Progress
+
+- **Phase 1 (2026-08-24):** `openapi/openapi.yaml` scaffold — valid OpenAPI 3.1 (redocly lint clean), complete Auth module (13 paths), shared envelope/pagination/error components, maintenance process documented in `openapi/README.md` (markdown contracts remain source of truth).
+- **Remaining:** users, addresses, catalog, cart, orders, reviews, admin modules; optional CI lint step; APIDOG import note.
