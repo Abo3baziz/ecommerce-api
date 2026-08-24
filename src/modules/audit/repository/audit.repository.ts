@@ -1,6 +1,7 @@
 import { prisma } from "../../../config/database.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import { dbSchema } from "../../../config/database.js";
+import { escapeLikePattern } from "../../../shared/utils/index.js";
 
 const auditTable = Prisma.raw(`"${dbSchema}"."audit_logs"`);
 const usersTable = Prisma.raw(`"${dbSchema}"."users"`);
@@ -55,7 +56,9 @@ function buildListWhere(filters: AuditListFilters): Prisma.Sql {
     conditions.push(Prisma.sql`u.public_id = ${filters.actorPublicId}`);
   }
   if (filters.actionPrefix) {
-    conditions.push(Prisma.sql`a.action ILIKE ${`${filters.actionPrefix}%`}`);
+    conditions.push(
+      Prisma.sql`a.action ILIKE ${`${escapeLikePattern(filters.actionPrefix)}%`} ESCAPE '\\'`,
+    );
   }
   if (filters.entityType) {
     conditions.push(Prisma.sql`a.entity_type = ${filters.entityType}`);

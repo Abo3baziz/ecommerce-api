@@ -1,6 +1,7 @@
 import { dbSchema, prisma } from "../../../config/database.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import type { CouponStatus } from "../validators/admin.js";
+import { escapeLikePattern } from "../../../shared/utils/index.js";
 
 // The list query derives status from time/usage comparisons that exceed
 // Prisma's typed where inputs, so raw SQL is used with schema-qualified
@@ -62,8 +63,8 @@ function buildListWhere(
   const conditions: Prisma.Sql[] = [];
 
   if (filters.search) {
-    const pattern = `${filters.search}%`;
-    conditions.push(Prisma.sql`c.code ILIKE ${pattern}`);
+    const pattern = `${escapeLikePattern(filters.search)}%`;
+    conditions.push(Prisma.sql`c.code ILIKE ${pattern} ESCAPE '\\'`);
   }
 
   if (filters.status) {

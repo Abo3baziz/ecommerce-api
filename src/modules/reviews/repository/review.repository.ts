@@ -2,7 +2,7 @@ import { dbSchema, prisma } from "../../../config/database.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import { order_status } from "../../../generated/prisma/enums.js";
 import { PUBLIC_ID_PREFIXES } from "../../../shared/constants/index.js";
-import { generatePublicId } from "../../../shared/utils/index.js";
+import { escapeLikePattern, generatePublicId } from "../../../shared/utils/index.js";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -122,10 +122,6 @@ const productsTable = Prisma.raw(`"${dbSchema}"."products"`);
 const orderItemsTable = Prisma.raw(`"${dbSchema}"."order_items"`);
 const variantsTable = Prisma.raw(`"${dbSchema}"."product_variants"`);
 const ordersTable = Prisma.raw(`"${dbSchema}"."orders"`);
-
-function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
 
 function buildCustomerWhere(filters: CustomerReviewFilters): Prisma.reviewsWhereInput {
   const where: Prisma.reviewsWhereInput = {

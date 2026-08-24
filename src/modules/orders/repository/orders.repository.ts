@@ -5,7 +5,7 @@ import {
   payment_status,
 } from "../../../generated/prisma/enums.js";
 import { PUBLIC_ID_PREFIXES } from "../../../shared/constants/index.js";
-import { generatePublicId } from "../../../shared/utils/index.js";
+import { escapeLikePattern, generatePublicId } from "../../../shared/utils/index.js";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -240,9 +240,9 @@ function buildAdminWhere(filters: OrderListFilters): Prisma.Sql {
   }
 
   if (filters.search) {
-    const pattern = `%${filters.search}%`;
+    const pattern = `%${escapeLikePattern(filters.search)}%`;
     conditions.push(
-      Prisma.sql`(o.order_number ILIKE ${pattern} OR (u.first_name || ' ' || u.last_name) ILIKE ${pattern} OR u.email ILIKE ${pattern})`,
+      Prisma.sql`(o.order_number ILIKE ${pattern} ESCAPE '\\' OR (u.first_name || ' ' || u.last_name) ILIKE ${pattern} ESCAPE '\\' OR u.email ILIKE ${pattern} ESCAPE '\\')`,
     );
   }
 

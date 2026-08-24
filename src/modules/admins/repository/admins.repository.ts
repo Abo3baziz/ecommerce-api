@@ -1,6 +1,7 @@
 import { prisma } from "../../../config/database.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import { dbSchema } from "../../../config/database.js";
+import { escapeLikePattern } from "../../../shared/utils/index.js";
 
 // Aggregates over sessions and audit_logs cannot be expressed with Prisma's
 // typed inputs, so raw SQL with schema-qualified identifiers is used.
@@ -72,9 +73,9 @@ function buildListWhere(
   const conditions: Prisma.Sql[] = [];
 
   if (filters.search) {
-    const pattern = `%${filters.search}%`;
+    const pattern = `%${escapeLikePattern(filters.search)}%`;
     conditions.push(
-      Prisma.sql`((t.first_name || ' ' || t.last_name) ILIKE ${pattern} OR t.email ILIKE ${pattern})`,
+      Prisma.sql`((t.first_name || ' ' || t.last_name) ILIKE ${pattern} ESCAPE '\\' OR t.email ILIKE ${pattern} ESCAPE '\\')`,
     );
   }
   if (filters.status) {

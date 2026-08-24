@@ -1666,6 +1666,37 @@ describe("orders.service", () => {
       expect(result.orders[0].customer_name).toBe("Ahmed Aziz");
     });
 
+    it("treats % and _ in search as literal characters, not wildcards", async () => {
+      const literal = await createCheckoutContext();
+      await prisma.users.update({
+        where: { id: literal.user.id },
+        data: { first_name: "O%dd", last_name: "Na_me" },
+      });
+      await placeOrder(literal.user.id, {
+        address_public_id: literal.address.public_id,
+        payment_method: "mock",
+      });
+      const wildcardVictim = await createCheckoutContext();
+      await prisma.users.update({
+        where: { id: wildcardVictim.user.id },
+        data: { first_name: "OXdd", last_name: "NaXme" },
+      });
+      await placeOrder(wildcardVictim.user.id, {
+        address_public_id: wildcardVictim.address.public_id,
+        payment_method: "mock",
+      });
+
+      const result = await listAdminOrders({
+        page: 1,
+        limit: 20,
+        sort: "-placed_at",
+        search: "%dd",
+      });
+
+      expect(result.orders).toHaveLength(1);
+      expect(result.orders[0].customer_name).toBe("O%dd Na_me");
+    });
+
     it("filters by status", async () => {
       const { user, address } = await createCheckoutContext();
       await placeOrder(user.id, {

@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-013 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/orders-search-like-escape` |
 | **Depends on** | — |
@@ -27,8 +27,8 @@ Escape `%` and `_` (and `\` if needed) before building ILIKE patterns in orders 
 
 ## Acceptance criteria
 
-- [ ] Literal `%`/`_` match as characters, not wildcards.
-- [ ] Tests green; §2.7 resolved.
+- [x] Literal `%`/`_` match as characters, not wildcards.
+- [x] Tests green; §2.7 resolved.
 
 ## References
 

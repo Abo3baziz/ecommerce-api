@@ -1,6 +1,7 @@
 import { dbSchema, prisma } from "../../../config/database.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import type { StockStatus } from "../utils/stock.js";
+import { escapeLikePattern } from "../../../shared/utils/index.js";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -114,9 +115,9 @@ function buildListWhere(filters: InventoryListFilters): Prisma.Sql {
   }
 
   if (filters.search) {
-    const pattern = `%${filters.search}%`;
+    const pattern = `%${escapeLikePattern(filters.search)}%`;
     conditions.push(
-      Prisma.sql`(v.sku ILIKE ${pattern} OR v.barcode ILIKE ${pattern} OR p.name ILIKE ${pattern})`,
+      Prisma.sql`(v.sku ILIKE ${pattern} ESCAPE '\\' OR v.barcode ILIKE ${pattern} ESCAPE '\\' OR p.name ILIKE ${pattern} ESCAPE '\\')`,
     );
   }
 

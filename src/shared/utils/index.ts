@@ -17,3 +17,11 @@ export function formatPaginationMeta(page: number, limit: number, total: number)
     hasPrev: page > 1,
   };
 }
+
+/**
+ * Escapes LIKE/ILIKE wildcards (`\`, `%`, `_`) in user input. Use with
+ * `ESCAPE '\'` in the SQL clause so `%` and `_` match literally.
+ */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
+}

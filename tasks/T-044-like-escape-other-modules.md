@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-044 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/search-like-escape-all-modules` |
 | **Depends on** | — |
@@ -33,8 +33,8 @@ Literal `%`, `_`, `\` behave as characters in every search endpoint.
 
 ## Acceptance criteria
 
-- [ ] Literal metacharacters match as characters everywhere; no full-scan pattern abuse.
-- [ ] Shared helper used; no duplicated escape logic.
+- [x] Literal metacharacters match as characters everywhere; no full-scan pattern abuse.
+- [x] Shared helper used; no duplicated escape logic.
 
 ## References
 
