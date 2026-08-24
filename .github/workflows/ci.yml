@@ -54,7 +54,7 @@ jobs:
         run: npm run build
 
       - name: Prepare test database
-        run: npx prisma db push --url "$DATABASE_URL" --accept-data-loss
+        run: npx prisma migrate deploy
 
       - name: Create test environment file
         env:

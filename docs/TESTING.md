@@ -144,9 +144,9 @@ Current scripts (from `package.json`):
 - **Never run integration tests against the production/dev database.** Locally, tests target the dedicated `Ecommerce_test` schema of the `Ecommerce_DB` database (created once via `npx prisma db push --url "postgresql://…/Ecommerce_DB?schema=Ecommerce_test"`); CI uses a dedicated Postgres database (`ecommerce_test`).
 - **Fail-fast guard:** `tests/setup/env.setup.ts` aborts the suite unless the configured database name or schema name contains "test". `cleanupTestData()` re-checks the same rule before its destructive wipe, so catalog data in a non-test database can never be deleted by accident — even if the setup guard is bypassed.
 - The project uses Prisma 7 with `@prisma/adapter-pg`. Notes that affect testing:
-  - `prisma db push` supports a `--url` flag to override the datasource URL — CI uses it to prepare the test database. (`--skip-generate` is **not** supported in Prisma 7; `prisma generate` runs separately.)
+  - `npx prisma migrate deploy` applies the committed migrations; CI runs it against the isolated test database.
   - Both Prisma clients force the pg session timezone to UTC (`options: "-c timezone=UTC"`). Any test-created Prisma client must do the same so timestamptz comparisons (token expiry, session TTL) behave identically in tests.
-- **Schema setup:** prepared before the suite runs via `prisma db push` (CI does this in the "Prepare test database" step). There is no in-suite migration step.
+- **Schema setup:** prepared before the suite runs via `npx prisma migrate deploy` from the committed baseline migration (CI's "Prepare test database" step). There is no in-suite migration step.
 - **Time-dependent logic:** token/OTP expiry, session TTL, and idle-timeout are expressed in milliseconds from constants (`VERIFICATION_TOKEN_TTL_MS`, `PHONE_OTP_TTL_MS`, `SESSION_TTL_MS`). Where a test needs an "expired" row, insert/update rows with past timestamps directly rather than mocking `Date.now()` unless the mock is unavoidable.
 - **Transactions:** services own `prisma.$transaction`. Integration tests must verify both the commit path (all writes persist) and the rollback path (a failing step leaves no partial rows) for flows like checkout and delete-account.
 - The Prisma client used by tests is the same client the app configures (`src/config/database.ts`); reuse it rather than constructing a separate test client.
@@ -268,7 +268,7 @@ Current setup:
 - **Adding a new test normally requires no change to `ci.yml`** — create the file under `tests/` with a proper name and it is discovered automatically.
 - **Adding a new dev/test dependency** (e.g. `vitest`, `supertest`) is the only situation that legitimately touches CI: the `npm ci` step in `ci.yml` must run after the dependency lands, and only `package.json`/`package-lock.json` changes are expected — never test-file lists.
 
-Current CI pipeline (in order): checkout → setup Node (matrix: 20, 22) → `npm ci` → `npx prisma generate` → `npm run typecheck` → `npm run build` → **"Prepare test database"** (`npx prisma db push --url "$DATABASE_URL" --accept-data-loss` against the `postgres:16` service) → **"Create test environment file"** (writes `.env.test` from GitHub secrets; see below) → **"Test"** (`npm test`).
+Current CI pipeline (in order): checkout → setup Node (matrix: 20, 22) → `npm ci` → `npx prisma generate` → `npm run typecheck` → `npm run build` → **"Prepare test database"** (`npx prisma migrate deploy` against the `postgres:16` service) → **"Create test environment file"** (writes `.env.test` from GitHub secrets; see below) → **"Test"** (`npm test`).
 
 CI uses a dedicated Postgres database (`ecommerce_test`) provisioned as a GitHub Actions service container; it never touches a shared or production database.
 

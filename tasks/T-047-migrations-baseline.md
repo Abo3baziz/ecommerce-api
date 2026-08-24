@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-047 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `chore` |
 | **Branch** | `chore/migrations-baseline` |
 | **Depends on** | — |
@@ -26,9 +26,9 @@ Replayable migration history; fresh environments match production including chec
 
 ## Acceptance criteria
 
-- [ ] Fresh database from `migrate deploy` includes all check constraints.
-- [ ] CI green without data-loss flags.
-- [ ] Docs updated; conflict note removed.
+- [x] Fresh database from `migrate deploy` includes all check constraints.
+- [x] CI green without data-loss flags.
+- [x] Docs updated; conflict note removed.
 
 ## References
 

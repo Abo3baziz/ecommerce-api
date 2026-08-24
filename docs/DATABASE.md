@@ -194,7 +194,7 @@ ck_reviews_rating_range
 ck_inventory_quantity_non_negative
 ```
 
-> Note: the following tables contain database-level check constraints (flagged in `prisma/schema.prisma` by the `/// This table contains check constraints…` comment; these require additional setup for migrations):
+> The following tables carry database-level check constraints (flagged in `prisma/schema.prisma`). Since the migrations baseline (`prisma/migrations/20260824000000_baseline`, task T-047) these are recreated automatically by `prisma migrate deploy` — no manual setup is required:
 >
 > - cart_items
 > - coupon_usages
