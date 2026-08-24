@@ -64,7 +64,7 @@ Task backlog derived from two audits:
 
 | ID | File | Title | Status |
 |----|------|-------|--------|
-| T-011 | [T-011-openapi-spec.md](./T-011-openapi-spec.md) | Generate OpenAPI 3.1 from `docs/api/**` | todo |
+| T-011 | [T-011-openapi-spec.md](./T-011-openapi-spec.md) | Generate OpenAPI 3.1 from `docs/api/**` | done |
 | T-012 | [T-012-coupon-code-case.md](./T-012-coupon-code-case.md) | Orders §2.6 — coupon code case-insensitivity | done |
 | T-013 | [T-013-orders-search-like-escape.md](./T-013-orders-search-like-escape.md) | Orders §2.7 — escape LIKE wildcards in search | done |
 | T-014 | [T-014-checkout-audit-log.md](./T-014-checkout-audit-log.md) | Audit-log order placement | done |

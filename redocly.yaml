@@ -1,0 +1,9 @@
+extends:
+  - recommended
+
+rules:
+  # Compact spec style: shared 4XX semantics live in components/responses;
+  # per-operation 4XX entries are added where they differ from the common set.
+  operation-4xx-response: off
+  no-server-example.com: off
+  info-license: off

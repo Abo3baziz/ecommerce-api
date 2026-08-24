@@ -49,10 +49,12 @@ All paths below use `{{base_url}}` as a prefix, e.g. `{{base_url}}/products`.
 
 ## 4. Import the API contract
 
-The project documents the contract in Markdown (`docs/API_DESIGN.md` + `docs/api/**`) and does **not** yet ship an OpenAPI file.
+The contract is authored in Markdown (`docs/API_DESIGN.md` + `docs/api/**`) and mirrored into an importable **OpenAPI 3.1** spec at **`openapi/openapi.yaml`**.
 
-- **Option A — import an OpenAPI spec (recommended once available):** Apidog → **Import Data** → **OpenAPI/Swagger**. The design docs are written to be directly convertible to an OpenAPI 3.1 specification; generating one from `docs/api/**` is a planned follow-up.
-- **Option B — build the request tree manually (works today):** create requests by hand following the endpoint tables in this document. Each module's design doc (`docs/api/products/products.md`, `docs/api/categories/categories.md`, …) contains the exact request/response schemas.
+- **Import the OpenAPI spec (recommended):** Apidog → **Import Data** → **OpenAPI/Swagger** → select `openapi/openapi.yaml`. The spec covers every implemented endpoint with shared envelope/pagination/error components.
+- **Build the request tree manually (fallback):** follow the endpoint tables in this document; each module's design doc (`docs/api/products/products.md`, …) contains the exact request/response schemas.
+
+Maintenance: the markdown docs remain the source of truth; update `openapi/openapi.yaml` in the same commit when a contract changes, and validate with `npx @redocly/cli lint openapi/openapi.yaml` (config in `redocly.yaml`). See `openapi/README.md`.
 
 Tip: keep requests organized in a **collection** named after the API (e.g. `Ecommerce API`) with one folder per module, matching the layout in §6.
 

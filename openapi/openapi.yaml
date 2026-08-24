@@ -14,6 +14,7 @@ info:
   version: 1.0.0
   license:
     name: UNLICENSED
+    url: https://github.com/Abo3baziz/ecommerce-api
 servers:
   - url: http://localhost:3000/api/v1
     description: Local development
@@ -32,6 +33,26 @@ tags:
     description: Checkout and customer order history.
   - name: Reviews
     description: Product reviews with moderation-backed visibility.
+  - name: Admin — Products
+    description: Product/variant/image management (admin).
+  - name: Admin — Categories
+    description: Category management and product assignment (admin).
+  - name: Admin — Inventory
+    description: Stock levels, adjustments and manual reserves (admin).
+  - name: Admin — Users
+    description: Customer accounts, roles and suspension (admin).
+  - name: Admin — Orders
+    description: Order queue and status transitions with side effects (admin).
+  - name: Admin — Reviews
+    description: Review moderation (admin).
+  - name: Admin — Coupons
+    description: Coupon lifecycle and usage inspection (admin).
+  - name: Admin — Stats & Analytics
+    description: Dashboard statistics, coupon insights and P&L expenses (super_admin unless noted).
+  - name: Admin — Audit
+    description: Append-only audit trail (super_admin).
+  - name: Admin — Admins
+    description: Admin account administration (super_admin).
 security:
   - sessionCookie: []
 
@@ -617,7 +638,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: Insufficient stock. content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+        "409": { description: "Insufficient stock.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
   /cart/items/{variant_public_id}:
     patch:
       tags: [Cart]
@@ -640,7 +661,7 @@ paths:
       responses:
         "200": { description: Updated line. }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: Insufficient stock. content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+        "409": { description: "Insufficient stock.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
     delete:
       tags: [Cart]
       summary: Remove one cart line.
@@ -779,7 +800,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: Duplicate review or unfulfilled purchase requirement. content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+        "409": { description: "Duplicate review or unfulfilled purchase requirement.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
   /reviews/{review_public_id}:
     get:
       tags: [Reviews]
@@ -859,6 +880,304 @@ paths:
           description: Own reviews with `is_approved` visible.
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  # ---- Admin: products / variants / images ----
+  /admin/products:
+    get: { tags: [Admin — Products], summary: "List products (admin projection, optional include_deleted).", operationId: adminListProducts, responses: { "200": { description: "Paginated." } } }
+    post:
+      tags: [Admin — Products]
+      summary: Create a product.
+      operationId: adminCreateProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                description: { type: string }
+                brand: { type: string }
+      responses:
+        "201": { description: Created. }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /admin/products/uploads/imagekit-auth:
+    get:
+      tags: [Admin — Products]
+      summary: Signed auth params for direct browser uploads to ImageKit.
+      operationId: adminImageKitAuth
+      responses:
+        "200": { description: "token/expire/signature/publicKey/urlEndpoint/folder." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/products/{product_public_id}:
+    get: { tags: [Admin — Products], summary: Product detail incl. variants and images (admin projection)., operationId: adminGetProduct, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch: { tags: [Admin — Products], summary: Update product fields., operationId: adminUpdateProduct, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } } }
+    delete: { tags: [Admin — Products], summary: Soft-delete a product and its variants., operationId: adminDeleteProduct, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /admin/products/{product_public_id}/variants:
+    get: { tags: [Admin — Products], summary: List variants (admin projection)., operationId: adminListVariants, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], responses: { "200": { description: OK } } }
+    post:
+      tags: [Admin — Products]
+      summary: Create a variant.
+      operationId: adminCreateVariant
+      parameters: [{ $ref: "#/components/parameters/ProductPublicId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku, price]
+              properties:
+                sku: { type: string }
+                barcode: { type: string }
+                color: { type: string }
+                size: { type: string }
+                price: { type: string, description: Decimal string. }
+                cost_price: { type: string }
+                discount_percentage: { type: string }
+                weight: { type: string }
+                length: { type: string }
+                width: { type: string }
+                height: { type: string }
+                status: { type: string, enum: [ACTIVE, DRAFT, INACTIVE, ARCHIVED] }
+      responses:
+        "201": { description: Created. }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /admin/products/{product_public_id}/variants/{variant_public_id}:
+    get: { tags: [Admin — Products], summary: Get one variant., operationId: adminGetVariant, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string, pattern: "^var_" } }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch: { tags: [Admin — Products], summary: Update one variant., operationId: adminUpdateVariant, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
+    delete: { tags: [Admin — Products], summary: Soft-delete one variant., operationId: adminDeleteVariant, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /admin/products/{product_public_id}/images:
+    get: { tags: [Admin — Products], summary: List product images., operationId: adminListProductImages, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], responses: { "200": { description: OK } } }
+    post: { tags: [Admin — Products], summary: Attach an uploaded ImageKit URL as a product image., operationId: adminCreateProductImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [image_url], properties: { image_url: { type: string }, alt_text: { type: string }, display_order: { type: integer }, is_primary: { type: boolean } } } } } }, responses: { "201": { description: Created }, "400": { $ref: "#/components/responses/BadRequest" }, "409": { $ref: "#/components/responses/Conflict" } } }
+  /admin/products/{product_public_id}/images/{image_public_id}:
+    get: { tags: [Admin — Products], summary: Get one product image., operationId: adminGetProductImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: image_public_id, in: path, required: true, schema: { type: string, pattern: "^pimg_" } }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch: { tags: [Admin — Products], summary: Update one product image (promotion maps P2002 races to 409)., operationId: adminUpdateProductImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: image_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } } }
+    delete: { tags: [Admin — Products], summary: Delete one product image; promotes the lowest-order survivor if it was primary., operationId: adminDeleteProductImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: image_public_id, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /admin/products/{product_public_id}/variants/{variant_public_id}/images:
+    get: { tags: [Admin — Products], summary: List variant images., operationId: adminListVariantImages, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: OK } } }
+    post: { tags: [Admin — Products], summary: Attach an image URL to a variant., operationId: adminCreateVariantImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }], responses: { "201": { description: Created }, "400": { $ref: "#/components/responses/BadRequest" } } }
+  /admin/products/{product_public_id}/variants/{variant_public_id}/images/{variant_image_public_id}:
+    get: { tags: [Admin — Products], summary: Get one variant image., operationId: adminGetVariantImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }, { name: variant_image_public_id, in: path, required: true, schema: { type: string, pattern: "^vimg_" } }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch: { tags: [Admin — Products], summary: Update one variant image., operationId: adminUpdateVariantImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }, { name: variant_image_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
+    delete: { tags: [Admin — Products], summary: Delete one variant image., operationId: adminDeleteVariantImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }, { name: variant_image_public_id, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+
+  # ---- Admin: categories ----
+  /admin/categories:
+    get: { tags: [Admin — Categories], summary: List categories including inactive ones., operationId: adminListCategories, responses: { "200": { description: OK } } }
+    post:
+      tags: [Admin — Categories]
+      summary: Create a category.
+      operationId: adminCreateCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                description: { type: string }
+                is_active: { type: boolean }
+      responses:
+        "201": { description: Created. }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /admin/categories/{category_public_id}:
+    get: { tags: [Admin — Categories], summary: Category detail., operationId: adminGetCategory, parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch: { tags: [Admin — Categories], summary: Update category., operationId: adminUpdateCategory, parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
+    delete: { tags: [Admin — Categories], summary: Soft-delete category., operationId: adminDeleteCategory, parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /admin/categories/{category_public_id}/products/{product_public_id}:
+    put: { tags: [Admin — Categories], summary: Assign a product to the category (idempotent)., operationId: adminAssignCategoryProduct, parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }, { $ref: "#/components/parameters/ProductPublicId" }], responses: { "204": { description: Assigned or already assigned. }, "404": { $ref: "#/components/responses/NotFound" } } }
+    delete: { tags: [Admin — Categories], summary: Remove a product from the category., operationId: adminRemoveCategoryProduct, parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }, { $ref: "#/components/parameters/ProductPublicId" }], responses: { "204": { description: Removed. }, "404": { $ref: "#/components/responses/NotFound" } } }
+
+  # ---- Admin: inventory ----
+  /admin/inventory:
+    get: { tags: [Admin — Inventory], summary: Inventory dashboard with stock-status filters and search., operationId: adminListInventory, responses: { "200": { description: OK } } }
+    post:
+      tags: [Admin — Inventory]
+      summary: Create an inventory record for a variant.
+      operationId: adminCreateInventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity_on_hand]
+              properties:
+                quantity_on_hand: { type: integer, minimum: 0 }
+                reorder_level: { type: integer, minimum: 0 }
+      responses:
+        "201": { description: Created. }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /admin/inventory/{variant_public_id}:
+    get: { tags: [Admin — Inventory], summary: Inventory for one variant., operationId: adminGetInventory, parameters: [{ name: variant_public_id, in: path, required: true, schema: { type: string, pattern: "^var_" } }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch:
+      tags: [Admin — Inventory]
+      summary: Set absolute stock levels (mutually exclusive with adjust).
+      operationId: adminSetInventory
+      parameters: [{ name: variant_public_id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity_on_hand: { type: integer, minimum: 0 }
+                reorder_level: { type: integer, minimum: 0 }
+      responses:
+        "200": { description: Updated. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/inventory/{variant_public_id}/reserve:
+    patch:
+      tags: [Admin — Inventory]
+      summary: Manually reserve or release reserved quantity (delta-based).
+      operationId: adminReserveInventory
+      parameters: [{ name: variant_public_id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity_reserved]
+              properties:
+                quantity_reserved: { type: integer, description: Delta; negative releases. }
+                reason: { type: string }
+      responses:
+        "200": { description: Adjusted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ---- Admin: users ----
+  /admin/users:
+    get: { tags: [Admin — Users], summary: Search/paginate customer and admin accounts., operationId: adminListUsers, responses: { "200": { description: OK } } }
+  /admin/users/{user_public_id}:
+    get: { tags: [Admin — Users], summary: Account detail with verification state., operationId: adminGetUser, parameters: [{ $ref: "#/components/parameters/UserPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch: { tags: [Admin — Users], summary: Update contact details (triggers reverification + audit)., operationId: adminUpdateUser, parameters: [{ $ref: "#/components/parameters/UserPublicId" }], responses: { "200": { description: Updated }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /admin/users/{user_public_id}/role:
+    patch: { tags: [Admin — Users], summary: Change role between CUSTOMER and ADMIN (SUPER_ADMIN changes are CLI-only)., operationId: adminChangeUserRole, parameters: [{ $ref: "#/components/parameters/UserPublicId" }], responses: { "200": { description: Updated }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /admin/users/{user_public_id}/suspend:
+    patch: { tags: [Admin — Users], summary: Suspend an account (sessions revoked)., operationId: adminSuspendUser, parameters: [{ $ref: "#/components/parameters/UserPublicId" }], responses: { "200": { description: Suspended }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /admin/users/{user_public_id}/activate:
+    patch: { tags: [Admin — Users], summary: Reactivate a suspended account., operationId: adminActivateUser, parameters: [{ $ref: "#/components/parameters/UserPublicId" }], responses: { "200": { description: Activated }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+
+  # ---- Admin: orders ----
+  /admin/orders:
+    get: { tags: [Admin — Orders], summary: "Search/filter all orders (status, date range, search).", operationId: adminListOrders, responses: { "200": { description: OK } } }
+  /admin/orders/{order_public_id}:
+    get: { tags: [Admin — Orders], summary: "Full order detail with items, payment and shipment.", operationId: adminGetOrder, parameters: [{ $ref: "#/components/parameters/OrderPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch:
+      tags: [Admin — Orders]
+      summary: Status transition (legal matrix enforced server-side with stock/payment side effects).
+      operationId: adminUpdateOrderStatus
+      parameters: [{ $ref: "#/components/parameters/OrderPublicId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [confirmed, processing, shipped, delivered, cancelled, returned, refunded]
+                carrier: { type: string, description: Required when transitioning to shipped. }
+                tracking_number: { type: string }
+      responses:
+        "200": { description: Transitioned. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Illegal transition, row-lock loss or nothing to refund.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+
+  # ---- Admin: reviews ----
+  /admin/reviews:
+    get: { tags: [Admin — Reviews], summary: "Moderation queue with filters (rating, is_approved, include_deleted, search).", operationId: adminListReviews, responses: { "200": { description: OK } } }
+  /admin/reviews/{review_public_id}:
+    get: { tags: [Admin — Reviews], summary: Review detail in any state with images., operationId: adminGetReview, parameters: [{ $ref: "#/components/parameters/ReviewPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch: { tags: [Admin — Reviews], summary: Moderate (is_approved) and edit title/comment., operationId: adminModerateReview, parameters: [{ $ref: "#/components/parameters/ReviewPublicId" }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
+    delete: { tags: [Admin — Reviews], summary: Hard-delete a review and its images., operationId: adminDeleteReview, parameters: [{ $ref: "#/components/parameters/ReviewPublicId" }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+
+  # ---- Admin: coupons ----
+  /admin/coupons:
+    get: { tags: [Admin — Coupons], summary: List coupons with status/search filters., operationId: adminListCoupons, responses: { "200": { description: OK } } }
+    post:
+      tags: [Admin — Coupons]
+      summary: Create a coupon.
+      operationId: adminCreateCoupon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, discount_type, discount_value]
+              properties:
+                code: { type: string }
+                discount_type: { type: string, enum: [FIXED_AMOUNT, PERCENTAGE] }
+                discount_value: { type: string }
+                usage_limit: { type: integer }
+                minimum_order_amount: { type: string }
+                maximum_discount_amount: { type: string }
+                expires_at: { type: string, format: date-time }
+      responses:
+        "201": { description: Created. }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /admin/coupons/{coupon_public_id}:
+    get: { tags: [Admin — Coupons], summary: Coupon detail., operationId: adminGetCoupon, parameters: [{ $ref: "#/components/parameters/CouponPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch: { tags: [Admin — Coupons], summary: Update coupon., operationId: adminUpdateCoupon, parameters: [{ $ref: "#/components/parameters/CouponPublicId" }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
+    delete: { tags: [Admin — Coupons], summary: Soft-delete coupon., operationId: adminDeleteCoupon, parameters: [{ $ref: "#/components/parameters/CouponPublicId" }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /admin/coupons/{coupon_public_id}/usages:
+    get: { tags: [Admin — Coupons], summary: Usage history drawer data., operationId: adminListCouponUsages, parameters: [{ $ref: "#/components/parameters/CouponPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+
+  # ---- Admin: stats / analytics / audit / admins ----
+  /admin/stats:
+    get: { tags: [Admin — Stats & Analytics], summary: Dashboard KPI aggregate., operationId: adminStats, responses: { "200": { description: OK } } }
+  /admin/analytics/overview:
+    get: { tags: [Admin — Stats & Analytics], summary: "P&L overview (revenue, costs, profit trend).", operationId: adminAnalyticsOverview, responses: { "200": { description: OK } } }
+  /admin/analytics/coupons:
+    get: { tags: [Admin — Stats & Analytics], summary: "Coupon insights (status counts, trends, most-used, revenue impact).", operationId: adminAnalyticsCoupons, responses: { "200": { description: OK } } }
+  /admin/analytics/expenses:
+    get: { tags: [Admin — Stats & Analytics], summary: Operating expense ledger (paginated)., operationId: adminListExpenses, responses: { "200": { description: OK } } }
+    post:
+      tags: [Admin — Stats & Analytics]
+      summary: Record an operating expense.
+      operationId: adminCreateExpense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description, category, amount, spent_at]
+              properties:
+                description: { type: string }
+                category: { type: string }
+                amount: { type: string }
+                spent_at: { type: string, format: date }
+      responses:
+        "201": { description: Created. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /admin/analytics/expenses/{expense_public_id}:
+    patch: { tags: [Admin — Stats & Analytics], summary: Update an expense., operationId: adminUpdateExpense, parameters: [{ name: expense_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
+    delete: { tags: [Admin — Stats & Analytics], summary: Delete an expense., operationId: adminDeleteExpense, parameters: [{ name: expense_public_id, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /admin/audit:
+    get: { tags: [Admin — Audit], summary: "Append-only audit trail with filters (actor, action prefix, entity).", operationId: adminListAuditLogs, responses: { "200": { description: OK } } }
+  /admin/admins:
+    get: { tags: [Admin — Admins], summary: "List admin accounts with activity aggregates (super_admin).", operationId: adminListAdmins, responses: { "200": { description: OK } } }
+  /admin/admins/{admin_public_id}:
+    get: { tags: [Admin — Admins], summary: Admin activity detail (super_admin)., operationId: adminGetAdmin, parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: OK }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch: { tags: [Admin — Admins], summary: Suspend/activate or manage an admin account (super_admin)., operationId: adminManageAdmin, parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Updated }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /admin/admins/{admin_public_id}/suspend:
+    patch: { tags: [Admin — Admins], summary: Suspend an admin account (super_admin)., operationId: adminSuspendAdmin, parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Suspended }, "403": { $ref: "#/components/responses/Forbidden" } } }
+  /admin/admins/{admin_public_id}/activate:
+    patch: { tags: [Admin — Admins], summary: Reactivate an admin account (super_admin)., operationId: adminActivateAdmin, parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Activated }, "403": { $ref: "#/components/responses/Forbidden" } } }
+
 components:
   securitySchemes:
     sessionCookie:
@@ -913,6 +1232,33 @@ components:
         image_url: { type: string }
         alt_text: { type: [string, "null"] }
   parameters:
+    OrderPublicId:
+      name: order_public_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^ord_"
+    ReviewPublicId:
+      name: review_public_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^rev_"
+    CouponPublicId:
+      name: coupon_public_id
+      in: path
+      required: true
+      schema:
+        type: string
+    UserPublicId:
+      name: user_public_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^usr_"
     ProductPublicId:
       name: product_public_id
       in: path
