@@ -14,6 +14,7 @@ import {
 } from "../repository/category.repository.js";
 import { slugify } from "../utils/slug.js";
 import { parseSort } from "../utils/sort.js";
+import { resolvePrimaryImage } from "../../products/utils/images.js";
 import type {
   AdminCategoryDetailResult,
   AdminCategoryResult,
@@ -52,6 +53,7 @@ function toCategoryProductResult(row: CategoryProductRow): ProductResult {
     name: row.name,
     description: row.description,
     brand: row.brand,
+    primary_image: resolvePrimaryImage(row.product_images),
     created_at: row.created_at,
     updated_at: row.updated_at,
   };

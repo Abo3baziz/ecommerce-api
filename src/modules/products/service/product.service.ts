@@ -10,12 +10,14 @@ import {
   type AdminDetailRow,
   type CustomerDetailRow,
   type ProductFilters,
+  type ProductListItemRow,
   type ProductRow,
 } from "../repository/product.repository.js";
 import {
   computeFinalPrice,
   decimalToFixed,
 } from "../utils/format.js";
+import { resolvePrimaryImage } from "../utils/images.js";
 import { slugify } from "../utils/slug.js";
 import { parseSort } from "../utils/sort.js";
 import type {
@@ -36,8 +38,16 @@ function toProductResult(row: ProductRow): ProductResult {
     name: row.name,
     description: row.description,
     brand: row.brand,
+    primary_image: null,
     created_at: row.created_at,
     updated_at: row.updated_at,
+  };
+}
+
+function toProductListItemResult(row: ProductListItemRow): ProductResult {
+  return {
+    ...toProductResult(row),
+    primary_image: resolvePrimaryImage(row.product_images),
   };
 }
 
@@ -65,6 +75,7 @@ function toCustomerVariantResult(
 function toCustomerProductDetail(row: CustomerDetailRow): CustomerProductDetailResult {
   return {
     ...toProductResult(row),
+    primary_image: resolvePrimaryImage(row.product_images),
     variants: row.product_variants.map(toCustomerVariantResult),
     images: row.product_images.map((image) => ({
       public_id: image.public_id,
@@ -110,6 +121,7 @@ function toAdminVariantResult(
 function toAdminProductDetail(row: AdminDetailRow): AdminProductDetailResult {
   return {
     ...toProductResult(row),
+    primary_image: resolvePrimaryImage(row.product_images),
     variants: row.product_variants.map((variant) =>
       toAdminVariantResult(variant, row.public_id),
     ),
@@ -161,7 +173,7 @@ export async function listProducts(
   ]);
 
   return {
-    products: rows.map(toProductResult),
+    products: rows.map(toProductListItemResult),
     pagination: formatPaginationMeta(page, limit, total),
   };
 }
@@ -196,7 +208,7 @@ export async function listAdminProducts(
   ]);
 
   return {
-    products: rows.map(toProductResult),
+    products: rows.map(toProductListItemResult),
     pagination: formatPaginationMeta(page, limit, total),
   };
 }

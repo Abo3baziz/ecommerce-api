@@ -20,12 +20,18 @@ export type {
 export type CreateProductInput = CreateProductBody;
 export type UpdateProductInput = UpdateProductBody;
 
+export interface ProductPrimaryImageResult {
+  image_url: string;
+  alt_text: string | null;
+}
+
 export interface ProductResult {
   public_id: string;
   slug: string;
   name: string;
   description: string | null;
   brand: string | null;
+  primary_image: ProductPrimaryImageResult | null;
   created_at: Date;
   updated_at: Date;
 }

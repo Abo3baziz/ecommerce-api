@@ -55,6 +55,15 @@ const categoryProductSelect = {
   brand: true,
   created_at: true,
   updated_at: true,
+  product_images: {
+    orderBy: { display_order: "asc" as const },
+    select: {
+      image_url: true,
+      alt_text: true,
+      is_primary: true,
+      display_order: true,
+    },
+  },
 } as const;
 
 export type CategoryProductRow = Prisma.productsGetPayload<{

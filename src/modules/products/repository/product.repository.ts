@@ -41,6 +41,23 @@ export type ProductRow = Prisma.productsGetPayload<{
   select: typeof productSelect;
 }>;
 
+const productListSelect = {
+  ...productSelect,
+  product_images: {
+    orderBy: { display_order: "asc" as const },
+    select: {
+      image_url: true,
+      alt_text: true,
+      is_primary: true,
+      display_order: true,
+    },
+  },
+} as const;
+
+export type ProductListItemRow = Prisma.productsGetPayload<{
+  select: typeof productListSelect;
+}>;
+
 const customerDetailSelect = {
   ...productSelect,
   product_images: {
@@ -221,7 +238,7 @@ export const productRepository = {
       orderBy,
       skip,
       take,
-      select: productSelect,
+      select: productListSelect,
     });
   },
 

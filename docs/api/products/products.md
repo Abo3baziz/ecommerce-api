@@ -28,6 +28,10 @@ Authentication and session management are handled by the Authentication API.
   "name": "Wireless Noise-Cancelling Headphones",
   "description": "Premium over-ear headphones with active noise cancellation and 40-hour battery life.",
   "brand": "SoundWave",
+  "primary_image": {
+    "image_url": "https://cdn.example.com/prd_01K4X8Y9P4M4G8N6F9V2A1B3C/hero.jpg",
+    "alt_text": "Wireless headphones in black"
+  },
   "created_at": "2026-08-01T10:00:00Z",
   "updated_at": "2026-08-01T10:00:00Z"
 }
@@ -40,6 +44,7 @@ Authentication and session management are handled by the Authentication API.
 | name | string | No | Product name |
 | description | string | Yes | Detailed product description |
 | brand | string | Yes | Product brand or manufacturer |
+| primary_image | object | Yes | Thumbnail summary: the `is_primary` image when one exists, otherwise the first image by `display_order`. Null for products without images. Present on list and detail responses; write responses (`POST`/`PATCH`) report it as `null`. |
 | created_at | string | No | Creation timestamp (ISO 8601) |
 | updated_at | string | No | Last modification timestamp (ISO 8601) |
 
