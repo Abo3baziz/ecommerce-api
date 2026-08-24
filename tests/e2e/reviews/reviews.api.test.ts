@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { imageKitImageUrl } from "../../helpers/image-url.js";
 import request from "supertest";
 import { nanoid } from "nanoid";
 import { app } from "../../../src/app/index.js";
@@ -164,7 +165,7 @@ describe("reviews API", () => {
             reviewPayload({
               product_public_id: product.public_id,
               images: [
-                { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/a.jpg", alt_text: "a" },
+                { image_url: imageKitImageUrl("a.jpg", "reviews"), alt_text: "a" },
               ],
             }),
           );

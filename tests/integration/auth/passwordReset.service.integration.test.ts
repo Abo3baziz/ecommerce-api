@@ -55,6 +55,7 @@ describe("auth.service password reset", () => {
         user.email,
         user.first_name,
         expect.stringMatching(/^[0-9a-f]{64}$/),
+        expect.stringMatching(/^\d{6}$/),
       );
 
       const token = await prisma.verification_tokens.findFirst({
@@ -96,6 +97,16 @@ describe("auth.service password reset", () => {
         where: { users_id: user.id, purpose: verification_type.PASSWORD_RESET },
       });
 
+      // Backdate past the resend cooldown (60s) so the second request is
+      // accepted; the test targets token invalidation, not rate limiting.
+      // Each request writes two rows (link + OTP channel) — backdate both.
+      await prisma.verification_tokens.updateMany({
+        where: { users_id: user.id, purpose: verification_type.PASSWORD_RESET },
+        data: {
+          created_at: new Date(Date.now() - 61 * 1000),
+        },
+      });
+
       await requestPasswordReset({ email: user.email });
 
       const updated = await prisma.verification_tokens.findUnique({
@@ -110,7 +121,14 @@ describe("auth.service password reset", () => {
           used_at: null,
         },
       });
-      expect(remaining).toHaveLength(1);
+      // The second request issues a fresh link row AND OTP row; every token
+      // from the first request must be invalidated.
+      expect(remaining).toHaveLength(2);
+      for (const token of remaining) {
+        expect(token.created_at.getTime()).toBeGreaterThan(
+          Date.now() - 10 * 1000,
+        );
+      }
     });
   });
 

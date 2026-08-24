@@ -22,6 +22,7 @@ import { ConflictError } from "../../../src/shared/errors/ConflictError.js";
 import { NotFoundError } from "../../../src/shared/errors/NotFoundError.js";
 import { PUBLIC_ID_PREFIXES } from "../../../src/shared/constants/index.js";
 import { generatePublicId } from "../../../src/shared/utils/index.js";
+import { imageKitImageUrl } from "../../helpers/image-url.js";
 import { prisma } from "../../../src/config/database.js";
 import { cleanupTestData } from "../../helpers/db.js";
 import { createUser } from "../../factories/user.factory.js";
@@ -40,7 +41,7 @@ function reviewInput(overrides: Record<string, unknown> = {}) {
     title: "Excellent quality",
     comment: "The fabric feels premium.",
     images: [
-      { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/a.jpg", alt_text: "alt a" },
+      { image_url: imageKitImageUrl("a.jpg", "reviews"), alt_text: "alt a" },
     ],
     ...overrides,
   };
@@ -259,8 +260,8 @@ describe("reviews.service", () => {
       const result = await createReviewService(
         user.id,
         reviewInput({ product_public_id: product.public_id, images: [
-          { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/1.jpg" },
-          { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/2.jpg", alt_text: "second" },
+          { image_url: imageKitImageUrl("1.jpg", "reviews") },
+          { image_url: imageKitImageUrl("2.jpg", "reviews"), alt_text: "second" },
         ] }),
       );
 
@@ -269,8 +270,8 @@ describe("reviews.service", () => {
       expect(result.customer_name).toBe(`${user.first_name} ${user.last_name}`);
       expect(result.images.map((image) => image.display_order)).toEqual([1, 2]);
       expect(result.images.map((image) => image.image_url)).toEqual([
-        "https://ik.imagekit.io/test/ecommerce/reviews/1.jpg",
-        "https://ik.imagekit.io/test/ecommerce/reviews/2.jpg",
+        imageKitImageUrl("1.jpg", "reviews"),
+        imageKitImageUrl("2.jpg", "reviews"),
       ]);
       expect(result).not.toHaveProperty("is_approved");
       expect(result).not.toHaveProperty("id");
@@ -408,14 +409,14 @@ describe("reviews.service", () => {
 
       const result = await updateReviewService(user.id, review.public_id, {
         images: [
-          { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/new1.jpg" },
-          { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/new2.jpg" },
+          { image_url: imageKitImageUrl("new1.jpg", "reviews") },
+          { image_url: imageKitImageUrl("new2.jpg", "reviews") },
         ],
       });
 
       expect(result.images.map((image) => image.image_url)).toEqual([
-        "https://ik.imagekit.io/test/ecommerce/reviews/new1.jpg",
-        "https://ik.imagekit.io/test/ecommerce/reviews/new2.jpg",
+        imageKitImageUrl("new1.jpg", "reviews"),
+        imageKitImageUrl("new2.jpg", "reviews"),
       ]);
       expect(result.images.map((image) => image.display_order)).toEqual([1, 2]);
     });
