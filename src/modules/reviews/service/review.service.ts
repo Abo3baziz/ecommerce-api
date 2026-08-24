@@ -11,7 +11,7 @@ import {
   validateUploadedImageUrl,
 } from "../../../shared/imagekit/index.js";
 import { recordAuditEvent } from "../../audit/service/audit.service.js";
-import type { Prisma } from "../../../generated/prisma/client.js";
+import { Prisma } from "../../../generated/prisma/client.js";
 import {
   newReviewImagePublicId,
   reviewRepository,
@@ -151,39 +151,51 @@ export async function createReview(
     validateUploadedImageUrl(image.image_url, "reviews", env.IMAGEKIT_URL_ENDPOINT);
   }
 
-  const row = await prisma.$transaction(async (tx) => {
-    const created = await reviewRepository.createReview(
-      {
-        public_id: generatePublicId(PUBLIC_ID_PREFIXES.REVIEW),
-        users_id: userId,
-        products_id: product.id,
-        rating: input.rating,
-        title: input.title ?? null,
-        comment: input.comment ?? null,
-      },
-      tx,
-    );
-
-    if (images.length > 0) {
-      await reviewRepository.createReviewImages(
-        created.id,
-        images.map((image, index) => ({
-          public_id: newReviewImagePublicId(),
-          image_url: image.image_url,
-          alt_text: image.alt_text ?? null,
-          display_order: index + 1,
-        })),
+  const row = await prisma
+    .$transaction(async (tx) => {
+      const created = await reviewRepository.createReview(
+        {
+          public_id: generatePublicId(PUBLIC_ID_PREFIXES.REVIEW),
+          users_id: userId,
+          products_id: product.id,
+          rating: input.rating,
+          title: input.title ?? null,
+          comment: input.comment ?? null,
+        },
         tx,
       );
-    }
 
-    const refreshed = await reviewRepository.findOwnReviewByPublicId(
-      created.public_id,
-      userId,
-      tx,
-    );
-    return refreshed!;
-  });
+      if (images.length > 0) {
+        await reviewRepository.createReviewImages(
+          created.id,
+          images.map((image, index) => ({
+            public_id: newReviewImagePublicId(),
+            image_url: image.image_url,
+            alt_text: image.alt_text ?? null,
+            display_order: index + 1,
+          })),
+          tx,
+        );
+      }
+
+      const refreshed = await reviewRepository.findOwnReviewByPublicId(
+        created.public_id,
+        userId,
+        tx,
+      );
+      return refreshed!;
+    })
+    .catch((error: unknown) => {
+      // The check-then-insert above can race; the partial unique index
+      // uq_reviews_one_live_review_per_user_product is the backstop (T-043).
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictError("You have already reviewed this product");
+      }
+      throw error;
+    });
 
   // Customer-side uploads are outside the /admin/* audit scope, so the
   // review module emits its own events (fire-and-forget, one per file).

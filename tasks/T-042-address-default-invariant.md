@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-042 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/address-default-invariant` |
 | **Depends on** | T-047 |
@@ -31,8 +31,8 @@ Every user has at most one default per type, and at least one where addresses ex
 
 ## Acceptance criteria
 
-- [ ] Concurrent create/update/delete tests never yield multi-default; zero-default only if product-decided.
-- [ ] P2002 races mapped to retry/409; suite green.
+- [x] Concurrent create/update/delete tests never yield multi-default; zero-default only if product-decided.
+- [x] P2002 races mapped to retry/409; suite green.
 
 ## References
 

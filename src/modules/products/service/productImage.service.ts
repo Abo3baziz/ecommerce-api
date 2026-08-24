@@ -1,5 +1,6 @@
 import { prisma } from "../../../config/database.js";
 import { env } from "../../../config/env.js";
+import { Prisma } from "../../../generated/prisma/client.js";
 import { PUBLIC_ID_PREFIXES } from "../../../shared/constants/index.js";
 import { BadRequestError } from "../../../shared/errors/BadRequestError.js";
 import { ConflictError } from "../../../shared/errors/ConflictError.js";
@@ -93,26 +94,45 @@ export async function createProductImage(
   validateUploadedImageUrl(input.image_url, "products", env.IMAGEKIT_URL_ENDPOINT);
 
   const displayOrder = await resolveDisplayOrder(product.id, input.display_order);
-  const imageCount = await productImageRepository.countByProduct(product.id);
-  const isPrimary = input.is_primary === true || imageCount === 0;
 
-  const created = await prisma.$transaction(async (tx) => {
-    if (isPrimary) {
-      await productImageRepository.clearPrimary(product.id, null, tx);
-    }
+  const created = await prisma
+    .$transaction(async (tx) => {
+      // Read inside the transaction so concurrent creates cannot both decide
+      // "I am the first image"; uq_product_images_one_primary_per_product is
+      // the backstop (T-041).
+      const imageCount = await productImageRepository.countByProduct(
+        product.id,
+        tx,
+      );
+      const isPrimary = input.is_primary === true || imageCount === 0;
 
-    return productImageRepository.createImage(
-      {
-        public_id: generatePublicId(PUBLIC_ID_PREFIXES.PRODUCT_IMAGE),
-        products_id: product.id,
-        image_url: input.image_url,
-        alt_text: input.alt_text ?? null,
-        display_order: displayOrder,
-        is_primary: isPrimary,
-      },
-      tx,
-    );
-  });
+      if (isPrimary) {
+        await productImageRepository.clearPrimary(product.id, null, tx);
+      }
+
+      return productImageRepository.createImage(
+        {
+          public_id: generatePublicId(PUBLIC_ID_PREFIXES.PRODUCT_IMAGE),
+          products_id: product.id,
+          image_url: input.image_url,
+          alt_text: input.alt_text ?? null,
+          display_order: displayOrder,
+          is_primary: isPrimary,
+        },
+        tx,
+      );
+    })
+    .catch((error: unknown) => {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictError(
+          "Another image of this product is already marked as primary",
+        );
+      }
+      throw error;
+    });
 
   return toProductImageResult(created, productPublicId);
 }
@@ -180,22 +200,34 @@ export async function updateProductImage(
     }
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    if (input.is_primary === true) {
-      await productImageRepository.clearPrimary(product.id, image.id, tx);
-    }
+  const updated = await prisma
+    .$transaction(async (tx) => {
+      if (input.is_primary === true) {
+        await productImageRepository.clearPrimary(product.id, image.id, tx);
+      }
 
-    return productImageRepository.updateImage(
-      image.id,
-      {
-        image_url: input.image_url,
-        alt_text: input.alt_text,
-        display_order: input.display_order,
-        is_primary: input.is_primary,
-      },
-      tx,
-    );
-  });
+      return productImageRepository.updateImage(
+        image.id,
+        {
+          image_url: input.image_url,
+          alt_text: input.alt_text,
+          display_order: input.display_order,
+          is_primary: input.is_primary,
+        },
+        tx,
+      );
+    })
+    .catch((error: unknown) => {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictError(
+          "Another image of this product is already marked as primary",
+        );
+      }
+      throw error;
+    });
 
   return toProductImageResult(updated, productPublicId);
 }
@@ -216,6 +248,11 @@ export async function deleteProductImage(
   }
 
   await prisma.$transaction(async (tx) => {
+    // Delete first: promoting the successor before removing the old primary
+    // would transiently hold two primaries, violating
+    // uq_product_images_one_primary_per_product (T-041).
+    await productImageRepository.deleteImage(image.id, tx);
+
     if (image.is_primary) {
       const next = await productImageRepository.findLowestOrderImage(
         product.id,
@@ -227,7 +264,5 @@ export async function deleteProductImage(
         await productImageRepository.setPrimary(next.id, tx);
       }
     }
-
-    await productImageRepository.deleteImage(image.id, tx);
   });
 }

@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-043 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/duplicate-review-backstop` |
 | **Depends on** | T-047 |
@@ -26,9 +26,9 @@ One live review per user per product, enforced by the database.
 
 ## Acceptance criteria
 
-- [ ] Concurrent duplicate creates: exactly one succeeds; other 409.
-- [ ] Delete-then-recreate still allowed.
-- [ ] Suite green.
+- [x] Concurrent duplicate creates: exactly one succeeds; other 409.
+- [x] Delete-then-recreate still allowed.
+- [x] Suite green.
 
 ## References
 

@@ -40,7 +40,7 @@ function reviewInput(overrides: Record<string, unknown> = {}) {
     title: "Excellent quality",
     comment: "The fabric feels premium.",
     images: [
-      { image_url: "https://example.com/reviews/a.jpg", alt_text: "alt a" },
+      { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/a.jpg", alt_text: "alt a" },
     ],
     ...overrides,
   };
@@ -61,7 +61,7 @@ describe("reviews.service", () => {
         rating: 5,
       });
       await createReview({
-        users_id: user.id,
+        users_id: (await createUser()).id,
         products_id: product.id,
         rating: 3,
         is_approved: false,
@@ -94,10 +94,11 @@ describe("reviews.service", () => {
     });
 
     it("rounds the average rating to 2 decimal places", async () => {
-      const user = await createUser();
       const product = await createProduct();
-      await createReview({ users_id: user.id, products_id: product.id, rating: 5 });
-      await createReview({ users_id: user.id, products_id: product.id, rating: 4 });
+      const reviewerA = await createUser();
+      const reviewerB = await createUser();
+      await createReview({ users_id: reviewerA.id, products_id: product.id, rating: 5 });
+      await createReview({ users_id: reviewerB.id, products_id: product.id, rating: 4 });
 
       const result = await listProductReviews(product.public_id, 1, 20, undefined, "-created_at");
 
@@ -121,7 +122,11 @@ describe("reviews.service", () => {
         products_id: product.id,
         rating: 5,
       });
-      await createReview({ users_id: user.id, products_id: product.id, rating: 3 });
+      await createReview({
+        users_id: (await createUser()).id,
+        products_id: product.id,
+        rating: 3,
+      });
 
       const result = await listProductReviews(product.public_id, 1, 20, 5, "-created_at");
 
@@ -135,7 +140,10 @@ describe("reviews.service", () => {
       const user = await createUser();
       const product = await createProduct();
       for (let index = 0; index < 3; index += 1) {
-        await createReview({ users_id: user.id, products_id: product.id });
+        await createReview({
+          users_id: (await createUser()).id,
+          products_id: product.id,
+        });
       }
 
       const result = await listProductReviews(product.public_id, 2, 2, undefined, "-created_at");
@@ -155,7 +163,11 @@ describe("reviews.service", () => {
       const user = await createUser();
       const product = await createProduct();
       const low = await createReview({ users_id: user.id, products_id: product.id, rating: 2 });
-      const high = await createReview({ users_id: user.id, products_id: product.id, rating: 4 });
+      const high = await createReview({
+        users_id: (await createUser()).id,
+        products_id: product.id,
+        rating: 4,
+      });
 
       const result = await listProductReviews(product.public_id, 1, 20, undefined, "rating");
 
@@ -247,8 +259,8 @@ describe("reviews.service", () => {
       const result = await createReviewService(
         user.id,
         reviewInput({ product_public_id: product.public_id, images: [
-          { image_url: "https://example.com/reviews/1.jpg" },
-          { image_url: "https://example.com/reviews/2.jpg", alt_text: "second" },
+          { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/1.jpg" },
+          { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/2.jpg", alt_text: "second" },
         ] }),
       );
 
@@ -257,8 +269,8 @@ describe("reviews.service", () => {
       expect(result.customer_name).toBe(`${user.first_name} ${user.last_name}`);
       expect(result.images.map((image) => image.display_order)).toEqual([1, 2]);
       expect(result.images.map((image) => image.image_url)).toEqual([
-        "https://example.com/reviews/1.jpg",
-        "https://example.com/reviews/2.jpg",
+        "https://ik.imagekit.io/test/ecommerce/reviews/1.jpg",
+        "https://ik.imagekit.io/test/ecommerce/reviews/2.jpg",
       ]);
       expect(result).not.toHaveProperty("is_approved");
       expect(result).not.toHaveProperty("id");
@@ -301,6 +313,33 @@ describe("reviews.service", () => {
       await expect(
         createReviewService(user.id, reviewInput({ product_public_id: product.public_id })),
       ).rejects.toThrow(ConflictError);
+    });
+
+    it("lets the unique index arbitrate concurrent duplicate creates (T-043)", async () => {
+      const user = await createUser();
+      const product = await createProduct();
+      const input = reviewInput({ product_public_id: product.public_id });
+
+      const results = await Promise.allSettled([
+        createReviewService(user.id, input),
+        createReviewService(user.id, input),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === "fulfilled");
+      const rejected = results.filter(
+        (r) => r.status === "rejected" && r.reason instanceof ConflictError,
+      );
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+
+      const liveReviews = await prisma.reviews.count({
+        where: {
+          users_id: user.id,
+          products_id: product.id,
+          deleted_at: null,
+        },
+      });
+      expect(liveReviews).toBe(1);
     });
 
     it("allows a new review after the previous one was soft-deleted", async () => {
@@ -369,14 +408,14 @@ describe("reviews.service", () => {
 
       const result = await updateReviewService(user.id, review.public_id, {
         images: [
-          { image_url: "https://example.com/reviews/new1.jpg" },
-          { image_url: "https://example.com/reviews/new2.jpg" },
+          { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/new1.jpg" },
+          { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/new2.jpg" },
         ],
       });
 
       expect(result.images.map((image) => image.image_url)).toEqual([
-        "https://example.com/reviews/new1.jpg",
-        "https://example.com/reviews/new2.jpg",
+        "https://ik.imagekit.io/test/ecommerce/reviews/new1.jpg",
+        "https://ik.imagekit.io/test/ecommerce/reviews/new2.jpg",
       ]);
       expect(result.images.map((image) => image.display_order)).toEqual([1, 2]);
     });
@@ -505,17 +544,17 @@ describe("reviews.service", () => {
       const user = await createUser();
       const other = await createUser();
       const product = await createProduct();
+      const otherProduct = await createProduct();
       const approved = await createReview({
         users_id: user.id,
         products_id: product.id,
       });
       const unapproved = await createReview({
         users_id: user.id,
-        products_id: product.id,
+        products_id: otherProduct.id,
         is_approved: false,
         rating: 2,
       });
-      await createReview({ users_id: user.id, products_id: product.id, deleted_at: new Date() });
       await createReview({ users_id: other.id, products_id: product.id });
 
       const result = await listOwnReviews(user.id, 1, 20, "-created_at");
@@ -532,8 +571,13 @@ describe("reviews.service", () => {
     it("sorts by rating descending", async () => {
       const user = await createUser();
       const product = await createProduct();
+      const otherProduct = await createProduct();
       const low = await createReview({ users_id: user.id, products_id: product.id, rating: 2 });
-      const high = await createReview({ users_id: user.id, products_id: product.id, rating: 5 });
+      const high = await createReview({
+        users_id: user.id,
+        products_id: otherProduct.id,
+        rating: 5,
+      });
 
       const result = await listOwnReviews(user.id, 1, 20, "-rating");
 
@@ -658,7 +702,7 @@ describe("reviews.service", () => {
       const product = await createProduct();
       await createReview({ users_id: user.id, products_id: product.id });
       const unapproved = await createReview({
-        users_id: user.id,
+        users_id: (await createUser()).id,
         products_id: product.id,
         is_approved: false,
       });
@@ -672,7 +716,11 @@ describe("reviews.service", () => {
       const user = await createUser();
       const product = await createProduct();
       const fiveStar = await createReview({ users_id: user.id, products_id: product.id, rating: 5 });
-      await createReview({ users_id: user.id, products_id: product.id, rating: 1 });
+      await createReview({
+        users_id: (await createUser()).id,
+        products_id: product.id,
+        rating: 1,
+      });
 
       const result = await listAdminReviews(1, 20, undefined, 5, undefined, false, "-created_at");
 
@@ -680,19 +728,21 @@ describe("reviews.service", () => {
     });
 
     it("searches across product name, title, comment, email, and customer name", async () => {
-      const user = await createUser();
+      const authorA = await createUser({ first_name: "Searchable", last_name: "Author" });
+      const authorB = await createUser();
+      const authorC = await createUser();
       const product = await createProduct({ name: "Cotton T-Shirt" });
       const byTitle = await createReview({
-        users_id: user.id,
+        users_id: authorA.id,
         products_id: product.id,
         title: "SearchableTitle",
       });
       const byComment = await createReview({
-        users_id: user.id,
+        users_id: authorB.id,
         products_id: product.id,
         comment: "SearchableComment",
       });
-      await createReview({ users_id: user.id, products_id: product.id });
+      await createReview({ users_id: authorC.id, products_id: product.id });
 
       const byProductName = await listAdminReviews(1, 20, "Cotton", undefined, undefined, false, "-created_at");
       expect(byProductName.reviews).toHaveLength(3);
@@ -703,18 +753,19 @@ describe("reviews.service", () => {
       const byCommentResult = await listAdminReviews(1, 20, "SearchableComment", undefined, undefined, false, "-created_at");
       expect(byCommentResult.reviews.map((review) => review.public_id)).toEqual([byComment.public_id]);
 
-      const byEmail = await listAdminReviews(1, 20, user.email, undefined, undefined, false, "-created_at");
-      expect(byEmail.reviews).toHaveLength(3);
+      const byEmail = await listAdminReviews(1, 20, authorA.email, undefined, undefined, false, "-created_at");
+      expect(byEmail.reviews).toHaveLength(1);
 
-      const byName = await listAdminReviews(1, 20, `${user.first_name} ${user.last_name}`, undefined, undefined, false, "-created_at");
-      expect(byName.reviews).toHaveLength(3);
+      const byName = await listAdminReviews(1, 20, `${authorA.first_name} ${authorA.last_name}`, undefined, undefined, false, "-created_at");
+      expect(byName.reviews).toHaveLength(1);
     });
 
     it("treats LIKE wildcards in search literally", async () => {
       const user = await createUser();
+      const other = await createUser();
       const product = await createProduct();
       await createReview({ users_id: user.id, products_id: product.id, comment: "100% genuine" });
-      await createReview({ users_id: user.id, products_id: product.id, comment: "plain text" });
+      await createReview({ users_id: other.id, products_id: product.id, comment: "plain text" });
 
       const result = await listAdminReviews(1, 20, "100%", undefined, undefined, false, "-created_at");
 
@@ -726,7 +777,11 @@ describe("reviews.service", () => {
       const user = await createUser();
       const product = await createProduct();
       const low = await createReview({ users_id: user.id, products_id: product.id, rating: 1 });
-      const high = await createReview({ users_id: user.id, products_id: product.id, rating: 5 });
+      const high = await createReview({
+        users_id: (await createUser()).id,
+        products_id: product.id,
+        rating: 5,
+      });
 
       const result = await listAdminReviews(1, 20, undefined, undefined, undefined, false, "-rating");
 

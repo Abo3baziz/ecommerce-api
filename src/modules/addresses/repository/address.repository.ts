@@ -68,6 +68,46 @@ export const addressRepository = {
     });
   },
 
+  findById(id: number, client: DbClient = prisma) {
+    return client.user_addresses.findUnique({
+      where: { id },
+      select: addressSelect,
+    });
+  },
+
+  hasDefault(
+    users_id: number,
+    flag: "shipping" | "billing",
+    client: DbClient = prisma,
+  ) {
+    return client.user_addresses.findFirst({
+      where: {
+        users_id,
+        deleted_at: null,
+        ...(flag === "shipping"
+          ? { is_default_shipping: true }
+          : { is_default_billing: true }),
+      },
+      select: { id: true },
+    });
+  },
+
+  findOldestLive(
+    users_id: number,
+    client: DbClient = prisma,
+    excludeId?: number,
+  ) {
+    return client.user_addresses.findFirst({
+      where: {
+        users_id,
+        deleted_at: null,
+        ...(excludeId === undefined ? {} : { id: { not: excludeId } }),
+      },
+      orderBy: [{ created_at: "asc" }, { id: "asc" }],
+      select: addressSelect,
+    });
+  },
+
   findOwnedByPublicId(public_id: string, users_id: number) {
     return prisma.user_addresses.findFirst({
       where: {
@@ -90,8 +130,8 @@ export const addressRepository = {
     });
   },
 
-  countByUser(users_id: number) {
-    return prisma.user_addresses.count({
+  countByUser(users_id: number, client: DbClient = prisma) {
+    return client.user_addresses.count({
       where: {
         users_id,
         deleted_at: null,

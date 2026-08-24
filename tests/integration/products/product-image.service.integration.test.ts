@@ -115,6 +115,31 @@ describe("productImage.service", () => {
   });
 
   describe("updateProductImage", () => {
+    it("arbitrates concurrent promotions to a single primary via the unique index (T-041)", async () => {
+      const product = await createProduct();
+      const current = await createProductImage(product.id, { is_primary: true });
+      const contenderA = await createProductImage(product.id, { display_order: 1 });
+      const contenderB = await createProductImage(product.id, { display_order: 2 });
+
+      const results = await Promise.allSettled([
+        updateProductImageService(product.public_id, contenderA.public_id, {
+          is_primary: true,
+        }),
+        updateProductImageService(product.public_id, contenderB.public_id, {
+          is_primary: true,
+        }),
+      ]);
+
+      const rejected = results.filter((r) => r.status === "rejected");
+      expect(rejected).toHaveLength(1);
+
+      const primaries = await prisma.product_images.count({
+        where: { products_id: product.id, is_primary: true },
+      });
+      expect(primaries).toBe(1);
+      void current;
+    });
+
     it("updates image fields", async () => {
       const product = await createProduct();
       const image = await createProductImage(product.id, { alt_text: "Old" });

@@ -98,6 +98,8 @@ describe("address.service", () => {
       });
       const newer = await createAddress(user.id, {
         ...addressPayload(),
+        is_default_shipping: false,
+        is_default_billing: false,
         created_at: new Date(2021, 0, 1),
       });
 
@@ -219,6 +221,57 @@ describe("address.service", () => {
         updateAddressService(other.id, address.public_id, { city: "Giza" }),
       ).rejects.toThrow(NotFoundError);
     });
+
+    it("promotes the oldest survivor when unsetting the last shipping default (T-042)", async () => {
+      const user = await createUser();
+      const first = await createAddressService(user.id, addressPayload());
+      const second = await createAddressService(user.id, addressPayload());
+
+      await updateAddressService(user.id, first.public_id, {
+        is_default_shipping: false,
+      });
+
+      const firstStored = await prisma.user_addresses.findFirst({
+        where: { public_id: first.public_id },
+      });
+      const secondStored = await prisma.user_addresses.findFirst({
+        where: { public_id: second.public_id },
+      });
+      expect(firstStored!.is_default_shipping).toBe(false);
+      expect(secondStored!.is_default_shipping).toBe(true);
+
+      const defaultCount = await prisma.user_addresses.count({
+        where: {
+          users_id: user.id,
+          deleted_at: null,
+          is_default_shipping: true,
+        },
+      });
+      expect(defaultCount).toBe(1);
+    });
+
+    it("arbitrates concurrent double-default creates via the unique index (T-042)", async () => {
+      const user = await createUser();
+
+      const results = await Promise.allSettled([
+        createAddressService(user.id, addressPayload({ is_default_shipping: true })),
+        createAddressService(user.id, addressPayload({ is_default_shipping: true })),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === "fulfilled");
+      const rejected = results.filter((r) => r.status === "rejected");
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+
+      const defaultCount = await prisma.user_addresses.count({
+        where: {
+          users_id: user.id,
+          deleted_at: null,
+          is_default_shipping: true,
+        },
+      });
+      expect(defaultCount).toBe(1);
+    });
   });
 
   describe("deleteAddress", () => {
@@ -246,6 +299,24 @@ describe("address.service", () => {
       await expect(
         deleteAddressService(other.id, address.public_id),
       ).rejects.toThrow(NotFoundError);
+    });
+
+    it("promotes a successor when deleting the default address (T-042)", async () => {
+      const user = await createUser();
+      const older = await createAddressService(user.id, addressPayload());
+      const defaultAddress = await createAddressService(user.id, addressPayload({
+        is_default_shipping: true,
+        is_default_billing: true,
+      }));
+
+      await deleteAddressService(user.id, defaultAddress.public_id);
+
+      const survivor = await prisma.user_addresses.findFirst({
+        where: { public_id: older.public_id },
+      });
+      expect(survivor!.is_default_shipping).toBe(true);
+      expect(survivor!.is_default_billing).toBe(true);
+      expect(survivor!.deleted_at).toBeNull();
     });
   });
 });

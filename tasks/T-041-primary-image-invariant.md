@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-041 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/primary-image-invariant` |
 | **Depends on** | T-047 (index/migration approach) |
@@ -26,8 +26,8 @@ At most one primary image per product, enforced by the database.
 
 ## Acceptance criteria
 
-- [ ] Concurrent promotions test ends with exactly one primary; loser 409.
-- [ ] Existing product-image suite green.
+- [x] Concurrent promotions test ends with exactly one primary; loser 409.
+- [x] Existing product-image suite green.
 
 ## References
 

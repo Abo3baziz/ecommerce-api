@@ -61,8 +61,8 @@ export const productImageRepository = {
     });
   },
 
-  countByProduct(products_id: number) {
-    return prisma.product_images.count({
+  countByProduct(products_id: number, client: DbClient = prisma) {
+    return client.product_images.count({
       where: { products_id },
     });
   },
