@@ -83,9 +83,9 @@ Task backlog derived from two audits:
 | T-038 | [T-038-phone-otp-attempt-limit.md](./T-038-phone-otp-attempt-limit.md) | Phone OTP attempt limiting + failure counter | wontfix |
 | T-039 | [T-039-admin-contact-edit-guard.md](./T-039-admin-contact-edit-guard.md) | Guard admin edits of customer contact fields | done |
 | T-040 | [T-040-cart-advisory-lock-coverage.md](./T-040-cart-advisory-lock-coverage.md) | Cart mutations must respect the per-user advisory lock | done |
-| T-041 | [T-041-primary-image-invariant.md](./T-041-primary-image-invariant.md) | Primary-image invariant via partial unique index | todo |
-| T-042 | [T-042-address-default-invariant.md](./T-042-address-default-invariant.md) | Fix address default-flag invariant (zero/multi defaults) | todo |
-| T-043 | [T-043-duplicate-review-backstop.md](./T-043-duplicate-review-backstop.md) | Duplicate-review DB backstop (partial unique index) | todo |
+| T-041 | [T-041-primary-image-invariant.md](./T-041-primary-image-invariant.md) | Primary-image invariant via partial unique index | done |
+| T-042 | [T-042-address-default-invariant.md](./T-042-address-default-invariant.md) | Fix address default-flag invariant (zero/multi defaults) | done |
+| T-043 | [T-043-duplicate-review-backstop.md](./T-043-duplicate-review-backstop.md) | Duplicate-review DB backstop (partial unique index) | done |
 | T-044 | [T-044-like-escape-other-modules.md](./T-044-like-escape-other-modules.md) | Escape LIKE wildcards in remaining search endpoints | done |
 | T-045 | [T-045-rating-summary-filter-bug.md](./T-045-rating-summary-filter-bug.md) | Review summary must ignore the rating filter | todo |
 | T-046 | [T-046-idle-timeout-effective.md](./T-046-idle-timeout-effective.md) | Make session idle timeout effective (constant == TTL) | done |
