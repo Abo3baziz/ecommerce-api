@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-010 |
 | **Priority** | P1 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `docs` / `chore` |
 | **Branch** | `docs/deploy-ops-checklist` (or `chore/…` if scripts added) |
 | **Depends on** | — |
@@ -35,9 +35,9 @@ Document (and implement only if missing and small):
 
 ## Acceptance criteria
 
-- [ ] Runbook merged and linked from `AGENTS.md` / docs index if appropriate.
-- [ ] Multi-instance rate-limit risk explicitly called out with a mitigation path.
-- [ ] Backup/restore steps are actionable.
+- [x] Runbook merged and linked from `AGENTS.md` / docs index if appropriate.
+- [x] Multi-instance rate-limit risk explicitly called out with a mitigation path.
+- [x] Backup/restore steps are actionable.
 
 ## References
 
