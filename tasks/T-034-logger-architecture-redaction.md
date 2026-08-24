@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-034 |
 | **Priority** | P1 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `refactor` |
 | **Branch** | `refactor/logger-sink-redaction` |
 | **Depends on** | — |
@@ -30,9 +30,9 @@ Bounded, append-only logging that never persists raw tokens.
 
 ## Acceptance criteria
 
-- [ ] Logging is O(1) per entry; rotation verified.
-- [ ] No raw token appears in any log output (regression test greps log output for seeded token).
-- [ ] LOGGER.md matches implementation.
+- [x] Logging is O(1) per entry; rotation verified.
+- [x] No raw token appears in any log output (regression test greps log output for seeded token).
+- [x] LOGGER.md matches implementation.
 
 ## References
 

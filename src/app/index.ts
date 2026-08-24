@@ -9,6 +9,7 @@ import { requestId } from "../middleware/requestId.js";
 import { rateLimiter } from "../middleware/rateLimiter.js";
 import { errorHandler } from "../middleware/errorHandler.js";
 import { logger } from "../shared/logger/index.js";
+import { stripUrlQuery } from "../shared/logger/redact.js";
 import { router } from "../routes/index.js";
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../public");
@@ -28,7 +29,9 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const context = {
       method: req.method,
-      url: req.originalUrl,
+      // Query strings carry single-use credentials (email-verification and
+      // reset tokens); persist the pathname only.
+      url: stripUrlQuery(req.originalUrl),
       status: res.statusCode,
       duration: Date.now() - start,
       requestId: req.headers["x-request-id"],

@@ -7,10 +7,10 @@ Implement a centralized logging system for the application.
 The logging system must:
 
 * Log to the terminal while the server is running.
-* Persist logs to a local `logs/log.json` file.
-* Store logs in a structured JSON format.
-* Categorize logs by type.
-* Append new log entries without overwriting existing ones.
+* Persist logs to append-only NDJSON files under `logs/`.
+* Store logs in a structured JSON format (one JSON object per line).
+* Append new log entries in O(1) — never re-read or rewrite existing content.
+* Never persist raw credentials (tokens, OTPs, passwords) from URLs.
 
 ---
 
@@ -30,167 +30,99 @@ Requirements:
 
 # Log Destinations
 
-Every log entry must be written to both:
+Every log entry is written to both:
 
 1. Terminal (stdout)
-2. `logs/log.json`
+2. `logs/app.ndjson` (append-only, one JSON object per line)
 
-Both outputs must contain the same structured information.
+Both outputs contain the same structured information.
+
+> **Migration note:** the original design persisted a categorized,
+> pretty-printed `logs/log.json` that was fully re-read and rewritten on every
+> entry. That design was O(n²) per write, grew without bound, risked corruption
+> on partial writes, and was unsafe with multiple instances. It was replaced by
+> the append-only sink described here; `logs/log.json` is no longer written.
 
 ---
 
-# Log Categories
+# File Behavior
 
-The JSON file must contain one top-level section for each log category.
+* If `logs/app.ndjson` does not exist it is created on first write (directory created as needed).
+* Entries are appended sequentially — existing content is never read back or modified.
+
+## Rotation and retention
+
+* When `app.ndjson` exceeds **5 MB**, it is rotated before the next write: the current file becomes `app.ndjson.1`.
+* Older rotations shift (`app.ndjson.1` → `.2` → `.3`); a maximum of **3** rotated files are kept.
+* Total on-disk footprint is therefore bounded at ~20 MB.
+
+---
+
+# Record Structure
+
+Each line in `app.ndjson` is one JSON object:
 
 ```json
 {
-  "success": {},
-  "info": {},
-  "warning": {},
-  "error": {},
-  "debug": {}
+  "level": "success",
+  "time": 1736184950739,
+  "msg": "Request completed",
+  "method": "GET",
+  "url": "/health",
+  "status": 200,
+  "duration": 2,
+  "requestId": "i_lQdGF0yeO7E8xX"
 }
 ```
 
-Each category stores its own records.
+Levels are string labels (`success`, `info`, `warning`, `error`, `debug`) via Pino custom levels. The categorized view that the old `log.json` provided can be derived by filtering lines on `level`.
 
----
+## Common Fields
 
-# Record IDs
+Every log entry includes, when applicable:
 
-Each new log entry must receive the next sequential string key.
-
-Example:
-
-```json
-{
-  "error": {
-    "1": {},
-    "2": {},
-    "3": {}
-  }
-}
-```
-
-The agent must determine the next available number before writing.
-
-Existing records must never be overwritten.
-
----
-
-# Success Log Structure
-
-```json
-{
-  "success": {
-    "1": {
-      "timestamp": "2026-08-07T01:55:50.739Z",
-      "level": "success",
-      "method": "GET",
-      "url": "/health",
-      "status": 200,
-      "duration": 2,
-      "requestId": "i_lQdGF0yeO7E8xX",
-      "message": "Health check completed."
-    }
-  }
-}
-```
-
----
-
-# Error Log Structure
-
-```json
-{
-  "error": {
-    "1": {
-      "timestamp": "2026-08-07T01:57:48.404Z",
-      "level": "error",
-      "method": "GET",
-      "url": "/api/v1/health",
-      "status": 404,
-      "duration": 4,
-      "requestId": "8EkbWYA25lyjeU2m",
-      "error": {
-        "code": "RESOURCE_NOT_FOUND",
-        "message": "The requested resource was not found.",
-        "details": null
-      }
-    }
-  }
-}
-```
-
----
-
-# Common Fields
-
-Every log entry should include, when applicable:
-
-* timestamp
+* timestamp (`time`)
 * level
-* message
+* message (`msg`)
 * requestId
 * method
-* url
+* url (**pathname only — query strings are stripped, see Redaction**)
 * status
 * duration
 * userId
 * ip
 * userAgent
 
-Error logs should additionally include:
+Error entries additionally include a serialized `err`:
 
-* error.code
-* error.message
-* error.details
-* stack (development only)
-
----
-
-# File Behavior
-
-If `logs/log.json` does not exist:
-
-* Create the directory.
-* Create the file.
-* Initialize it with:
-
-```json
-{
-  "success": {},
-  "info": {},
-  "warning": {},
-  "error": {},
-  "debug": {}
-}
-```
+* err.code
+* err.message
+* err.details
+* err.stack (development only)
 
 ---
 
-# Write Rules
+# URL Redaction
 
-For every new log:
+Request middleware logs `req.originalUrl`'s **pathname only**
+(`stripUrlQuery` in `src/shared/logger/redact.ts`).
 
-1. Read the current JSON file.
-2. Determine the correct category.
-3. Find the highest numeric key.
-4. Increment it.
-5. Insert the new log.
-6. Save the updated JSON.
-7. Never overwrite existing entries.
+Email links embed single-use credentials (`?token=…` on verification,
+email-change and password-reset links) and some flows pass OTPs or secrets
+as query parameters. Because the entire query string is dropped, every such
+value (token, otp, password, …) is kept out of persistent logs by design —
+there is no key allowlist to maintain. Regression coverage:
+`tests/unit/shared/logger.redact.test.ts`.
 
 ---
 
 # Terminal Output
 
-While the server is running, all logs must continue to appear in the terminal.
+While the server is running, all logs continue to appear in the terminal.
 
-Development output should be human-readable.
+Development output is human-readable (pino-pretty).
 
-Production output should remain structured JSON.
+Production output remains structured JSON on stdout.
 
 ---
 
@@ -219,6 +151,7 @@ Do not log:
 * JWTs
 * OTP codes
 * API keys
+* Raw tokens (including URL query tokens)
 * Credit card data
 * Sensitive personal information
 
@@ -227,19 +160,18 @@ Do not log:
 # Performance Considerations
 
 * Logging failures must never crash the application.
-* File writes should be non-blocking where possible.
-* The logger must be reusable throughout the application via dependency injection or a shared singleton.
-* All application components should use the same logger instance.
+* File writes are non-blocking and serialized through an internal promise chain.
+* Each entry costs one O(1) append; rotation is a rename, not a copy.
+* The logger is a shared singleton used throughout the application.
 
 ---
 
 # Goal
 
-The resulting logging system should provide:
+The resulting logging system provides:
 
 * Real-time terminal logging.
-* Persistent structured logs in `logs/log.json`.
-* Categorized log storage.
-* Sequential log records.
-* Consistent JSON structure across the entire application.
+* Persistent structured NDJSON logs under `logs/` with bounded disk usage.
+* O(1) appends with atomic renames for rotation.
+* Credentials-free persistent output.
 * A single centralized logging implementation used throughout the project.
