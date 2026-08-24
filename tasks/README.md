@@ -1,4 +1,4 @@
-﻿# Production Readiness Tasks
+# Production Readiness Tasks
 
 Task backlog derived from two audits:
 
@@ -52,13 +52,13 @@ Task backlog derived from two audits:
 | T-007 | [T-007-orders-updateMany-counts.md](./T-007-orders-updateMany-counts.md) | Orders §2.5 — check `updateMany` affected-row counts | done |
 | T-008 | [T-008-auto-restock-on-cancel.md](./T-008-auto-restock-on-cancel.md) | Auto-restock inventory on cancel/refund | done |
 | T-009 | [T-009-real-sms-provider.md](./T-009-real-sms-provider.md) | Real SMS provider for phone OTP | wontfix |
-| T-010 | [T-010-deploy-ops-checklist.md](./T-010-deploy-ops-checklist.md) | Deploy & ops checklist (secrets, monitoring, backups) | todo |
+| T-010 | [T-010-deploy-ops-checklist.md](./T-010-deploy-ops-checklist.md) | Deploy & ops checklist (secrets, monitoring, backups) | done |
 | T-029 | [T-029-login-brute-force-defense.md](./T-029-login-brute-force-defense.md) | Login/register brute-force defense (IP limits + account lockout) | done |
 | T-030 | [T-030-shipment-address-width-mismatch.md](./T-030-shipment-address-width-mismatch.md) | Checkout 500: shipment address column-width mismatch | done |
 | T-031 | [T-031-reset-password-page-missing.md](./T-031-reset-password-page-missing.md) | Build the missing reset-password page | done |
-| T-032 | [T-032-test-db-isolation-guard.md](./T-032-test-db-isolation-guard.md) | Test/dev DB isolation + destructive-cleanup guard | todo |
-| T-033 | [T-033-trust-proxy-config.md](./T-033-trust-proxy-config.md) | Configure trust proxy for correct client IPs | todo |
-| T-034 | [T-034-logger-architecture-redaction.md](./T-034-logger-architecture-redaction.md) | Logger: O(n²) rewrite, rotation, token redaction | todo |
+| T-032 | [T-032-test-db-isolation-guard.md](./T-032-test-db-isolation-guard.md) | Test/dev DB isolation + destructive-cleanup guard | done |
+| T-033 | [T-033-trust-proxy-config.md](./T-033-trust-proxy-config.md) | Configure trust proxy for correct client IPs | done |
+| T-034 | [T-034-logger-architecture-redaction.md](./T-034-logger-architecture-redaction.md) | Logger: O(n²) rewrite, rotation, token redaction | done |
 
 ### P2 — Correctness / invariants / platform
 
