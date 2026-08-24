@@ -22,7 +22,8 @@ reversed (decision recorded in `tasks/T-011-openapi-spec.md`).
 | Module | Status |
 | --- | --- |
 | Auth (`/auth/*`) | covered |
-| Users, Addresses, Catalog, Cart, Orders, Reviews, Admin | planned — see `tasks/T-011-openapi-spec.md` |
+| Users profile/password/email/phone + Addresses (`/users/me*`) | covered |
+| Catalog, Cart, Orders, Reviews, Admin | planned — see `tasks/T-011-openapi-spec.md` |
 
 Common shapes are defined once under `components`: `SuccessEnvelope`,
 `ErrorEnvelope`, `PaginationMeta`, and reusable error responses.

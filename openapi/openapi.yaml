@@ -20,6 +20,10 @@ servers:
 tags:
   - name: Auth
     description: Registration, login, sessions, email verification, password reset.
+  - name: Users
+    description: Profile management, password, email/phone change, account deletion.
+  - name: Addresses
+    description: Customer address book with per-type default flags.
 security:
   - sessionCookie: []
 
@@ -264,6 +268,224 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "410": { $ref: "#/components/responses/Gone" }
 
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get the authenticated user's profile.
+      operationId: getCurrentUser
+      responses:
+        "200":
+          description: Profile with verification state and role.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [Users]
+      summary: Update profile names.
+      operationId: updateCurrentUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name: { type: string, minLength: 1, maxLength: 100 }
+                last_name: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        "200":
+          description: Updated profile.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [Users]
+      summary: Soft-delete the account (requires password).
+      operationId: deleteCurrentUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        "204": { description: Account deleted; sessions revoked. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /users/me/password:
+    patch:
+      tags: [Users]
+      summary: Change password (re-authenticates with the current one).
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string }
+                new_password: { type: string, minLength: 8 }
+      responses:
+        "200": { description: Password changed. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /users/me/email:
+    post:
+      tags: [Users]
+      summary: Request an email change (sends verification to the new address).
+      operationId: requestEmailChange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_email, password]
+              properties:
+                new_email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "202": { description: Verification email queued. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /users/me/email/verify:
+    post:
+      tags: [Users]
+      summary: Verify an email change with the emailed token.
+      operationId: verifyEmailChange
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200": { description: Email updated. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/Gone" }
+  /users/me/phone-number:
+    post:
+      tags: [Users]
+      summary: Request a phone-number change (sends an OTP code).
+      operationId: requestPhoneChange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_phone_number, password]
+              properties:
+                new_phone_number:
+                  type: string
+                  pattern: '^\+[1-9]\d{1,14}$'
+                  description: E.164 format.
+                password: { type: string }
+      responses:
+        "202": { description: OTP dispatched. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /users/me/phone-number/verify:
+    post:
+      tags: [Users]
+      summary: Verify a phone-number change with the OTP code.
+      operationId: verifyPhoneChange
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_phone_number, otp, password]
+              properties:
+                new_phone_number: { type: string }
+                otp: { type: string }
+                password: { type: string }
+      responses:
+        "200": { description: Phone number updated. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "410": { $ref: "#/components/responses/Gone" }
+  /users/me/addresses:
+    get:
+      tags: [Addresses]
+      summary: List addresses (paginated, newest first).
+      operationId: listAddresses
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Paginated address list.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Addresses]
+      summary: Create an address. First address becomes default for both types.
+      operationId: createAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressInput"
+      responses:
+        "201":
+          description: Created address.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /users/me/addresses/{address_public_id}:
+    get:
+      tags: [Addresses]
+      summary: Get one owned address.
+      operationId: getAddress
+      parameters:
+        - $ref: "#/components/parameters/AddressPublicId"
+      responses:
+        "200": { description: The address. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Addresses]
+      summary: Partially update an owned address.
+      operationId: updateAddress
+      parameters:
+        - $ref: "#/components/parameters/AddressPublicId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressInput"
+      responses:
+        "200": { description: Updated address. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Addresses]
+      summary: Soft-delete an owned address; a surviving address is promoted if it was a default.
+      operationId: deleteAddress
+      parameters:
+        - $ref: "#/components/parameters/AddressPublicId"
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
 components:
   securitySchemes:
     sessionCookie:
@@ -296,6 +518,29 @@ components:
         totalPages: { type: integer, minimum: 0 }
         hasNext: { type: boolean }
         hasPrev: { type: boolean }
+    AddressInput:
+      type: object
+      required: [recipient_name, phone_number, country, state, city, address_1]
+      properties:
+        recipient_name: { type: string, minLength: 1, maxLength: 100 }
+        phone_number: { type: string, maxLength: 20 }
+        label: { type: string, maxLength: 50 }
+        country: { type: string, minLength: 1, maxLength: 100 }
+        state: { type: string, minLength: 1, maxLength: 100 }
+        city: { type: string, minLength: 1, maxLength: 100 }
+        address_1: { type: string, minLength: 1 }
+        address_2: { type: string }
+        zip_code: { type: string, maxLength: 20 }
+        is_default_shipping: { type: boolean }
+        is_default_billing: { type: boolean }
+  parameters:
+    AddressPublicId:
+      name: address_public_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^adr_"
   responses:
     BadRequest:
       description: Invalid body, query or path parameter.
