@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-032 |
 | **Priority** | P1 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `chore` |
 | **Branch** | `chore/test-db-isolation` |
 | **Depends on** | — |
@@ -27,9 +27,9 @@ Tests can never destroy non-test data.
 
 ## Acceptance criteria
 
-- [ ] Setup aborts with a clear error when targeting a non-test database.
-- [ ] Dev data survives a full suite run.
-- [ ] CI updated to the isolated DB.
+- [x] Setup aborts with a clear error when targeting a non-test database.
+- [x] Dev data survives a full suite run.
+- [x] CI updated to the isolated DB.
 
 ## References
 

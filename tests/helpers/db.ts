@@ -1,6 +1,11 @@
 import { prisma } from "../../src/config/database.js";
+import { assertTestDatabase } from "../setup/env.setup.js";
 
 export async function cleanupTestData(): Promise<void> {
+  // Defense-in-depth: the wipe below must never run against a non-test DB,
+  // even if a future refactor removes the setup-file guard.
+  assertTestDatabase(process.env.DATABASE_URL);
+
   const testUsers = await prisma.users.findMany({
     where: { email: { startsWith: "test-" } },
     select: { id: true },

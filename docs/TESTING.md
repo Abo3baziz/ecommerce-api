@@ -141,7 +141,8 @@ Current scripts (from `package.json`):
 
 # 10. Database Testing with PostgreSQL/Prisma
 
-- **Never run integration tests against the production/dev database.** Tests use the `Ecommerce_DB` database's `Ecommerce` schema locally and a dedicated Postgres database in CI (`ecommerce_test`).
+- **Never run integration tests against the production/dev database.** Locally, tests target the dedicated `Ecommerce_test` schema of the `Ecommerce_DB` database (created once via `npx prisma db push --url "postgresql://…/Ecommerce_DB?schema=Ecommerce_test"`); CI uses a dedicated Postgres database (`ecommerce_test`).
+- **Fail-fast guard:** `tests/setup/env.setup.ts` aborts the suite unless the configured database name or schema name contains "test". `cleanupTestData()` re-checks the same rule before its destructive wipe, so catalog data in a non-test database can never be deleted by accident — even if the setup guard is bypassed.
 - The project uses Prisma 7 with `@prisma/adapter-pg`. Notes that affect testing:
   - `prisma db push` supports a `--url` flag to override the datasource URL — CI uses it to prepare the test database. (`--skip-generate` is **not** supported in Prisma 7; `prisma generate` runs separately.)
   - Both Prisma clients force the pg session timezone to UTC (`options: "-c timezone=UTC"`). Any test-created Prisma client must do the same so timestamptz comparisons (token expiry, session TTL) behave identically in tests.
@@ -237,7 +238,7 @@ For each business-rule error path: assert the exact documented status — e.g. c
 
 The env schema (`src/config/env.ts`) is validated by zod and calls `process.exit(1)` on failure. Any test run must satisfy:
 
-- `DATABASE_URL` (local: the `Ecommerce_DB` database's `Ecommerce` schema)
+- `DATABASE_URL` (local: the `Ecommerce_DB` database's `Ecommerce_test` schema)
 - `SESSION_SECRET` (≥16 chars)
 - `CORS_ORIGIN`
 - `RESEND_API_KEY` (non-empty; use a dummy value)
