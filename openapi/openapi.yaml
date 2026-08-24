@@ -24,6 +24,8 @@ tags:
     description: Profile management, password, email/phone change, account deletion.
   - name: Addresses
     description: Customer address book with per-type default flags.
+  - name: Catalog
+    description: Public product and category browsing.
 security:
   - sessionCookie: []
 
@@ -486,6 +488,88 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /products:
+    get:
+      tags: [Catalog]
+      summary: List customer-visible products.
+      operationId: listProducts
+      security: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string }
+          description: Case-insensitive match on name, brand or description.
+        - name: brand
+          in: query
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at, -created_at, name, -name]
+            default: "-created_at"
+      responses:
+        "200":
+          description: Paginated products; each carries a primary_image thumbnail.
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /products/{product_public_id}:
+    get:
+      tags: [Catalog]
+      summary: Product detail with active variants and images.
+      operationId: getProduct
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+      responses:
+        "200":
+          description: |
+            Product with `images` (ordered by display_order, includes
+            is_primary) and `variants` (ACTIVE only) each carrying their own
+            images and computed final_price.
+        "404": { $ref: "#/components/responses/NotFound" }
+  /categories:
+    get:
+      tags: [Catalog]
+      summary: List categories.
+      operationId: listCategories
+      security: []
+      responses:
+        "200": { description: Paginated categories. }
+  /categories/{category_public_id}:
+    get:
+      tags: [Catalog]
+      summary: Get one category.
+      operationId: getCategory
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CategoryPublicId"
+      responses:
+        "200": { description: The category. }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /categories/{category_public_id}/products:
+    get:
+      tags: [Catalog]
+      summary: List the products of a category (paginated).
+      operationId: listCategoryProducts
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CategoryPublicId"
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200": { description: Paginated products in the category. }
+        "404": { $ref: "#/components/responses/NotFound" }
+
 components:
   securitySchemes:
     sessionCookie:
@@ -533,7 +617,27 @@ components:
         zip_code: { type: string, maxLength: 20 }
         is_default_shipping: { type: boolean }
         is_default_billing: { type: boolean }
+    ProductPrimaryImage:
+      type: object
+      required: [image_url]
+      properties:
+        image_url: { type: string }
+        alt_text: { type: [string, "null"] }
   parameters:
+    ProductPublicId:
+      name: product_public_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^prd_"
+    CategoryPublicId:
+      name: category_public_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^cat_"
     AddressPublicId:
       name: address_public_id
       in: path
