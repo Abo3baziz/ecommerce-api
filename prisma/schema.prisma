@@ -174,6 +174,7 @@ model orders {
   @@index([status], map: "idx_orders_status")
   @@index([user_addresses_id], map: "idx_orders_user_address_id")
   @@index([users_id], map: "idx_orders_user_id")
+  @@index([users_id, placed_at], map: "idx_orders_users_id_placed_at")
 }
 
 model password_reset_tokens {
@@ -216,6 +217,7 @@ model payments {
   @@index([public_id], map: "idx_payments_public_id")
   @@index([status], map: "idx_payments_status")
   @@index([transaction_reference], map: "idx_payments_transaction_reference")
+  @@index([users_id], map: "idx_payments_user_id")
 }
 
 model product_categories {
@@ -598,4 +600,5 @@ model operating_expenses {
 
   @@index([spent_at], map: "idx_operating_expenses_spent_at")
   @@index([category], map: "idx_operating_expenses_category")
+  @@index([created_by_users_id], map: "idx_operating_expenses_created_by_user_id")
 }

@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-049 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `chore` |
 | **Branch** | `chore/payments-users-index` |
 | **Depends on** | T-047 preferred (migration path) |
@@ -25,8 +25,8 @@ All FK columns indexed.
 
 ## Acceptance criteria
 
-- [ ] Schema updated; applied via migration (or db push per current workflow).
-- [ ] Query plan uses the index for a users-scoped payments query.
+- [x] Schema updated; applied via migration (or db push per current workflow).
+- [x] Query plan uses the index for a users-scoped payments query.
 
 ## References
 

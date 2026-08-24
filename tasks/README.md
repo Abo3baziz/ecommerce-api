@@ -74,7 +74,7 @@ Task backlog derived from two audits:
 | T-018 | [T-018-super-admin-recovery-cli.md](./T-018-super-admin-recovery-cli.md) | SUPER_ADMIN recovery / demotion CLI | todo |
 | T-019 | [T-019-payment-refund-status-guard.md](./T-019-payment-refund-status-guard.md) | Scope `markPaymentRefunded` to `PAID` only | todo |
 | T-020 | [T-020-shipment-null-guards.md](./T-020-shipment-null-guards.md) | Defensive shipment null guards | todo |
-| T-021 | [T-021-orders-composite-index.md](./T-021-orders-composite-index.md) | Composite index `(users_id, placed_at)` on orders | todo |
+| T-021 | [T-021-orders-composite-index.md](./T-021-orders-composite-index.md) | Composite index `(users_id, placed_at)` on orders | done |
 | T-022 | [T-022-imagekit-live-upload-verify.md](./T-022-imagekit-live-upload-verify.md) | Live ImageKit client-side upload verification | todo |
 | T-023 | [T-023-stale-progress-cleanup.md](./T-023-stale-progress-cleanup.md) | Clean stale Next Step entries in PROJECT_PROGRESS | todo |
 | T-035 | [T-035-prisma-error-mapping.md](./T-035-prisma-error-mapping.md) | Global Prisma error mapping (P2002/P2025 → 4xx) | done |
@@ -91,7 +91,7 @@ Task backlog derived from two audits:
 | T-046 | [T-046-idle-timeout-effective.md](./T-046-idle-timeout-effective.md) | Make session idle timeout effective (constant == TTL) | done |
 | T-047 | [T-047-migrations-baseline.md](./T-047-migrations-baseline.md) | Baseline Prisma migrations + migrate deploy | done |
 | T-048 | [T-048-dependency-audit-vulns.md](./T-048-dependency-audit-vulns.md) | Resolve high-severity npm audit findings | todo |
-| T-049 | [T-049-payments-users-index.md](./T-049-payments-users-index.md) | Add missing index on payments.users_id | todo |
+| T-049 | [T-049-payments-users-index.md](./T-049-payments-users-index.md) | Add missing index on payments.users_id | done |
 | T-050 | [T-050-ci-push-trigger.md](./T-050-ci-push-trigger.md) | Run CI on pushes to main (close direct-push bypass) | todo |
 | T-051 | [T-051-api-404-envelope.md](./T-051-api-404-envelope.md) | JSON 404 envelope for unknown /api routes | done |
 | T-052 | [T-052-health-readiness.md](./T-052-health-readiness.md) | Health/readiness endpoint with DB probe, above limiter | done |

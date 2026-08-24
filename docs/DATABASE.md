@@ -221,6 +221,9 @@ idx_{dt}_{sc}
 
 Examples
 
+Composite and FK-coverage notes:
+
+
 ```
 idx_users_email
 idx_users_public_id
@@ -230,6 +233,11 @@ idx_product_variants_product_id
 ```
 
 > Note: several legacy index names reference the singular conceptual column rather than the actual foreign-key column (e.g., `idx_orders_user_id` indexes `users_id`, `idx_product_variants_product_id` indexes `products_id`, `idx_cart_items_cart_id` indexes `carts_id`). Index map names are authoritative.
+
+Composite and FK-coverage notes (T-021 / T-049):
+
+- `idx_orders_users_id_placed_at` serves the customer order list, which filters by `users_id` and sorts by `placed_at DESC`.
+- Every FK column carries an index. `idx_payments_user_id` and `idx_operating_expenses_created_by_user_id` closed the last two gaps found by the audit sweep.
 
 ---
 

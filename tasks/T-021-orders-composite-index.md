@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-021 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `chore` / db |
 | **Branch** | `chore/orders-user-placed-index` |
 | **Depends on** | — |
@@ -26,8 +26,8 @@ Add index and document in `docs/DATABASE.md`.
 
 ## Acceptance criteria
 
-- [ ] Index exists in schema/DB.
-- [ ] DATABASE.md updated.
+- [x] Index exists in schema/DB.
+- [x] DATABASE.md updated.
 
 ## References
 
