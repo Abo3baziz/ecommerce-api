@@ -164,7 +164,7 @@ describe("reviews API", () => {
             reviewPayload({
               product_public_id: product.public_id,
               images: [
-                { image_url: "https://example.com/reviews/a.jpg", alt_text: "a" },
+                { image_url: "https://ik.imagekit.io/test/ecommerce/reviews/a.jpg", alt_text: "a" },
               ],
             }),
           );
@@ -331,9 +331,10 @@ describe("reviews API", () => {
           users_id: storedUser!.id,
           products_id: product.id,
         });
+        const otherProduct = await createProduct();
         const unapproved = await createReview({
           users_id: storedUser!.id,
-          products_id: product.id,
+          products_id: otherProduct.id,
           rating: 2,
           is_approved: false,
         });
@@ -434,8 +435,10 @@ describe("reviews API", () => {
         const product = await createProduct();
         const storedUser = await userByEmail(payload.email);
         await createReview({ users_id: storedUser!.id, products_id: product.id });
+        const secondAuthor = await registerUser(app);
+        const secondUserId = (await userByEmail(secondAuthor.payload.email))!.id;
         const unapproved = await createReview({
-          users_id: storedUser!.id,
+          users_id: secondUserId,
           products_id: product.id,
           rating: 1,
           is_approved: false,

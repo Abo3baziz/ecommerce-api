@@ -1283,7 +1283,10 @@ describe("orders.service", () => {
       });
       expect(updatedCoupon?.usage_count).toBe(0);
 
-      const address = await createAddress(user.id);
+      const address = await createAddress(user.id, {
+        is_default_shipping: false,
+        is_default_billing: false,
+      });
       const cart = await createCart(user.id);
       const variant = await createVariant(
         await createProduct().then((p) => p.id),
