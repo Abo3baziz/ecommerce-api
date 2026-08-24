@@ -5,6 +5,7 @@ import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { env } from "../config/env.js";
+import { prisma } from "../config/database.js";
 import { requestId } from "../middleware/requestId.js";
 import { rateLimiter } from "../middleware/rateLimiter.js";
 import { errorHandler } from "../middleware/errorHandler.js";
@@ -55,14 +56,41 @@ app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
+// Health probes live above the global rate limiter: LB/uptime checks come
+// from one IP and would otherwise 429-flap a healthy instance (T-052).
+const DB_PROBE_TIMEOUT_MS = 2000;
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.get("/health/ready", async (_req, res) => {
+  try {
+    await Promise.race([
+      prisma.$queryRaw`SELECT 1`,
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("database probe timed out")),
+          DB_PROBE_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+    res.json({ status: "ok", db: "up" });
+  } catch {
+    res.status(503).json({ status: "degraded", db: "down" });
+  }
+});
+
 if (env.NODE_ENV !== "test") {
   app.use(rateLimiter);
 }
 
 app.use("/api", router);
 
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+// Unknown /api routes get the JSON error envelope instead of Express's
+// default HTML 404 (T-051). Non-API paths keep their existing behavior.
+app.use("/api", (_req, res) => {
+  res.status(404).json({ success: false, message: "Not found" });
 });
 
 app.use(express.static(PUBLIC_DIR));

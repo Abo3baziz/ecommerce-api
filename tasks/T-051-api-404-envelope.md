@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-051 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/api-404-envelope` |
 | **Depends on** | — |
@@ -25,8 +25,8 @@ All `/api/*` 404/405 responses use the API error envelope.
 
 ## Acceptance criteria
 
-- [ ] Unknown `/api/*` path returns JSON envelope with 404.
-- [ ] e2e test added.
+- [x] Unknown `/api/*` path returns JSON envelope with 404.
+- [x] e2e test added.
 
 ## References
 

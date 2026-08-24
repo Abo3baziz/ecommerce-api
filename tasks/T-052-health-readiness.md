@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-052 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `feature` |
 | **Branch** | `feature/health-readiness` |
 | **Depends on** | — |
@@ -26,9 +26,9 @@ Cheap liveness + dependency-aware readiness, both outside rate limiting.
 
 ## Acceptance criteria
 
-- [ ] `/health` never 429s under probe load.
-- [ ] `/health/ready` reflects DB outage (503) and recovery.
-- [ ] Tests for both endpoints.
+- [x] `/health` never 429s under probe load.
+- [x] `/health/ready` reflects DB outage (503) and recovery.
+- [x] Tests for both endpoints.
 
 ## References
 
