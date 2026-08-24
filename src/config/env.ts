@@ -18,6 +18,25 @@ const envSchema = z.object({
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   REGISTER_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+  // Express "trust proxy" value for correct client IPs behind a reverse
+  // proxy/LB: "true", a hop count ("1"), or comma-separated CIDRs.
+  // Unset/"false" = direct exposure (socket peer is the client).
+  TRUST_PROXY: z
+    .string()
+    .optional()
+    .transform((value) => {
+      const raw = value?.trim();
+      if (!raw || raw === "false") {
+        return false as const;
+      }
+      if (raw === "true") {
+        return true as const;
+      }
+      if (/^\d+$/.test(raw)) {
+        return Number(raw);
+      }
+      return raw.split(",").map((entry) => entry.trim()).filter(Boolean);
+    }),
   // Strict enum parse (NOT coerce.boolean — "false" would become true).
   // Defaults to enabled; production boot fails when disabled (see index.ts).
   ENABLE_CSRF: z

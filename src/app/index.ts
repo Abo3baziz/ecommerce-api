@@ -15,6 +15,12 @@ const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 
 const app = express();
 
+// Client-IP resolution for rate limiting, logs and session records. Must run
+// before any middleware reads req.ip.
+if (env.TRUST_PROXY !== false) {
+  app.set("trust proxy", env.TRUST_PROXY);
+}
+
 app.use(requestId);
 
 app.use((req, res, next) => {

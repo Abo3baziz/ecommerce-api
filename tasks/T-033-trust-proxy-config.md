@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-033 |
 | **Priority** | P1 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/trust-proxy` |
 | **Depends on** | — |
@@ -26,9 +26,9 @@ Client IP resolution is correct for the deployed topology.
 
 ## Acceptance criteria
 
-- [ ] Behind a proxy, limiters key on real client IP; logs/sessions record it.
-- [ ] Direct deployment unchanged.
-- [ ] Ops docs updated.
+- [x] Behind a proxy, limiters key on real client IP; logs/sessions record it.
+- [x] Direct deployment unchanged.
+- [x] Ops docs updated.
 
 ## References
 

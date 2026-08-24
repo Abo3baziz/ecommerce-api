@@ -4,6 +4,38 @@
 
 ---
 
+# Reverse Proxy / Trust Proxy
+
+## Purpose
+
+Express must know about trusted proxies to resolve the real client IP. This affects:
+
+- **Rate limiting** — express-rate-limit keys on `req.ip`; without trust proxy every client behind a proxy shares one bucket (platform-wide self-DoS), with blind trust an attacker forges `X-Forwarded-For` to bypass limits.
+- **Audit trail** — request logs and `sessions.ip_address` record the client, not the proxy.
+
+## Configuration
+
+Set `TRUST_PROXY` in the environment before booting. Values map directly to Express' [`trust proxy` setting](https://expressjs.com/en/guide/behind-proxies.html):
+
+| Deployment topology | `TRUST_PROXY` |
+| --- | --- |
+| Direct internet exposure (no proxy) | unset or `false` |
+| One local reverse proxy (nginx on same host) | `1` |
+| Known LB/proxy addresses | comma-separated CIDRs, e.g. `10.0.0.0/8,192.168.1.10` |
+| Platform that always sets the header correctly | `true` (avoid unless documented by the platform) |
+
+Unset/`false` keeps current behavior: socket peer is treated as the client.
+
+## Verification
+
+After deploying behind a proxy, hit any endpoint and confirm:
+
+- Response/request logs show your public IP (not the proxy IP).
+- Rapid requests produce `429` keyed to your IP only; another client is unaffected.
+- New session rows record your real IP in `sessions.ip_address`.
+
+---
+
 # Session Cleanup Job
 
 ## Purpose
