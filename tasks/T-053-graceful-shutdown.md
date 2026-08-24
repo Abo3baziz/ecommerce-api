@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-053 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/graceful-shutdown` |
 | **Depends on** | T-034 (flush semantics depend on sink) |
@@ -25,9 +25,9 @@ Predictable, bounded shutdown that persists final logs and closes DB connections
 
 ## Acceptance criteria
 
-- [ ] SIGTERM exits within the configured bound with open keep-alive connections.
-- [ ] Fatal log written before exit on crash path.
-- [ ] No hanging processes in local/CI runs.
+- [x] SIGTERM exits within the configured bound with open keep-alive connections.
+- [x] Fatal log written before exit on crash path.
+- [x] No hanging processes in local/CI runs.
 
 ## References
 

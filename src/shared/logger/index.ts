@@ -80,3 +80,13 @@ export const logger = pino(
   },
   pino.multistream([{ stream: terminalStream }, { stream: fileSink }]),
 );
+
+/**
+ * Resolves once every entry queued behind the file sink's write chain has
+ * been appended. Crash handlers call this before process.exit so final
+ * log lines (e.g. fatal errors) reach disk.
+ */
+export async function flushLogger(): Promise<void> {
+  await pendingWrite;
+  await new Promise<void>((resolve) => logger.flush(() => resolve()));
+}
