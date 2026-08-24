@@ -36,7 +36,14 @@ const ALLOWED_TRANSITIONS: Record<order_status, readonly order_status[]> = {
 };
 
 function toAdminOrderResult(row: AdminOrderRow): AdminOrderResult {
-  const shipment = row.shipments!;
+  const shipment = row.shipments;
+  if (!shipment) {
+    // Checkout always creates the shipment; reaching this means corrupt
+    // legacy data. Fail with a domain error instead of a raw TypeError (T-020).
+    throw new ConflictError(
+      `Order ${row.public_id} has no shipment record`,
+    );
+  }
 
   return {
     ...toOrderResult(row),

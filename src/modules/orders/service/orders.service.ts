@@ -62,7 +62,12 @@ export function toOrderResult(row: CustomerOrderRow): OrderResult {
     created_at: item.created_at,
   }));
 
-  const shipment = row.shipments!;
+  const shipment = row.shipments;
+  if (!shipment) {
+    // Checkout always creates the shipment; reaching this means corrupt
+    // legacy data. Fail with a domain error instead of a raw TypeError (T-020).
+    throw new ConflictError(`Order ${row.public_id} has no shipment record`);
+  }
   const payment = row.payments;
 
   return {

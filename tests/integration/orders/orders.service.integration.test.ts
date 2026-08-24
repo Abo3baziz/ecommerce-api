@@ -991,6 +991,28 @@ describe("orders.service", () => {
       expect(payment?.refunded_at).toBeTruthy();
     });
 
+    it("refuses to mark a non-PAID payment as refunded", async () => {
+      const { user, order } = await createOrderInStatus({
+        status: order_status.CONFIRMED,
+        quantity: 2,
+        onHand: 100,
+      });
+
+      await prisma.payments.updateMany({
+        where: { orders_id: order.id },
+        data: { status: payment_status.FAILED },
+      });
+
+      await expect(
+        updateOrderStatus(order.public_id, { status: "cancelled" }, { id: user.id }),
+      ).rejects.toThrow(/No payment to refund/);
+
+      const payment = await prisma.payments.findFirst({
+        where: { orders_id: order.id },
+      });
+      expect(payment?.status).toBe(payment_status.FAILED);
+    });
+
     it("transitions processing to cancelled, refunding and restocking inventory", async () => {
       const { user, order, variant } = await createOrderInStatus({
         status: order_status.PROCESSING,

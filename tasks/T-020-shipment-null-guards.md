@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-020 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/shipment-null-guards` |
 | **Depends on** | — |
@@ -26,8 +26,8 @@ Replace non-null assertions with explicit checks and a clear domain error (or nu
 
 ## Acceptance criteria
 
-- [ ] No `shipments!` assertions in hot paths.
-- [ ] Missing shipment yields controlled error.
+- [x] No `shipments!` assertions in hot paths.
+- [x] Missing shipment yields controlled error.
 
 ## References
 

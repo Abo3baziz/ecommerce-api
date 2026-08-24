@@ -549,8 +549,10 @@ export const ordersRepository = {
     refunded_at: Date,
     client: DbClient = prisma,
   ) {
+    // Only PAID payments may transition to REFUNDED; callers surface the
+    // affected-row count as a conflict when nothing matched (T-019).
     return client.payments.updateMany({
-      where: { orders_id },
+      where: { orders_id, status: payment_status.PAID },
       data: {
         status: payment_status.REFUNDED,
         refunded_at,

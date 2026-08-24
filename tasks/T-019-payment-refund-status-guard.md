@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-019 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` |
 | **Branch** | `bugfix/payment-refund-status-guard` |
 | **Depends on** | — |
@@ -26,8 +26,8 @@ Only transition `PAID → REFUNDED`; 0 rows → conflict/error.
 
 ## Acceptance criteria
 
-- [ ] Non-PAID payments cannot be marked refunded.
-- [ ] Tests green.
+- [x] Non-PAID payments cannot be marked refunded.
+- [x] Tests green.
 
 ## References
 
