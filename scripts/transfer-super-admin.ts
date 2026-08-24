@@ -47,7 +47,7 @@ export async function transferSuperAdmin(
 
     const successor = await tx.users.findUnique({
       where: { email: successorEmail },
-      select: { id: true, role: true },
+      select: { id: true, role: true, public_id: true },
     });
 
     if (!successor) {
@@ -76,7 +76,7 @@ export async function transferSuperAdmin(
       actorUsersId: current.id,
       action: "auth.super_admin.transferred",
       entityType: "user",
-      entityPublicId: successor.email,
+      entityPublicId: successor.public_id,
       statusCode: 200,
       requestBody: { from_email: currentEmail, to_email: successorEmail },
     });
