@@ -30,6 +30,8 @@ tags:
     description: The customer's single, lazily created cart.
   - name: Orders
     description: Checkout and customer order history.
+  - name: Reviews
+    description: Product reviews with moderation-backed visibility.
 security:
   - sessionCookie: []
 
@@ -719,6 +721,143 @@ paths:
         "200": { description: Full order detail. }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /products/{product_public_id}/reviews:
+    get:
+      tags: [Reviews]
+      summary: List approved reviews of a product with a rating summary.
+      operationId: listProductReviews
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - name: rating
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 5 }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [created_at, "-created_at", rating, "-rating"] }
+      responses:
+        "200":
+          description: |
+            Rating summary (`average_rating`, `total_count`) plus paginated
+            approved reviews. Customer projection hides `is_approved`.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /reviews:
+    post:
+      tags: [Reviews]
+      summary: Create a review (one live review per user per product).
+      operationId: createReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_public_id, rating]
+              properties:
+                product_public_id: { type: string, pattern: "^prd_" }
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                title: { type: string }
+                comment: { type: string }
+                images:
+                  type: array
+                  items:
+                    type: object
+                    required: [image_url]
+                    properties:
+                      image_url: { type: string }
+                      alt_text: { type: string }
+      responses:
+        "201": { description: Review created (auto-approved). }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Duplicate review or unfulfilled purchase requirement. content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+  /reviews/{review_public_id}:
+    get:
+      tags: [Reviews]
+      summary: Get a single review.
+      operationId: getReview
+      security: []
+      parameters:
+        - name: review_public_id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^rev_" }
+      responses:
+        "200": { description: The review. }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Reviews]
+      summary: Update the authenticated user's own review.
+      operationId: updateReview
+      parameters:
+        - name: review_public_id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^rev_" }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                title: { type: string }
+                comment: { type: string }
+                images:
+                  type: array
+                  items:
+                    type: object
+                    required: [image_url]
+                    properties:
+                      image_url: { type: string }
+                      alt_text: { type: string }
+      responses:
+        "200": { description: Updated review; image set replaced when provided. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Reviews]
+      summary: Soft-delete the authenticated user's own review.
+      operationId: deleteReview
+      parameters:
+        - name: review_public_id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^rev_" }
+      responses:
+        "204": { description: Review soft-deleted; the pair becomes reviewable again. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /users/me/reviews:
+    get:
+      tags: [Reviews]
+      summary: List the authenticated user's own reviews (includes unapproved).
+      operationId: listMyReviews
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [created_at, "-created_at", rating, "-rating"] }
+      responses:
+        "200":
+          description: Own reviews with `is_approved` visible.
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
 components:
   securitySchemes:
