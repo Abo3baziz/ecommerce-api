@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-054 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `docs` |
 | **Branch** | `docs/api-endpoints-contract-fix` |
 | **Depends on** | — |
@@ -30,9 +30,14 @@ API_ENDPOINTS.md matches implemented behavior exactly.
 
 ## Acceptance criteria
 
-- [ ] No `has_more` / dual-envelope claims remain.
-- [ ] Cross-check notes recorded.
+- [x] No `has_more` / dual-envelope claims remain.
+- [x] Cross-check notes recorded.
 
 ## References
 
 - Audit: `tasks/AUDIT-2026-08-21.md` §4.5
+
+## Cross-check record (2026-08-24)
+
+- Envelope claim fixed to the single implemented `{ success: false, message }` shape emitted by the global error handler (`src/middleware/errorHandler.ts`); zero `{error:{code}}` occurrences in src/.
+- Reviews pagination corrected to the standard `formatPaginationMeta` shape (verified in `src/modules/reviews/service/review.service.ts`); all four `has_more` mentions removed from the doc.

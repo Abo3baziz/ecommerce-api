@@ -76,7 +76,7 @@ Task backlog derived from two audits:
 | T-020 | [T-020-shipment-null-guards.md](./T-020-shipment-null-guards.md) | Defensive shipment null guards | todo |
 | T-021 | [T-021-orders-composite-index.md](./T-021-orders-composite-index.md) | Composite index `(users_id, placed_at)` on orders | done |
 | T-022 | [T-022-imagekit-live-upload-verify.md](./T-022-imagekit-live-upload-verify.md) | Live ImageKit client-side upload verification | todo |
-| T-023 | [T-023-stale-progress-cleanup.md](./T-023-stale-progress-cleanup.md) | Clean stale Next Step entries in PROJECT_PROGRESS | todo |
+| T-023 | [T-023-stale-progress-cleanup.md](./T-023-stale-progress-cleanup.md) | Clean stale Next Step entries in PROJECT_PROGRESS | done |
 | T-035 | [T-035-prisma-error-mapping.md](./T-035-prisma-error-mapping.md) | Global Prisma error mapping (P2002/P2025 → 4xx) | done |
 | T-036 | [T-036-token-invalidation-on-password-change.md](./T-036-token-invalidation-on-password-change.md) | Invalidate pending tokens on credential rotation | done |
 | T-037 | [T-037-last-admin-race.md](./T-037-last-admin-race.md) | Fix last-admin demotion TOCTOU race | done |
@@ -96,7 +96,7 @@ Task backlog derived from two audits:
 | T-051 | [T-051-api-404-envelope.md](./T-051-api-404-envelope.md) | JSON 404 envelope for unknown /api routes | done |
 | T-052 | [T-052-health-readiness.md](./T-052-health-readiness.md) | Health/readiness endpoint with DB probe, above limiter | done |
 | T-053 | [T-053-graceful-shutdown.md](./T-053-graceful-shutdown.md) | Complete graceful shutdown (sockets, Prisma, log flush) | todo |
-| T-054 | [T-054-docs-contract-drift.md](./T-054-docs-contract-drift.md) | Fix documented-vs-implemented contract drift (API_ENDPOINTS.md) | todo |
+| T-054 | [T-054-docs-contract-drift.md](./T-054-docs-contract-drift.md) | Fix documented-vs-implemented contract drift (API_ENDPOINTS.md) | done |
 
 ### P3 — Quality / hardening / future product
 

@@ -35,16 +35,17 @@ Most endpoints wrap the payload in:
   ```json
   { "page": 1, "limit": 20, "total": 42, "totalPages": 3, "hasNext": true, "hasPrev": false }
   ```
-- Reviews use a different pagination shape: `{ "page": 1, "limit": 10, "total": 12, "has_more": true }`.
+  This is the **only** pagination shape — product lists, category products, orders, admin lists, and reviews all return it.
 - Several endpoints return a bare object, bare array, or `204 No Content` (empty body) — this is called out per endpoint.
 - Auth/users/session endpoints return bare objects; addresses, products, categories, orders, reviews, and admin endpoints use the `{ success: true, data }` wrapper.
 
 ### Error Envelope
 
-Two formats are in use:
+A single envelope is used everywhere (global error handler):
 
-- **Products / categories / auth / users / admin products** — `{ "error": { "code": "<ERROR_CODE>", "message": "<message>" } }`
-- **Inventory / cart / orders / reviews** — `{ "success": false, "message": "<message>" }`
+```json
+{ "success": false, "message": "<human-readable message>" }
+```
 
 ### Conventions
 
@@ -2807,7 +2808,7 @@ Never exposes `is_approved` or `deleted_at`. Customer-visible reviews always hav
 
 **Response**
 
-- Success: `200 OK` — enveloped object with `summary`, `reviews`, and `pagination` (shape `{ page, limit, total, has_more }`).
+- Success: `200 OK` — enveloped object with `summary`, `reviews`, and `pagination` (standard shape `{ page, limit, total, totalPages, hasNext, hasPrev }`).
 
   ```json
   {
@@ -2815,7 +2816,7 @@ Never exposes `is_approved` or `deleted_at`. Customer-visible reviews always hav
     "data": {
       "summary": { "average_rating": 4.5, "total_count": 12 },
       "reviews": [ { "public_id": "rev_01K4...", "rating": 5, "customer_name": "Jane Doe" } ],
-      "pagination": { "page": 1, "limit": 10, "total": 12, "has_more": true }
+      "pagination": { "page": 1, "limit": 10, "total": 12, "totalPages": 2, "hasNext": true, "hasPrev": false }
     }
   }
   ```
@@ -2989,7 +2990,7 @@ curl -X DELETE "https://api.example.com/api/v1/reviews/rev_01J6XK8Q3M2N5B7V9C4D1
 
 **Response**
 
-- Success: `200 OK` — `{ "success": true, "data": { "reviews": [ Review Object + "is_approved": true ], "pagination": { page, limit, total, has_more } } }`. This is the only customer projection that includes `is_approved`; no rating summary.
+- Success: `200 OK` — `{ "success": true, "data": { "reviews": [ Review Object + "is_approved": true ], "pagination": { page, limit, total, totalPages, hasNext, hasPrev } } }`. This is the only customer projection that includes `is_approved`; no rating summary.
 - Errors: `400` invalid query parameters · `401` not authenticated
 
 **Example Request**
@@ -3030,7 +3031,7 @@ Admin review responses use the Review Object extended with: `is_approved` (boole
 
 **Response**
 
-- Success: `200 OK` — `{ "success": true, "data": { "reviews": [ Review Object (admin projection) ], "pagination": { page, limit, total, has_more } } }`.
+- Success: `200 OK` — `{ "success": true, "data": { "reviews": [ Review Object (admin projection) ], "pagination": { page, limit, total, totalPages, hasNext, hasPrev } } }`.
 - Errors: `400` invalid query parameters · `401` not authenticated · `403` not admin/super_admin
 
 **Example Request**

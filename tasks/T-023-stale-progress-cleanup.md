@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-023 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `docs` |
 | **Branch** | `docs/progress-cleanup` |
 | **Depends on** | — |
@@ -26,9 +26,9 @@ Reconcile Completed / Pending / Next Step with actual `main` state; point Next S
 
 ## Acceptance criteria
 
-- [ ] No “uncommitted password-reset” or “§2.3 decision needed” while those are merged.
-- [ ] Next Step references `tasks/README.md`.
-- [ ] Pending list matches real open work (or defers to tasks/).
+- [x] No “uncommitted password-reset” or “§2.3 decision needed” while those are merged.
+- [x] Next Step references `tasks/README.md`.
+- [x] Pending list matches real open work (or defers to tasks/).
 
 ## References
 

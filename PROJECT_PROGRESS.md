@@ -399,23 +399,20 @@
 - **No currency in v1** (per user decision): the Payments requirement in `docs/REQUIREMENTS.md`, the Payment Object, and the `payments` table carry no currency — the store is single-unit (USD), so the proposed `currency CHAR(3)` column was dropped from the Orders design and the doc's Schema Changes section now reflects the applied schema for `order_items` (10 snapshot columns incl. variant dimensions) and `payments` (`public_id`, 1:1 unique `orders_id`, `payment_status` enum, `failed_at`/`refunded_at`, unique `transaction_reference`, 5 indexes). The shipping-address snapshot reconciliation (shipments columns vs the proposed orders JSONB) is **resolved**: the `shipments` row is created at checkout (`status = "pending"`) holding the address snapshot, so the Order Object's `shipping_address` derives from it — no schema change required.
 
 ### Pending
-- Test files are not type-checked by `npm run typecheck` (tsconfig `include` covers `src/**/*` only); a `tests/` tsconfig or a typecheck command that includes tests is a possible follow-up.
-- Unit tests for the repository layer (repositories are exercised through integration tests today).
-- A dedicated audit-log table for administrator actions remains a future enhancement (role changes are logged today via the structured logger).
-- Recovering a lost/compromised `SUPER_ADMIN` requires manual database intervention; an operator-driven CLI demotion/recovery path is a possible future enhancement.
-- Live client-side upload verification to ImageKit (upload a file with the issued auth params and confirm it lands in the media library + a product image row is created) is a manual step pending a client; the server-side auth-params endpoint was verified live with the real keys.
-- Cart stock availability (e.g., `max_available` on cart lines) is a documented possible future enhancement; the customer product contract stays stock-free until then.
+Production backlog lives in `tasks/README.md` — see its index for open items and priorities. Notes on resolved former-pending items:
+
+- Test files are now type-checked (`npm run typecheck:tests`, T-016).
+- A dedicated audit-log table exists (`audit_logs` + admin surface, frontend task T22); role changes and critical admin actions persist audit rows transactionally.
+- SUPER_ADMIN recovery no longer needs manual SQL: use `npm run superadmin:transfer` (T-018).
+- Live client-side upload verification was completed end-to-end on 2026-08-24 (see `tasks/T-022-imagekit-live-upload-verify.md`).
+- Repository-layer unit tests remain open (T-017); cart stock availability remains a documented possible future enhancement (T-024).
 
 ### Next Step
-- **`feature/password-reset` implemented and verified** (typecheck + 25 new tests green); changes are uncommitted on the branch — awaiting instruction to commit and later merge.
-- **`docs/imagekit-upload-example` branch carries this session's work** (ADR-0001 + AGENTS.md index + `docs/API_ENDPOINTS.md`): non-feature work, no PR — committed; await instruction to merge into `main`.
-- **Reviews module merged to `main` via PR #12** (`6c3b851`, GitHub merge commit); `feature/reviews` deleted locally + remotely per AGENTS.md.
-- **Orders design-review fixes merged to `main`** (`bugfix/orders` → `main` via `b698899`, this session): discount capped at subtotal + atomic guarded coupon-limit increment; 4 regression tests; full suite **56 files / 977 tests green**.
-- **Categories sort tiebreaker fix merged to `main` and pushed** (`bugfix/categories-sort-tiebreaker` → `main` via `c73b49a` + `1a2ce44` docs(progress) commit, this session): `origin/main` is now `1a2ce44`, in sync with local `main`.
-- **`docs/APIDOG_TESTING.md` update is uncommitted** — awaiting explicit instruction to commit (non-feature docs work, no PR).
-- **Orders design-review §2.3 decision needed**: coupon quota on cancelled/refunded orders (`usage_count` is never decremented; a cancelled order still burns quota) — document as lifetime redemptions or decrement on `pending → cancelled`.
-- Generate an OpenAPI 3.1 specification from `docs/api/**` so the Apidog guide's Import step becomes one-click (listed as a follow-up in `docs/APIDOG_TESTING.md`).
-- Generate an OpenAPI 3.1 specification from `docs/api/**` so the Apidog guide's Import step becomes one-click (listed as a follow-up in `docs/APIDOG_TESTING.md`).
+Active production work is tracked in **`tasks/README.md`** (priorities P0→P3 with suggested waves). Current focus:
+
+- **P0 Paymob epic** — T-081…T-087 (config schema → DB migration → HTTP client → async checkout → webhook HMAC → expiry reconciliation → refunds); supersedes T-002/T-003.
+- Remaining P2s after the 2026-08-24 wave: T-011 (OpenAPI spec), T-017 (repository unit tests), T-054 follow-ups in docs sweep.
+
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.
 - Email templates live in `src/shared/mailer/templates/` as pure string-rendering functions (table-based layout + scoped `<style>`, max-width 600px, CTA as a padded link, text fallback under the button) so future emails (password reset, order confirmations) reuse the same shell; user-supplied values are escaped before interpolation.
 - Runtime E2E verification of the users + addresses endpoints (register → login → profile/address CRUD → email/phone/password change) is pending a running local DB with the schema migrated.
