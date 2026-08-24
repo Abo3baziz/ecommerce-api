@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-027 |
 | **Priority** | P3 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `bugfix` / hardening |
 | **Branch** | `bugfix/image-url-host-allowlist` |
 | **Depends on** | — |
@@ -27,9 +27,9 @@ Optionally allowlist `image_url` to the configured ImageKit `urlEndpoint` host (
 
 ## Acceptance criteria
 
-- [ ] Non-allowlisted hosts rejected on write (if feature enabled).
-- [ ] Documented config flag/default.
-- [ ] Tests green.
+- [x] Non-allowlisted hosts rejected on write (if feature enabled).
+- [x] Documented config flag/default.
+- [x] Tests green.
 
 ## References
 
