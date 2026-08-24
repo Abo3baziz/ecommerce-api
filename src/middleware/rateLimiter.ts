@@ -15,7 +15,7 @@ function createRateLimiter(max: number, message: string) {
 }
 
 export const rateLimiter = createRateLimiter(
-  100,
+  env.RATE_LIMIT_MAX,
   "Too many requests, please try again later",
 );
 

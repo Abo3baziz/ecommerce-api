@@ -17,6 +17,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   REGISTER_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   // Strict enum parse (NOT coerce.boolean — "false" would become true).
   // Defaults to enabled; production boot fails when disabled (see index.ts).
   ENABLE_CSRF: z
