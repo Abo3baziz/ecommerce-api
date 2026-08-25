@@ -880,6 +880,26 @@ paths:
           description: Own reviews with `is_approved` visible.
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /uploads/imagekit-auth:
+    get:
+      tags: [Reviews]
+      summary: Signed auth params for direct browser uploads to ImageKit (customer surface).
+      operationId: imageKitAuth
+      description: |
+        Issues token/expire/signature/publicKey/urlEndpoint/folder for a direct
+        browser upload. Defaults to the reviews folder; an unknown `context`
+        falls back to it silently. Persisted upload URLs are re-validated
+        server-side against the same folder allowlist.
+      parameters:
+        - name: context
+          in: query
+          schema: { type: string, enum: [products, reviews], default: reviews }
+      responses:
+        "200":
+          description: "token/expire/signature/publicKey/urlEndpoint/folder."
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+
   # ---- Admin: products / variants / images ----
   /admin/products:
     get: { tags: [Admin — Products], summary: "List products (admin projection, optional include_deleted).", operationId: adminListProducts, responses: { "200": { description: "Paginated." } } }
