@@ -39,9 +39,9 @@ Integrate at least one real payment provider behind the existing payment abstrac
 
 ## Decisions needed
 
-- [ ] Which provider first?
-- [ ] Authorize-then-capture vs charge-immediately?
-- [ ] Keep mock gateway available behind `NODE_ENV=test` / feature flag?
+- [x] **Provider: Paymob** (cards + wallets, Egypt EGP, Unified Checkout redirect). Concrete implementation tracked in T-081…T-087.
+- [x] Charge-immediately via Payment Intention (no separate auth/capture in v1).
+- [x] Keep mock gateway available behind `PAYMOB_ENABLED=false` default + `payment_method: "mock"` validator.
 
 ## Acceptance criteria
 

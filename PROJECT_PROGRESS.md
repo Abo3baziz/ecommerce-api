@@ -410,7 +410,7 @@ Production backlog lives in `tasks/README.md` — see its index for open items a
 ### Next Step
 Active production work is tracked in **`tasks/README.md`** (priorities P0→P3 with suggested waves). Current focus:
 
-- **P0 Paymob epic** — T-081…T-087 (config schema → DB migration → HTTP client → async checkout → webhook HMAC → expiry reconciliation → refunds); supersedes T-002/T-003.
+- ~~**P0 Paymob epic** — T-081…T-087 (config schema → DB migration → HTTP client → async checkout → webhook HMAC → expiry reconciliation → refunds); supersedes T-002/T-003.~~ **Dropped 2026-08-25**: Paymob is out of scope by product decision; T-081…T-087 marked `wontfix` in `tasks/README.md` (frontend T19 likewise). Checkout stays on the `mock` provider.
 - Remaining P2s after the 2026-08-24 wave: T-011 (OpenAPI spec), T-017 (repository unit tests), T-054 follow-ups in docs sweep.
 
 - The verify page is a stop-gap for backend-only testing: it's a single self-contained HTML/JS pair (no build step, external script so it passes helmet's default CSP) served by the API itself. A real SPA frontend can replace it later; the API contract is unchanged.

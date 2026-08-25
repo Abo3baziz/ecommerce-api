@@ -43,5 +43,6 @@ Receive and verify provider webhooks; reconcile payment + order status idempoten
 ## References
 
 - T-002
+- T-085 (Paymob webhook + HMAC), T-086 (expiry + inquiry) — concrete Paymob implementation
 - `src/modules/orders/payment/`
 - Orders design review — idempotency note

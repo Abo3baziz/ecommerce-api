@@ -132,6 +132,13 @@ Task backlog derived from two audits:
 | T-078 | [T-078-ci-hygiene.md](./T-078-ci-hygiene.md) | CI hygiene: pin actions, secret fallbacks, restore lost workflows | todo |
 | T-079 | [T-079-enhancements-triage.md](./T-079-enhancements-triage.md) | ENHANCEMENTS.md triage (phone flow, duplicate-endpoint claim) | todo |
 | T-080 | [T-080-reviews-purchase-flag-doc.md](./T-080-reviews-purchase-flag-doc.md) | Document REVIEWS_REQUIRE_PURCHASE flag state | todo |
+| T-081 | [T-081-paymob-config-schema.md](./T-081-paymob-config-schema.md) | Paymob config + env schema | wontfix |
+| T-082 | [T-082-paymob-db-migration.md](./T-082-paymob-db-migration.md) | Paymob DB migration (payments provider columns) | wontfix |
+| T-083 | [T-083-paymob-client.md](./T-083-paymob-client.md) | Paymob HTTP client (intention / inquiry / refund) | wontfix |
+| T-084 | [T-084-paymob-async-checkout.md](./T-084-paymob-async-checkout.md) | Async checkout split (Paymob pending orders) | wontfix |
+| T-085 | [T-085-paymob-webhook-hmac.md](./T-085-paymob-webhook-hmac.md) | Paymob webhook + HMAC verification | wontfix |
+| T-086 | [T-086-paymob-expiry-reconciliation.md](./T-086-paymob-expiry-reconciliation.md) | Pending-order expiry + transaction inquiry | wontfix |
+| T-087 | [T-087-paymob-refunds.md](./T-087-paymob-refunds.md) | Paymob refunds (admin refund transition) | wontfix |
 
 ## Suggested execution order
 
@@ -149,6 +156,7 @@ Legacy waves from the 2026-08-16 review (security+money T-001→T-002→T-003; s
 ## Notes
 
 - Real payment gateway is listed in `docs/REQUIREMENTS.md` **Out of Scope** for the initial version; T-002/T-003 are still production blockers if real money is the goal.
+- **2026-08-25:** Paymob integration dropped by product decision — T-081…T-087 (P0 Paymob epic) and frontend T19 marked `wontfix` / won't do; checkout stays on the `mock` provider. T-002/T-003 remain superseded by that decision.
 - Prefer small, focused branches. Do not mix P0 security work with P3 product work.
 - Each task file is the source of truth for that item until marked `done`.
 - T-047 (migrations baseline) unblocks several schema tasks (T-041/T-042/T-043/T-064/T-065/T-069/T-071/T-076) — do it early in Wave 3.
