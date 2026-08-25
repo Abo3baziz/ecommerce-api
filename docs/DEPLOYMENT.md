@@ -146,3 +146,53 @@ Minimum viable setup: uptime probe + daily disk check + weekly review of error-r
 6. **Postmortem:** timeline, root cause, action items filed as tasks in `tasks/`.
 
 Escalation contacts and hosting credentials belong in the operator's password manager — never in this repository.
+
+---
+
+# 7. PaaS Deployment — Railway/Render (API) + Vercel (Storefront)
+
+The supported split-hosting topology keeps browser traffic **same-origin** via the
+frontend's rewrite proxy, so `SameSite=Lax` session cookies work without any code
+changes:
+
+```
+Browser ──► Vercel (storefront)
+              │  same-origin /api/v1/* requests
+              ▼  next.config.ts rewrites ──► Railway/Render (this API) ──► managed Postgres
+```
+
+## API service (Railway / Render / Fly)
+
+- **Build command:** `npm ci && npm run build` (`postinstall` runs `prisma generate`,
+  so the generated client exists before `tsc`).
+- **Start command:** `npm run db:migrate:deploy && npm start` — applies pending
+  migrations, then boots `dist/index.js`.
+- **Health check:** point the platform probe at `/health/ready` (200 = DB reachable,
+  503 = degraded). `/health` is liveness only.
+- **Env vars:** copy `.env.example` into the platform secret store. The two that
+  must match the frontend are:
+  - `CORS_ORIGIN` = the exact storefront origin (e.g. `https://app.vercel.app`),
+    no trailing slash. It drives CORS **and** every link inside transactional
+    emails (`/verify-email`, `/reset-password`, `/verify-email-change`), which is
+    why it must be the *public site* URL, not the API URL.
+  - `TRUST_PROXY=1` — one proxy hop (platform edge); otherwise rate limiting and
+    logs key on the proxy IP.
+- `PORT` is injected by the platform and picked up automatically.
+- In-memory rate limiting is per-instance — scale to **one** API instance or add a
+  shared store first (see §2 Multi-instance caveats).
+
+## Storefront (Vercel)
+
+- Env vars:
+  - `NEXT_PUBLIC_API_BASE_URL=/api/v1` (relative — browser stays same-origin;
+    cookies remain first-party, no CORS involved for browser calls).
+  - `API_ORIGIN=https://<your-api>.up.railway.app` (no trailing slash) — used
+    server-side by `next.config.ts` rewrites.
+- Deploy with defaults (`next build`); rewrites run on Vercel's edge/server side.
+
+## Post-deploy smoke test
+
+1. `GET https://<api>/health` → 200; `GET /health/ready` → 200.
+2. Register → verification email arrives with links pointing at the storefront origin.
+3. Login → browse → cart → mock checkout → order visible; CSRF round-trip works
+   through the proxy (writes succeed without manual token handling).
