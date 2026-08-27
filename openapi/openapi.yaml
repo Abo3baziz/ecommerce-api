@@ -97,12 +97,8 @@ paths:
     get:
       tags:
       - Auth
-      summary: Issue a CSRF token bound to the current session.
-      description: 'Required before any cookie-authenticated write when CSRF is enabled.
-
-        Returns the token in the body and sets it in an HttpOnly cookie.
-
-        '
+      summary: Get CSRF token
+      description: Returns a CSRF token bound to the current session. Requires an active session cookie; the token is sent both in the response body and as an HttpOnly cookie and must be sent back in the x-csrf-token header for subsequent state-changing requests.
       operationId: getCsrfToken
       responses:
         '200':
@@ -138,8 +134,8 @@ paths:
     post:
       tags:
       - Auth
-      summary: Register a customer account.
-      description: Register a customer account.
+      summary: Register a new customer account
+      description: Creates a customer account and authenticates the user by setting a session cookie. Validates first name, last name, E.164 phone number, email, and password complexity (8+ characters with uppercase, lowercase, number and special character). Queues a 24-hour verification email and returns the new user's public ID; responds with 409 if the email is already registered.
       operationId: register
       requestBody:
         required: true
@@ -224,8 +220,8 @@ paths:
     post:
       tags:
       - Auth
-      summary: Log in with email and password.
-      description: Log in with email and password.
+      summary: Log in with email and password
+      description: Authenticates a user with email and password and sets a session cookie on success. Applies brute-force protection (lockout after 10 failed attempts for 15 minutes) and rejects suspended or deleted accounts. Returns the user's public ID and email verification status.
       operationId: login
       requestBody:
         required: true
@@ -275,8 +271,8 @@ paths:
     get:
       tags:
       - Auth
-      summary: Get the current session and user summary.
-      description: Get the current session and user summary.
+      summary: Get current session
+      description: Returns the authenticated user's session details and basic profile (public ID, email, role, email verification). Requires a valid session cookie; responds with 401 if the session is missing, expired, or revoked.
       operationId: getCurrentSession
       responses:
         '200':
@@ -309,8 +305,8 @@ paths:
     delete:
       tags:
       - Auth
-      summary: Revoke the current session (logout).
-      description: Revoke the current session (logout).
+      summary: Log out current session
+      description: Revokes the current session and clears the session cookie. Requires authentication; succeeds with 204 even if the session was already revoked.
       operationId: logout
       responses:
         '204':
@@ -321,8 +317,8 @@ paths:
     get:
       tags:
       - Auth
-      summary: List active sessions for the current user.
-      description: List active sessions for the current user.
+      summary: List active sessions
+      description: Lists all active sessions for the authenticated user, ordered newest first. Each entry includes the public ID, device and IP metadata, and timestamps. Requires authentication.
       operationId: listSessions
       responses:
         '200':
@@ -353,8 +349,8 @@ paths:
     delete:
       tags:
       - Auth
-      summary: Revoke every other active session.
-      description: Revoke every other active session.
+      summary: Revoke all other sessions
+      description: Revokes every active session for the current user except the one making the request. Useful for signing out from all other devices. Requires authentication.
       operationId: revokeAllOtherSessions
       responses:
         '200':
@@ -369,8 +365,8 @@ paths:
     delete:
       tags:
       - Auth
-      summary: Revoke one specific session.
-      description: Revoke one specific session.
+      summary: Revoke a specific session
+      description: Revokes a single session identified by its public ID. If the revoked session is the current one, the session cookie is cleared. Returns 404 if the session does not belong to the user or does not exist.
       operationId: revokeSession
       parameters:
       - name: session_public_id
@@ -392,8 +388,8 @@ paths:
     post:
       tags:
       - Auth
-      summary: Verify a registration email token.
-      description: Verify a registration email token.
+      summary: Verify registration email
+      description: Verifies a registration email using the token sent to the user's inbox. The token is opaque and single-use with a 24-hour expiry. Returns 404 if the token is unknown and 410 if it has already been used or expired.
       operationId: verifyEmail
       requestBody:
         required: true
@@ -426,8 +422,8 @@ paths:
     post:
       tags:
       - Auth
-      summary: Resend the verification email.
-      description: Resend the verification email.
+      summary: Resend verification email
+      description: Resends the registration verification email to the authenticated user. Requires authentication and is rate-limited (5 per 15 minutes). Responds with 409 if the email is already verified and 202 when the email is queued.
       operationId: resendVerificationEmail
       responses:
         '202':
@@ -442,8 +438,8 @@ paths:
     post:
       tags:
       - Auth
-      summary: Request a password reset (always returns the same message).
-      description: Request a password reset (always returns the same message).
+      summary: Request password reset
+      description: Starts a password reset by email. Always returns 202 with the same message to prevent account enumeration, even if the email is unknown. When the account exists, invalidates previous reset tokens, creates a 15-minute token and a 6-digit OTP, and queues an email. Rate-limited.
       operationId: requestPasswordReset
       requestBody:
         required: true
@@ -468,8 +464,8 @@ paths:
     post:
       tags:
       - Auth
-      summary: Verify the emailed OTP and receive a reset token.
-      description: Verify the emailed OTP and receive a reset token.
+      summary: Verify password reset OTP
+      description: Verifies the 6-digit OTP sent by email and, on success, issues a single-use reset token valid for 15 minutes. Applies a 60-second resend cooldown and a limit of 5 incorrect attempts before the code is invalidated. Returns 410 if the code has expired or been invalidated.
       operationId: verifyPasswordResetOtp
       requestBody:
         required: true
@@ -526,8 +522,8 @@ paths:
     post:
       tags:
       - Auth
-      summary: Complete the reset — set a new password (revokes all sessions).
-      description: Complete the reset — set a new password (revokes all sessions).
+      summary: Complete password reset
+      description: Completes the password reset using the reset token and a new password meeting complexity requirements. On success the password is updated and all active sessions are revoked, requiring re-login. The token is single-use and expires after 15 minutes.
       operationId: verifyPasswordReset
       requestBody:
         required: true
@@ -562,8 +558,8 @@ paths:
     get:
       tags:
       - Users
-      summary: Get the authenticated user's profile.
-      description: Get the authenticated user's profile.
+      summary: Get current user profile
+      description: Returns the authenticated user's profile including names, email, phone number, role, and email verification status. Requires authentication.
       operationId: getCurrentUser
       responses:
         '200':
@@ -602,8 +598,8 @@ paths:
     patch:
       tags:
       - Users
-      summary: Update profile names.
-      description: Update profile names.
+      summary: Update profile names
+      description: Updates the authenticated user's first and/or last name. At least one field must be provided; each is trimmed and limited to 1-100 characters. Returns the updated profile.
       operationId: updateCurrentUser
       requestBody:
         content:
@@ -636,8 +632,8 @@ paths:
     delete:
       tags:
       - Users
-      summary: Soft-delete the account (requires password).
-      description: Soft-delete the account (requires password).
+      summary: Delete current account
+      description: Soft-deletes the authenticated user's account after verifying the supplied password. Revokes all sessions and clears the session cookie. The operation is irreversible via the API and responds with 204 on success.
       operationId: deleteCurrentUser
       requestBody:
         required: true
@@ -662,8 +658,8 @@ paths:
     patch:
       tags:
       - Users
-      summary: Change password (re-authenticates with the current one).
-      description: Change password (re-authenticates with the current one).
+      summary: Change password
+      description: Changes the authenticated user's password after verifying the current password. The new password must meet complexity requirements and must differ from the current one. Revokes all other sessions and is rate-limited.
       operationId: changePassword
       requestBody:
         required: true
@@ -700,8 +696,8 @@ paths:
     post:
       tags:
       - Users
-      summary: Request an email change (sends verification to the new address).
-      description: Request an email change (sends verification to the new address).
+      summary: Request email change
+      description: Starts an email change for the authenticated user. Requires the new email address and current password for re-authentication. Checks that the email is not already in use, creates a 24-hour verification token, and queues an email to the new address. Rate-limited.
       operationId: requestEmailChange
       requestBody:
         required: true
@@ -735,8 +731,8 @@ paths:
     post:
       tags:
       - Users
-      summary: Verify an email change with the emailed token.
-      description: Requires an active session (same user who requested the change).
+      summary: Verify email change
+      description: Confirms an email change using the token sent to the new address. Requires an active session for the same user who requested the change. The token is single-use and expires after 24 hours; re-checks that the email is still available before updating.
       operationId: verifyEmailChange
       requestBody:
         required: true
@@ -770,8 +766,8 @@ paths:
     post:
       tags:
       - Users
-      summary: Request a phone-number change (sends an OTP code).
-      description: Request a phone-number change (sends an OTP code).
+      summary: Request phone number change
+      description: Starts a phone number change for the authenticated user. Requires the new E.164 phone number and current password. Checks uniqueness, creates a 6-digit OTP valid for 10 minutes, and dispatches it via SMS. Rate-limited.
       operationId: requestPhoneChange
       requestBody:
         required: true
@@ -806,8 +802,8 @@ paths:
     post:
       tags:
       - Users
-      summary: Verify a phone-number change with the OTP code.
-      description: Requires an active session; the pending phone number is taken from the prior request.
+      summary: Verify phone number change
+      description: Confirms a pending phone number change using the 6-digit OTP. Requires an active session; the target number is taken from the pending request initiated by the same user. The OTP is single-use and expires after 10 minutes.
       operationId: verifyPhoneChange
       requestBody:
         required: true
@@ -842,8 +838,8 @@ paths:
     get:
       tags:
       - Addresses
-      summary: List addresses (paginated, newest first).
-      description: List addresses (paginated, newest first).
+      summary: List saved addresses
+      description: Lists the authenticated user's saved addresses with pagination (newest first). Supports page and limit parameters. Requires authentication.
       operationId: listAddresses
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -869,8 +865,8 @@ paths:
     post:
       tags:
       - Addresses
-      summary: Create an address. First address becomes default for both types.
-      description: Create an address. First address becomes default for both types.
+      summary: Create an address
+      description: Creates a new address for the authenticated user. Requires recipient name, phone number, country, state, city and street address; label, second line, zip code and default flags are optional. The first address is automatically set as both shipping and billing default; otherwise default flags are respected with 409 on conflict.
       operationId: createAddress
       requestBody:
         required: true
@@ -910,8 +906,8 @@ paths:
     get:
       tags:
       - Addresses
-      summary: Get one owned address.
-      description: Get one owned address.
+      summary: Get an address
+      description: Returns a single address owned by the authenticated user, identified by its public ID. Responds with 404 if the address does not exist or does not belong to the user.
       operationId: getAddress
       parameters:
       - $ref: '#/components/parameters/AddressPublicId'
@@ -934,8 +930,8 @@ paths:
     patch:
       tags:
       - Addresses
-      summary: Partially update an owned address.
-      description: Partially update an owned address.
+      summary: Update an address
+      description: Partially updates an address owned by the authenticated user. Only supplied fields are changed; default flags trigger promotion or clearing of other defaults. Applies the same validation as creation and handles unique default constraints.
       operationId: updateAddress
       parameters:
       - $ref: '#/components/parameters/AddressPublicId'
@@ -967,8 +963,8 @@ paths:
     delete:
       tags:
       - Addresses
-      summary: Soft-delete an owned address; a surviving address is promoted if it was a default.
-      description: Soft-delete an owned address; a surviving address is promoted if it was a default.
+      summary: Delete an address
+      description: Soft-deletes an address owned by the authenticated user. If the deleted address was a default, the oldest remaining address is promoted to preserve a default. Returns 404 if not found.
       operationId: deleteAddress
       parameters:
       - $ref: '#/components/parameters/AddressPublicId'
@@ -983,8 +979,8 @@ paths:
     get:
       tags:
       - Catalog
-      summary: List customer-visible products.
-      description: List customer-visible products.
+      summary: List products
+      description: Lists customer-visible products with pagination, optional free-text search across name, brand and description, optional brand filter, and sorting by name, creation or update date (default newest). Only products with at least one active variant and not soft-deleted are included.
       operationId: listProducts
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -1035,8 +1031,8 @@ paths:
     get:
       tags:
       - Catalog
-      summary: Product detail with active variants and images.
-      description: Product detail with active variants and images.
+      summary: Get product details
+      description: Returns a single product with its ordered images (including primary flag) and active variants with their images, pricing and computed final price. Only customer-visible products are returned; responds with 404 otherwise.
       operationId: getProduct
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -1065,8 +1061,8 @@ paths:
     get:
       tags:
       - Catalog
-      summary: List categories.
-      description: List categories.
+      summary: List categories
+      description: Lists customer-visible categories with pagination, optional search, and sorting by name, creation or update date (default name). Only active, non-deleted categories are included.
       operationId: listCategories
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -1109,8 +1105,8 @@ paths:
     get:
       tags:
       - Catalog
-      summary: Get one category.
-      description: Get one category.
+      summary: Get a category
+      description: Returns a single customer-visible category by its public ID, including product count. Responds with 404 if the category is inactive, deleted, or does not exist.
       operationId: getCategory
       parameters:
       - $ref: '#/components/parameters/CategoryPublicId'
@@ -1133,8 +1129,8 @@ paths:
     get:
       tags:
       - Catalog
-      summary: List the products of a category (paginated).
-      description: List the products of a category (paginated).
+      summary: List products in a category
+      description: Lists customer-visible products belonging to a specific category with pagination, optional search, and sorting. The category must be customer-visible; otherwise the endpoint returns 404. Products are filtered to only those with active variants.
       operationId: listCategoryProducts
       parameters:
       - $ref: '#/components/parameters/CategoryPublicId'
@@ -1180,8 +1176,8 @@ paths:
     get:
       tags:
       - Cart
-      summary: Get the current cart (created lazily on first add).
-      description: Get the current cart (created lazily on first add).
+      summary: Get current cart
+      description: Returns the authenticated user's cart with line items, unit prices, line totals and cart totals. The cart is created lazily on first add; if no cart exists yet the API returns 404. Requires authentication.
       operationId: getCart
       responses:
         '200':
@@ -1206,8 +1202,8 @@ paths:
     delete:
       tags:
       - Cart
-      summary: Clear all cart lines.
-      description: Clear all cart lines.
+      summary: Clear cart
+      description: Removes all line items from the authenticated user's cart. If the user has no cart, responds with 404. Returns the emptied cart on success.
       operationId: clearCart
       responses:
         '200':
@@ -1229,8 +1225,8 @@ paths:
     post:
       tags:
       - Cart
-      summary: Add a variant to the cart (merge-on-add per variant).
-      description: Add a variant to the cart (merge-on-add per variant).
+      summary: Add item to cart
+      description: Adds a product variant to the authenticated user's cart, merging quantity if the variant is already present. Validates the variant ID and quantity (1-999, default 1) and checks available stock; responds with 409 if insufficient stock.
       operationId: addCartItem
       requestBody:
         required: true
@@ -1286,8 +1282,8 @@ paths:
     patch:
       tags:
       - Cart
-      summary: Set the quantity of one cart line.
-      description: Set the quantity of one cart line.
+      summary: Update cart item quantity
+      description: Sets the quantity for a specific variant already in the cart. Validates the new quantity (1-999) and checks stock availability, returning 409 if insufficient. The variant is identified by its public ID in the path.
       operationId: updateCartItemQuantity
       parameters:
       - name: variant_public_id
@@ -1339,8 +1335,8 @@ paths:
     delete:
       tags:
       - Cart
-      summary: Remove one cart line.
-      description: Remove one cart line.
+      summary: Remove cart item
+      description: Removes a single variant line from the authenticated user's cart. Identified by variant public ID in the path; returns 404 if the line is not in the cart. Responds with 204 on success.
       operationId: removeCartItem
       parameters:
       - name: variant_public_id
@@ -1362,8 +1358,8 @@ paths:
     post:
       tags:
       - Orders
-      summary: Place an order from the current cart.
-      description: Place an order from the current cart.
+      summary: Place order from cart
+      description: Creates an order from the current cart in a single transaction guarded by a per-user advisory lock. Requires an owned address and payment method 'mock'; optional coupon code (uppercased) and notes are supported. Validates cart not empty, items active, and stock available; on success the cart is cleared and the confirmed order is returned. Returns 409 for empty cart, inactive items, insufficient stock or invalid coupon.
       operationId: placeOrder
       requestBody:
         required: true
@@ -1430,8 +1426,8 @@ paths:
     get:
       tags:
       - Orders
-      summary: List the customer's orders (paginated).
-      description: List the customer's orders (paginated).
+      summary: List my orders
+      description: Lists the authenticated user's orders with pagination, optional status filter, and sorting by placement date, order number or total amount (default newest). Requires authentication.
       operationId: listMyOrders
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -1489,8 +1485,8 @@ paths:
     get:
       tags:
       - Orders
-      summary: Get one owned order with items, shipment snapshot and payment.
-      description: Get one owned order with items, shipment snapshot and payment.
+      summary: Get order details
+      description: Returns a single order owned by the authenticated user, including line items with frozen price and SKU snapshots, payment status and shipment snapshot. Responds with 404 if the order does not belong to the user.
       operationId: getOrder
       parameters:
       - name: order_public_id
@@ -1521,8 +1517,8 @@ paths:
     get:
       tags:
       - Reviews
-      summary: List approved reviews of a product with a rating summary.
-      description: List approved reviews of a product with a rating summary.
+      summary: List product reviews
+      description: Lists approved reviews for a product with a rating summary (average and total count) and paginated review entries. Supports filtering by exact rating and sorting by creation date or rating. Customer view hides moderation flags; responds with 404 if the product does not exist.
       operationId: listProductReviews
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -1597,8 +1593,8 @@ paths:
     post:
       tags:
       - Reviews
-      summary: Create a review (one live review per user per product).
-      description: Create a review (one live review per user per product).
+      summary: Create a product review
+      description: Creates a review for a product on behalf of the authenticated user. Requires product ID and rating (1-5); title, comment and up to 5 images (ImageKit URLs) are optional. Enforces one live review per user per product; auto-approves on creation. Returns 409 on duplicate.
       operationId: createReview
       requestBody:
         required: true
@@ -1679,8 +1675,8 @@ paths:
     get:
       tags:
       - Reviews
-      summary: Get a single review.
-      description: Get a single review.
+      summary: Get a review
+      description: Returns a single review by its public ID. The endpoint is public and returns the review regardless of approval state as stored; responds with 404 if not found.
       operationId: getReview
       parameters:
       - name: review_public_id
@@ -1709,8 +1705,8 @@ paths:
     patch:
       tags:
       - Reviews
-      summary: Update the authenticated user's own review.
-      description: Update the authenticated user's own review.
+      summary: Update own review
+      description: Updates the authenticated user's own review. At least one of rating, title, comment or images must be supplied; providing images replaces the entire image set. Null clears title or comment. Returns 403 if the review belongs to another user.
       operationId: updateReview
       parameters:
       - name: review_public_id
@@ -1778,8 +1774,8 @@ paths:
     delete:
       tags:
       - Reviews
-      summary: Soft-delete the authenticated user's own review.
-      description: Soft-delete the authenticated user's own review.
+      summary: Delete own review
+      description: Soft-deletes the authenticated user's own review. After deletion the user may create a new review for the same product. Returns 403 if not owned and 404 if not found, with 204 on success.
       operationId: deleteReview
       parameters:
       - name: review_public_id
@@ -1803,8 +1799,8 @@ paths:
     get:
       tags:
       - Reviews
-      summary: List the authenticated user's own reviews (includes unapproved).
-      description: List the authenticated user's own reviews (includes unapproved).
+      summary: List my reviews
+      description: Lists reviews authored by the authenticated user, including unapproved entries not visible publicly. Paginated and sortable by creation date or rating; exposes the approval flag.
       operationId: listMyReviews
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -1845,16 +1841,8 @@ paths:
     get:
       tags:
       - Reviews
-      summary: Signed auth params for direct browser uploads to ImageKit (customer surface).
-      description: 'Issues token/expire/signature/publicKey/urlEndpoint/folder for a direct
-
-        browser upload. Defaults to the reviews folder; an unknown `context`
-
-        falls back to it silently. Persisted upload URLs are re-validated
-
-        server-side against the same folder allowlist.
-
-        '
+      summary: Get ImageKit upload auth
+      description: Returns signed ImageKit authentication parameters (token, expiry, signature, public key, endpoint and folder) for direct browser uploads. Defaults to the reviews folder; the context query selects the product or review folder and falls back to reviews for unknown values. Requires authentication.
       operationId: imageKitAuth
       parameters:
       - name: context
@@ -1884,8 +1872,8 @@ paths:
     get:
       tags:
       - Admin — Products
-      summary: List products (admin projection, optional include_deleted).
-      description: List products (admin projection, optional include_deleted).
+      summary: List products (admin)
+      description: Lists products for administrators with pagination, search, brand filter, sorting, and an optional include_deleted flag to show soft-deleted entries. Requires ADMIN role and returns a paginated admin projection.
       operationId: adminListProducts
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -1945,8 +1933,8 @@ paths:
     post:
       tags:
       - Admin — Products
-      summary: Create a product.
-      description: Create a product.
+      summary: Create product (admin)
+      description: Creates a new product as an administrator. Requires a name (1-255 characters); slug is auto-generated if omitted and must match slug format, while description and brand are optional. Responds with 409 on slug conflict.
       operationId: adminCreateProduct
       requestBody:
         required: true
@@ -1999,8 +1987,8 @@ paths:
     get:
       tags:
       - Admin — Products
-      summary: Signed auth params for direct browser uploads to ImageKit (admin product folder).
-      description: Signed auth params for direct browser uploads to ImageKit (admin product folder).
+      summary: Get admin ImageKit auth
+      description: Returns signed ImageKit parameters for direct browser uploads to the admin product folder. Requires ADMIN role; no query context is needed as the folder is fixed server-side.
       operationId: adminImageKitAuth
       responses:
         '200':
@@ -2022,8 +2010,8 @@ paths:
     get:
       tags:
       - Admin — Products
-      summary: Product detail incl. variants and images (admin projection).
-      description: Product detail incl. variants and images (admin projection).
+      summary: Get product (admin)
+      description: Returns an admin projection of a product including variants and images, identified by public ID. Supports an include_deleted_variants query to show soft-deleted variants. Requires ADMIN role.
       operationId: adminGetProduct
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2060,8 +2048,8 @@ paths:
     patch:
       tags:
       - Admin — Products
-      summary: Update product fields.
-      description: Update product fields.
+      summary: Update product (admin)
+      description: Updates an existing product's fields as an administrator. Only supplied fields are changed; null clears description or brand. Validates slug format and returns 409 on unique constraint.
       operationId: adminUpdateProduct
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2111,8 +2099,8 @@ paths:
     delete:
       tags:
       - Admin — Products
-      summary: Soft-delete a product and its variants.
-      description: Soft-delete a product and its variants.
+      summary: Delete product (admin)
+      description: Soft-deletes a product and its variants as an administrator. The product remains in the database with deleted_at set and is hidden from customer views. Returns 404 if not found.
       operationId: adminDeleteProduct
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2129,8 +2117,8 @@ paths:
     get:
       tags:
       - Admin — Products
-      summary: List variants (admin projection).
-      description: List variants (admin projection).
+      summary: List product variants (admin)
+      description: Lists variants for a specific product with admin visibility, including pagination, optional status filter, include_deleted flag, and sorting by SKU, price or timestamps. Requires ADMIN role.
       operationId: adminListVariants
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2195,8 +2183,8 @@ paths:
     post:
       tags:
       - Admin — Products
-      summary: Create a variant.
-      description: Create a variant.
+      summary: Create variant (admin)
+      description: Creates a new variant for a product as an administrator. Requires SKU (1-80 characters) and price as a decimal string (10,2); barcode, color, size, cost price, discount percentage, dimensions and status are optional. Returns 409 on SKU conflict.
       operationId: adminCreateVariant
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2268,8 +2256,8 @@ paths:
     get:
       tags:
       - Admin — Products
-      summary: Get one variant.
-      description: Get one variant.
+      summary: Get variant (admin)
+      description: Returns a single variant for a product, identified by both public IDs. Requires ADMIN role and responds with 404 if the product or variant does not exist.
       operationId: adminGetVariant
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2297,8 +2285,8 @@ paths:
     patch:
       tags:
       - Admin — Products
-      summary: Update one variant.
-      description: Update one variant.
+      summary: Update variant (admin)
+      description: Updates an existing variant as an administrator. Only supplied fields are changed; null clears optional fields like barcode, color, size, cost price or dimensions. Validates decimal formats and status enum.
       operationId: adminUpdateVariant
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2391,8 +2379,8 @@ paths:
     delete:
       tags:
       - Admin — Products
-      summary: Soft-delete one variant.
-      description: Soft-delete one variant.
+      summary: Delete variant (admin)
+      description: Soft-deletes a variant as an administrator. The variant is hidden from customer views but retained for order history. Returns 404 if not found.
       operationId: adminDeleteVariant
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2416,8 +2404,8 @@ paths:
     get:
       tags:
       - Admin — Products
-      summary: List product images.
-      description: List product images.
+      summary: List product images (admin)
+      description: Lists images attached to a product for administrators, with pagination. Ordered by display order; includes primary flag. Requires ADMIN role.
       operationId: adminListProductImages
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2437,8 +2425,8 @@ paths:
     post:
       tags:
       - Admin — Products
-      summary: Attach an uploaded ImageKit URL as a product image.
-      description: Attach an uploaded ImageKit URL as a product image.
+      summary: Create product image (admin)
+      description: Attaches an already-uploaded ImageKit URL as a product image. Requires a valid http/https URL; alt text, display order and primary flag are optional. Validates the URL host against the allowlist and enforces exactly one primary.
       operationId: adminCreateProductImage
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2484,8 +2472,8 @@ paths:
     get:
       tags:
       - Admin — Products
-      summary: Get one product image.
-      description: Get one product image.
+      summary: Get product image (admin)
+      description: Returns a single product image by its public ID. Requires ADMIN role and responds with 404 if the product or image does not exist.
       operationId: adminGetProductImage
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2513,8 +2501,8 @@ paths:
     patch:
       tags:
       - Admin — Products
-      summary: Update one product image (promotion maps P2002 races to 409).
-      description: Update one product image (promotion maps P2002 races to 409).
+      summary: Update product image (admin)
+      description: Updates a product image's URL, alt text, display order or primary flag. Handles concurrent primary promotion via unique constraint and maps race conditions to 409. At least one field must be supplied.
       operationId: adminUpdateProductImage
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2564,8 +2552,8 @@ paths:
     delete:
       tags:
       - Admin — Products
-      summary: Delete one product image; promotes the lowest-order survivor if it was primary.
-      description: Delete one product image; promotes the lowest-order survivor if it was primary.
+      summary: Delete product image (admin)
+      description: Deletes a product image as an administrator. If the deleted image was primary, the lowest-order surviving image is promoted to primary automatically.
       operationId: adminDeleteProductImage
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2589,8 +2577,8 @@ paths:
     get:
       tags:
       - Admin — Products
-      summary: List variant images.
-      description: List variant images.
+      summary: List variant images (admin)
+      description: Lists images attached to a specific variant with pagination. Requires ADMIN role and both product and variant IDs.
       operationId: adminListVariantImages
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2617,8 +2605,8 @@ paths:
     post:
       tags:
       - Admin — Products
-      summary: Attach an image URL to a variant.
-      description: Attach an image URL to a variant.
+      summary: Create variant image (admin)
+      description: Attaches an uploaded ImageKit URL as a variant image. Requires a valid URL; alt text and display order are optional. Requires ADMIN role.
       operationId: adminCreateVariantImage
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2671,8 +2659,8 @@ paths:
     get:
       tags:
       - Admin — Products
-      summary: Get one variant image.
-      description: Get one variant image.
+      summary: Get variant image (admin)
+      description: Returns a single variant image identified by product, variant and image public IDs. Requires ADMIN role.
       operationId: adminGetVariantImage
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2707,8 +2695,8 @@ paths:
     patch:
       tags:
       - Admin — Products
-      summary: Update one variant image.
-      description: Update one variant image.
+      summary: Update variant image (admin)
+      description: Updates a variant image's URL, alt text or display order. At least one field must be supplied; null clears alt text. Requires ADMIN role.
       operationId: adminUpdateVariantImage
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2763,8 +2751,8 @@ paths:
     delete:
       tags:
       - Admin — Products
-      summary: Delete one variant image.
-      description: Delete one variant image.
+      summary: Delete variant image (admin)
+      description: Deletes a variant image as an administrator. Requires product, variant and image IDs; returns 404 if any does not exist.
       operationId: adminDeleteVariantImage
       parameters:
       - $ref: '#/components/parameters/ProductPublicId'
@@ -2795,8 +2783,8 @@ paths:
     get:
       tags:
       - Admin — Categories
-      summary: List categories including inactive ones.
-      description: List categories including inactive ones.
+      summary: List categories (admin)
+      description: Lists categories for administrators including inactive and optionally soft-deleted entries. Supports pagination, search, sorting, and filters for active status and deleted inclusion. Requires ADMIN role.
       operationId: adminListCategories
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -2858,8 +2846,8 @@ paths:
     post:
       tags:
       - Admin — Categories
-      summary: Create a category.
-      description: Create a category.
+      summary: Create category (admin)
+      description: Creates a new category as an administrator. Requires a name; slug, description and active flag are optional (slug auto-generated and validated if supplied). Returns 409 on slug conflict.
       operationId: adminCreateCategory
       requestBody:
         required: true
@@ -2904,8 +2892,8 @@ paths:
     get:
       tags:
       - Admin — Categories
-      summary: Category detail.
-      description: Category detail.
+      summary: Get category (admin)
+      description: Returns a single category by public ID for administrators, including inactive and soft-deleted states as visible to admin. Requires ADMIN role.
       operationId: adminGetCategory
       parameters:
       - $ref: '#/components/parameters/CategoryPublicId'
@@ -2925,8 +2913,8 @@ paths:
     patch:
       tags:
       - Admin — Categories
-      summary: Update category.
-      description: Update category.
+      summary: Update category (admin)
+      description: Updates a category's fields as an administrator. Only supplied fields are changed; null clears description. Validates name and slug format.
       operationId: adminUpdateCategory
       parameters:
       - $ref: '#/components/parameters/CategoryPublicId'
@@ -2972,8 +2960,8 @@ paths:
     delete:
       tags:
       - Admin — Categories
-      summary: Soft-delete category.
-      description: Soft-delete category.
+      summary: Delete category (admin)
+      description: Soft-deletes a category as an administrator. The category is hidden from customer views but retained for referential integrity. Returns 404 if not found.
       operationId: adminDeleteCategory
       parameters:
       - $ref: '#/components/parameters/CategoryPublicId'
@@ -2990,8 +2978,8 @@ paths:
     put:
       tags:
       - Admin — Categories
-      summary: Assign a product to the category (idempotent).
-      description: Assign a product to the category (idempotent).
+      summary: Assign product to category
+      description: Assigns a product to a category as an administrator. The operation is idempotent — assigning an already assigned product returns 204. Returns 404 if either ID does not exist.
       operationId: adminAssignCategoryProduct
       parameters:
       - $ref: '#/components/parameters/CategoryPublicId'
@@ -3008,8 +2996,8 @@ paths:
     delete:
       tags:
       - Admin — Categories
-      summary: Remove a product from the category.
-      description: Remove a product from the category.
+      summary: Remove product from category
+      description: Removes a product from a category as an administrator. Succeeds with 204 even if the assignment did not exist; returns 404 if the category or product does not exist.
       operationId: adminRemoveCategoryProduct
       parameters:
       - $ref: '#/components/parameters/CategoryPublicId'
@@ -3027,8 +3015,8 @@ paths:
     get:
       tags:
       - Admin — Inventory
-      summary: Inventory dashboard with stock-status filters and search.
-      description: Inventory dashboard with stock-status filters and search.
+      summary: List inventory (admin)
+      description: Lists inventory records for administrators with pagination, free-text search, optional stock status filter (IN_STOCK, LOW_STOCK, OUT_OF_STOCK), deleted inclusion, and sorting. Each row includes on-hand, reserved, available quantities and status.
       operationId: adminListInventory
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -3094,8 +3082,8 @@ paths:
     post:
       tags:
       - Admin — Inventory
-      summary: Create an inventory record for a variant.
-      description: Create an inventory record for a variant.
+      summary: Create inventory record (admin)
+      description: Creates an inventory record for a variant as an administrator. Requires the variant public ID and on-hand quantity (integer >=0); reorder level is optional. Returns 409 if a record already exists for the variant.
       operationId: adminCreateInventory
       requestBody:
         required: true
@@ -3144,8 +3132,8 @@ paths:
     get:
       tags:
       - Admin — Inventory
-      summary: Inventory for one variant.
-      description: Inventory for one variant.
+      summary: Get inventory for variant
+      description: Returns the inventory record for a single variant, including on-hand, reserved, available quantities, reorder level and computed stock status. Requires ADMIN role.
       operationId: adminGetInventory
       parameters:
       - name: variant_public_id
@@ -3172,14 +3160,8 @@ paths:
     patch:
       tags:
       - Admin — Inventory
-      summary: Set absolute stock levels or apply a delta (mutually exclusive).
-      description: 'Provide **either** `quantity_on_hand` (absolute) **or** `quantity_change`
-
-        (delta, non-zero). `quantity_on_hand` and `quantity_change` are mutually
-
-        exclusive. At least one field is required.
-
-        '
+      summary: Set inventory levels (admin)
+      description: Sets absolute stock levels or applies a delta for a variant. Provide either quantity_on_hand (absolute) or quantity_change (non-zero delta) — they are mutually exclusive — plus optional reorder level and reason. At least one field is required.
       operationId: adminSetInventory
       parameters:
       - name: variant_public_id
@@ -3242,8 +3224,8 @@ paths:
     patch:
       tags:
       - Admin — Inventory
-      summary: Manually reserve or release reserved quantity (delta-based).
-      description: Manually reserve or release reserved quantity (delta-based).
+      summary: Reserve inventory (admin)
+      description: Manually adjusts the reserved quantity for a variant as an administrator using a delta. Positive values reserve additional units, negative values release them. The delta must be non-zero; optional reason is stored for audit. Applies stock availability checks.
       operationId: adminReserveInventory
       parameters:
       - name: variant_public_id
@@ -3294,8 +3276,8 @@ paths:
     get:
       tags:
       - Admin — Users
-      summary: Search/paginate customer and admin accounts.
-      description: Search/paginate customer and admin accounts.
+      summary: List users (admin)
+      description: Lists customer and admin accounts for administrators with pagination, search, status filter (ACTIVE, SUSPENDED, DELETED), deleted inclusion and sorting. Requires ADMIN role; SUPER_ADMIN sees all roles.
       operationId: adminListUsers
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -3358,8 +3340,8 @@ paths:
     get:
       tags:
       - Admin — Users
-      summary: Account detail with verification state.
-      description: Account detail with verification state.
+      summary: Get user (admin)
+      description: Returns a single user account by public ID for administrators, including verification state and status. Requires ADMIN role.
       operationId: adminGetUser
       parameters:
       - $ref: '#/components/parameters/UserPublicId'
@@ -3379,8 +3361,8 @@ paths:
     patch:
       tags:
       - Admin — Users
-      summary: Update contact details (triggers reverification + audit).
-      description: Update contact details (triggers reverification + audit).
+      summary: Update user (admin)
+      description: Updates a user's contact details as an administrator. Supports first name, last name, email and E.164 phone number; changing email or phone triggers reverification and creates an audit entry. Requires ADMIN role.
       operationId: adminUpdateUser
       parameters:
       - $ref: '#/components/parameters/UserPublicId'
@@ -3427,8 +3409,8 @@ paths:
     patch:
       tags:
       - Admin — Users
-      summary: Change role between CUSTOMER and ADMIN (SUPER_ADMIN changes are CLI-only).
-      description: Change role between CUSTOMER and ADMIN (SUPER_ADMIN changes are CLI-only).
+      summary: Change user role (admin)
+      description: Changes a user's role between CUSTOMER and ADMIN. Requires SUPER_ADMIN; attempts to change a SUPER_ADMIN via the API are rejected (CLI-only). Returns 403 if the caller lacks permission.
       operationId: adminChangeUserRole
       parameters:
       - $ref: '#/components/parameters/UserPublicId'
@@ -3466,8 +3448,8 @@ paths:
     patch:
       tags:
       - Admin — Users
-      summary: Suspend an account (sessions revoked).
-      description: Suspend an account (sessions revoked).
+      summary: Suspend user account
+      description: Suspends a user account as an administrator, preventing login and revoking all active sessions. Returns 403 if the caller lacks permission and 409 if already suspended.
       operationId: adminSuspendUser
       parameters:
       - $ref: '#/components/parameters/UserPublicId'
@@ -3490,8 +3472,8 @@ paths:
     patch:
       tags:
       - Admin — Users
-      summary: Reactivate a suspended account.
-      description: Reactivate a suspended account.
+      summary: Activate user account
+      description: Reactivates a previously suspended user account as an administrator, restoring login capability. Returns 409 if the account is already active.
       operationId: adminActivateUser
       parameters:
       - $ref: '#/components/parameters/UserPublicId'
@@ -3514,8 +3496,8 @@ paths:
     get:
       tags:
       - Admin — Orders
-      summary: Search/filter all orders (status, date range, search).
-      description: Search/filter all orders (status, date range, search).
+      summary: List all orders (admin)
+      description: Lists all orders for administrators with pagination, status and free-text search, optional placed date range (placed_from/to with offset) and sorting including customer name. Requires ADMIN role.
       operationId: adminListOrders
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -3592,8 +3574,8 @@ paths:
     get:
       tags:
       - Admin — Orders
-      summary: Full order detail with items, payment and shipment.
-      description: Full order detail with items, payment and shipment.
+      summary: Get order (admin)
+      description: Returns full order details for administrators including line items with frozen snapshots, payment and shipment information. Requires ADMIN role.
       operationId: adminGetOrder
       parameters:
       - $ref: '#/components/parameters/OrderPublicId'
@@ -3613,8 +3595,8 @@ paths:
     patch:
       tags:
       - Admin — Orders
-      summary: Status transition (legal matrix enforced server-side with stock/payment side effects).
-      description: Status transition (legal matrix enforced server-side with stock/payment side effects).
+      summary: Update order status (admin)
+      description: Transitions an order to a new status as an administrator, enforcing the legal status matrix server-side. Requires status and, when transitioning to shipped, a carrier; tracking number is optional. Side effects include creating shipment, restocking inventory on cancellation, and refunding payment where applicable. Returns 409 on illegal transition.
       operationId: adminUpdateOrderStatus
       parameters:
       - $ref: '#/components/parameters/OrderPublicId'
@@ -3682,8 +3664,8 @@ paths:
     get:
       tags:
       - Admin — Reviews
-      summary: Moderation queue with filters (rating, is_approved, include_deleted, search).
-      description: Moderation queue with filters (rating, is_approved, include_deleted, search).
+      summary: List reviews (admin)
+      description: Lists reviews for moderation with pagination, search, rating filter, approval state filter (true, false or all), deleted inclusion and sorting. Requires ADMIN role and returns all review states.
       operationId: adminListReviews
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -3752,8 +3734,8 @@ paths:
     get:
       tags:
       - Admin — Reviews
-      summary: Review detail in any state with images.
-      description: Review detail in any state with images.
+      summary: Get review (admin)
+      description: Returns a single review in any state (including unapproved or deleted) with its images for moderation. Requires ADMIN role.
       operationId: adminGetReview
       parameters:
       - $ref: '#/components/parameters/ReviewPublicId'
@@ -3773,8 +3755,8 @@ paths:
     patch:
       tags:
       - Admin — Reviews
-      summary: Moderate (is_approved) and edit title/comment.
-      description: Moderate (is_approved) and edit title/comment.
+      summary: Moderate review (admin)
+      description: Moderates a review as an administrator by toggling approval and optionally editing rating, title or comment. At least one field must be supplied; null clears title or comment. Requires ADMIN role.
       operationId: adminModerateReview
       parameters:
       - $ref: '#/components/parameters/ReviewPublicId'
@@ -3821,8 +3803,8 @@ paths:
     delete:
       tags:
       - Admin — Reviews
-      summary: Hard-delete a review and its images.
-      description: Hard-delete a review and its images.
+      summary: Delete review (admin)
+      description: Hard-deletes a review and its images as an administrator. This permanently removes the review, unlike customer soft-delete. Requires ADMIN role.
       operationId: adminDeleteReview
       parameters:
       - $ref: '#/components/parameters/ReviewPublicId'
@@ -3839,8 +3821,8 @@ paths:
     get:
       tags:
       - Admin — Coupons
-      summary: List coupons with status/search filters.
-      description: List coupons with status/search filters.
+      summary: List coupons (admin)
+      description: Lists coupons for administrators with pagination, search, status filter (ACTIVE, INACTIVE, EXPIRED, USAGE_LIMIT_REACHED), deleted inclusion and sorting. Requires ADMIN role.
       operationId: adminListCoupons
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -3909,8 +3891,8 @@ paths:
     post:
       tags:
       - Admin — Coupons
-      summary: Create a coupon.
-      description: Create a coupon.
+      summary: Create coupon (admin)
+      description: Creates a new coupon as an administrator. Requires code (3-50 alphanumeric/dash/underscore, uppercased), discount type and value, and both total and per-user usage limits. Optional minimum order amount, maximum discount, start/expiry dates and active flag are validated (expiry must be after start, percentage ≤100).
       operationId: adminCreateCoupon
       requestBody:
         required: true
@@ -4009,8 +3991,8 @@ paths:
     get:
       tags:
       - Admin — Coupons
-      summary: Coupon detail.
-      description: Coupon detail.
+      summary: Get coupon (admin)
+      description: Returns a single coupon by public ID for administrators, including usage counts and status. Requires ADMIN role.
       operationId: adminGetCoupon
       parameters:
       - $ref: '#/components/parameters/CouponPublicId'
@@ -4030,8 +4012,8 @@ paths:
     patch:
       tags:
       - Admin — Coupons
-      summary: Update coupon.
-      description: Update coupon.
+      summary: Update coupon (admin)
+      description: Updates an existing coupon as an administrator. Only supplied fields are changed; null clears optional monetary or date fields. At least one field is required and the same validation as creation applies.
       operationId: adminUpdateCoupon
       parameters:
       - $ref: '#/components/parameters/CouponPublicId'
@@ -4105,8 +4087,8 @@ paths:
     delete:
       tags:
       - Admin — Coupons
-      summary: Soft-delete coupon.
-      description: Soft-delete coupon.
+      summary: Delete coupon (admin)
+      description: Soft-deletes a coupon as an administrator, hiding it from checkout while preserving usage history. Returns 404 if not found.
       operationId: adminDeleteCoupon
       parameters:
       - $ref: '#/components/parameters/CouponPublicId'
@@ -4123,8 +4105,8 @@ paths:
     get:
       tags:
       - Admin — Coupons
-      summary: Usage history drawer data.
-      description: Usage history drawer data.
+      summary: List coupon usages (admin)
+      description: Returns the usage history for a coupon as an administrator, with pagination. Each entry includes the user, order and discount applied. Returns 404 if the coupon does not exist.
       operationId: adminListCouponUsages
       parameters:
       - $ref: '#/components/parameters/CouponPublicId'
@@ -4158,8 +4140,8 @@ paths:
     get:
       tags:
       - Admin — Stats & Analytics
-      summary: Dashboard KPI aggregate.
-      description: Dashboard KPI aggregate.
+      summary: Get dashboard stats
+      description: Returns aggregated dashboard KPIs for administrators (revenue, orders, customers) for a selectable period preset (today, 7d default, 30d). Requires ADMIN role; SUPER_ADMIN for full analytics scope.
       operationId: adminStats
       parameters:
       - name: period
@@ -4195,8 +4177,8 @@ paths:
     get:
       tags:
       - Admin — Stats & Analytics
-      summary: P&L overview (revenue, costs, profit trend).
-      description: P&L overview (revenue, costs, profit trend).
+      summary: Get P&L overview
+      description: Returns profit-and-loss overview including revenue, costs and profit trend for an optional date range. Requires SUPER_ADMIN role.
       operationId: adminAnalyticsOverview
       parameters:
       - name: date_from
@@ -4230,8 +4212,8 @@ paths:
     get:
       tags:
       - Admin — Stats & Analytics
-      summary: Coupon insights (status counts, trends, most-used, revenue impact).
-      description: Coupon insights (status counts, trends, most-used, revenue impact).
+      summary: Get coupon analytics
+      description: Returns coupon analytics including status counts, usage trends, most-used coupons and revenue impact for an optional date range. Requires SUPER_ADMIN role.
       operationId: adminAnalyticsCoupons
       parameters:
       - name: date_from
@@ -4263,8 +4245,8 @@ paths:
     get:
       tags:
       - Admin — Stats & Analytics
-      summary: Operating expense ledger (paginated).
-      description: Operating expense ledger (paginated).
+      summary: List expenses
+      description: Lists operating expenses with pagination, optional category filter and date range filtering. Requires SUPER_ADMIN role.
       operationId: adminListExpenses
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -4319,8 +4301,8 @@ paths:
     post:
       tags:
       - Admin — Stats & Analytics
-      summary: Record an operating expense.
-      description: Record an operating expense.
+      summary: Create expense
+      description: Records a new operating expense as a SUPER_ADMIN. Requires description (1-255), category (RENT, SALARIES, MARKETING, UTILITIES, SHIPPING, SOFTWARE, OTHER), amount (0.01-99,999,999) and spending date.
       operationId: adminCreateExpense
       requestBody:
         required: true
@@ -4383,8 +4365,8 @@ paths:
     patch:
       tags:
       - Admin — Stats & Analytics
-      summary: Update an expense.
-      description: Update an expense.
+      summary: Update expense
+      description: Updates an existing expense as a SUPER_ADMIN. Only supplied fields are changed; at least one field is required. Validates category and amount ranges.
       operationId: adminUpdateExpense
       parameters:
       - name: expense_public_id
@@ -4440,8 +4422,8 @@ paths:
     delete:
       tags:
       - Admin — Stats & Analytics
-      summary: Delete an expense.
-      description: Delete an expense.
+      summary: Delete expense
+      description: Deletes an operating expense as a SUPER_ADMIN. Returns 404 if the expense does not exist.
       operationId: adminDeleteExpense
       parameters:
       - name: expense_public_id
@@ -4464,8 +4446,8 @@ paths:
     get:
       tags:
       - Admin — Audit
-      summary: Append-only audit trail with filters (actor, action prefix, entity).
-      description: Append-only audit trail with filters (actor, action prefix, entity).
+      summary: List audit logs
+      description: Returns the append-only audit trail with pagination and filters for actor, action prefix, entity type and ID, date range and sorting. Requires SUPER_ADMIN role.
       operationId: adminListAuditLogs
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -4542,8 +4524,8 @@ paths:
     get:
       tags:
       - Admin — Admins
-      summary: List admin accounts with activity aggregates (super_admin).
-      description: List admin accounts with activity aggregates (super_admin).
+      summary: List admin accounts
+      description: Lists admin accounts with activity aggregates for SUPER_ADMIN, supporting pagination, search, status (ACTIVE, SUSPENDED) and activity (ACTIVE, INACTIVE based on recent login/audit within 2 days) filters, and sorting.
       operationId: adminListAdmins
       parameters:
       - $ref: '#/components/parameters/PageParam'
@@ -4605,8 +4587,8 @@ paths:
     get:
       tags:
       - Admin — Admins
-      summary: Admin activity detail (super_admin).
-      description: Admin activity detail (super_admin).
+      summary: Get admin details
+      description: Returns detailed activity information for a single admin account, including recent logins and audited actions. Requires SUPER_ADMIN role.
       operationId: adminGetAdmin
       parameters:
       - name: admin_public_id
@@ -4633,8 +4615,8 @@ paths:
     patch:
       tags:
       - Admin — Admins
-      summary: Suspend an admin account (super_admin).
-      description: Suspend an admin account (super_admin).
+      summary: Suspend admin account
+      description: Suspends an admin account as a SUPER_ADMIN, preventing login. Returns 409 if already suspended and 403 if the caller lacks SUPER_ADMIN permission.
       operationId: adminSuspendAdmin
       parameters:
       - name: admin_public_id
@@ -4663,8 +4645,8 @@ paths:
     patch:
       tags:
       - Admin — Admins
-      summary: Reactivate an admin account (super_admin).
-      description: Reactivate an admin account (super_admin).
+      summary: Reactivate admin account
+      description: Reactivates a previously suspended admin account as a SUPER_ADMIN, restoring login capability. Returns 409 if already active.
       operationId: adminActivateAdmin
       parameters:
       - name: admin_public_id
