@@ -3,21 +3,40 @@ info:
   title: Ecommerce Backend API
   summary: Production-level e-commerce API (storefront + admin console).
   description: |
-    Session-cookie authenticated API. Money values are decimal strings with two
-    decimal places; timestamps are ISO 8601 UTC; only public IDs (`usr_`, `prd_`,
-    …) are exposed.
+    Session-cookie authenticated REST API. Money values are decimal strings
+    (`"10.00"`, pattern `^\d{1,10}(\.\d{1,2})?$`); timestamps are ISO 8601 UTC
+    (`date-time` with offset); only public IDs (`usr_`, `prd_`, …) are exposed.
+    All write operations require a session cookie and, when CSRF is enabled, an
+    `x-csrf-token` header.
+
+    **Authentication:** Opaque DB-backed `session` HttpOnly cookie (SameSite=Lax).
+    Obtain via `POST /auth/register` or `POST /auth/login`; revoke via
+    `DELETE /auth/session`. Call `GET /auth/csrf-token` before cookie-authenticated
+    writes.
+
+    **Pagination:** `page` (1-based, default 1) + `limit` (1–100, default 20).
+    Response `meta` carries `total`, `totalPages`, `hasNext`, `hasPrev`.
 
     **Source of truth:** the hand-maintained contracts in `docs/api/**` remain
     authoritative for semantics; this file is a machine-importable projection of
     them (kept in sync manually — see openapi/README.md). Markdown wins on any
     conflict until this note is reversed.
+
+    **Password policy:** minimum 8 characters and must include an uppercase
+    letter, a lowercase letter, a number and a special character
+    (`/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}/`).
   version: 1.0.0
+  contact:
+    name: API Support
+    url: https://github.com/Abo3baziz/ecommerce-api
   license:
     name: UNLICENSED
     url: https://github.com/Abo3baziz/ecommerce-api
 servers:
   - url: http://localhost:3000/api/v1
     description: Local development
+  - url: https://api.example.com/api/v1
+    description: Production (override host)
 tags:
   - name: Auth
     description: Registration, login, sessions, email verification, password reset.
@@ -40,7 +59,7 @@ tags:
   - name: Admin — Inventory
     description: Stock levels, adjustments and manual reserves (admin).
   - name: Admin — Users
-    description: Customer accounts, roles and suspension (admin).
+    description: Customer accounts, roles and suspension (admin + super_admin for role).
   - name: Admin — Orders
     description: Order queue and status transitions with side effects (admin).
   - name: Admin — Reviews
@@ -79,7 +98,12 @@ paths:
                     type: object
                     required: [csrf_token]
                     properties:
-                      csrf_token: { type: string }
+                      csrf_token:
+                        type: string
+                        example: "csrf_abc123"
+              examples:
+                default:
+                  value: { success: true, data: { csrf_token: "csrf_abc123" } }
         "401": { $ref: "#/components/responses/Unauthorized" }
   /auth/register:
     post:
@@ -95,14 +119,27 @@ paths:
               type: object
               required: [first_name, last_name, phone_number, email, password]
               properties:
-                first_name: { type: string, maxLength: 100 }
-                last_name: { type: string, maxLength: 100 }
+                first_name: { type: string, minLength: 1, maxLength: 100, example: "Jane" }
+                last_name: { type: string, minLength: 1, maxLength: 100, example: "Doe" }
                 phone_number:
                   type: string
                   description: E.164 format.
                   pattern: '^\+[1-9]\d{1,14}$'
-                email: { type: string, format: email }
-                password: { type: string, minLength: 8 }
+                  example: "+14155552671"
+                email: { type: string, format: email, example: "jane@example.com" }
+                password:
+                  type: string
+                  minLength: 8
+                  description: Must include uppercase, lowercase, number and special character.
+                  example: "S3cure!Pass"
+            examples:
+              default:
+                value:
+                  first_name: "Jane"
+                  last_name: "Doe"
+                  phone_number: "+14155552671"
+                  email: "jane@example.com"
+                  password: "S3cure!Pass"
       responses:
         "201":
           description: Account created; session cookie set; verification email queued.
@@ -119,6 +156,9 @@ paths:
                         properties:
                           public_id: { $ref: "#/components/schemas/UserPublicId" }
                           email_verified: { type: boolean }
+              examples:
+                default:
+                  value: { success: true, data: { public_id: "usr_01H", email_verified: false } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -136,8 +176,8 @@ paths:
               type: object
               required: [email, password]
               properties:
-                email: { type: string, format: email }
-                password: { type: string }
+                email: { type: string, format: email, example: "jane@example.com" }
+                password: { type: string, example: "S3cure!Pass" }
       responses:
         "200":
           description: Session cookie set.
@@ -165,6 +205,20 @@ paths:
       responses:
         "200":
           description: Current session details.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          public_id: { $ref: "#/components/schemas/UserPublicId" }
+                          email: { type: string, format: email }
+                          role: { type: string, enum: [CUSTOMER, ADMIN, SUPER_ADMIN] }
+                          email_verified: { type: boolean }
         "401": { $ref: "#/components/responses/Unauthorized" }
     delete:
       tags: [Auth]
@@ -181,6 +235,21 @@ paths:
       responses:
         "200":
           description: Active sessions, newest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            public_id: { type: string, example: "ses_01H" }
+                            created_at: { type: string, format: date-time }
+                            expires_at: { type: string, format: date-time }
         "401": { $ref: "#/components/responses/Unauthorized" }
     delete:
       tags: [Auth]
@@ -189,6 +258,9 @@ paths:
       responses:
         "200":
           description: Remaining sessions revoked.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" }
         "401": { $ref: "#/components/responses/Unauthorized" }
   /auth/sessions/{session_public_id}:
     delete:
@@ -199,7 +271,8 @@ paths:
         - name: session_public_id
           in: path
           required: true
-          schema: { type: string }
+          schema: { type: string, minLength: 1, example: "ses_01H" }
+          description: Session public ID.
       responses:
         "204": { description: Revoked. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -218,9 +291,9 @@ paths:
               type: object
               required: [token]
               properties:
-                token: { type: string }
+                token: { type: string, minLength: 1, example: "vrf_abc123" }
       responses:
-        "200": { description: Email verified. }
+        "200": { description: Email verified., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
         "410": { $ref: "#/components/responses/Gone" }
@@ -248,7 +321,7 @@ paths:
               type: object
               required: [email]
               properties:
-                email: { type: string, format: email }
+                email: { type: string, format: email, example: "jane@example.com" }
       responses:
         "202":
           description: Accepted. Identical for unknown emails (no enumeration).
@@ -265,12 +338,32 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email, otp]
+              required: [email, code]
               properties:
-                email: { type: string, format: email }
-                otp: { type: string }
+                email: { type: string, format: email, example: "jane@example.com" }
+                code:
+                  type: string
+                  pattern: '^\d{6}$'
+                  description: 6-digit OTP code.
+                  example: "123456"
+            examples:
+              default:
+                value: { email: "jane@example.com", code: "123456" }
       responses:
-        "200": { description: Reset token issued. }
+        "200":
+          description: Reset token issued.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [token]
+                        properties:
+                          token: { type: string, example: "rst_abc123" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
         "410": { $ref: "#/components/responses/Gone" }
@@ -289,8 +382,12 @@ paths:
               type: object
               required: [token, new_password]
               properties:
-                token: { type: string }
-                new_password: { type: string, minLength: 8 }
+                token: { type: string, minLength: 1, example: "rst_abc123" }
+                new_password:
+                  type: string
+                  minLength: 8
+                  description: Must include uppercase, lowercase, number and special character.
+                  example: "N3w!Secure"
       responses:
         "204": { description: Password updated; all sessions revoked. }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -305,6 +402,23 @@ paths:
       responses:
         "200":
           description: Profile with verification state and role.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          public_id: { $ref: "#/components/schemas/UserPublicId" }
+                          first_name: { type: string }
+                          last_name: { type: string }
+                          email: { type: string, format: email }
+                          phone_number: { type: string }
+                          role: { type: string, enum: [CUSTOMER, ADMIN, SUPER_ADMIN] }
+                          email_verified: { type: boolean }
         "401": { $ref: "#/components/responses/Unauthorized" }
     patch:
       tags: [Users]
@@ -315,12 +429,16 @@ paths:
           application/json:
             schema:
               type: object
+              minProperties: 1
               properties:
-                first_name: { type: string, minLength: 1, maxLength: 100 }
-                last_name: { type: string, minLength: 1, maxLength: 100 }
+                first_name: { type: string, minLength: 1, maxLength: 100, example: "Jane" }
+                last_name: { type: string, minLength: 1, maxLength: 100, example: "Doe" }
       responses:
         "200":
           description: Updated profile.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
     delete:
@@ -335,7 +453,7 @@ paths:
               type: object
               required: [password]
               properties:
-                password: { type: string }
+                password: { type: string, example: "S3cure!Pass" }
       responses:
         "204": { description: Account deleted; sessions revoked. }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -353,10 +471,14 @@ paths:
               type: object
               required: [current_password, new_password]
               properties:
-                current_password: { type: string }
-                new_password: { type: string, minLength: 8 }
+                current_password: { type: string, example: "Old!Pass1" }
+                new_password:
+                  type: string
+                  minLength: 8
+                  description: Must include uppercase, lowercase, number and special character.
+                  example: "N3w!Secure1"
       responses:
-        "200": { description: Password changed. }
+        "200": { description: Password changed., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -373,10 +495,11 @@ paths:
               type: object
               required: [new_email, password]
               properties:
-                new_email: { type: string, format: email }
-                password: { type: string }
+                new_email: { type: string, format: email, example: "new@example.com" }
+                password: { type: string, example: "S3cure!Pass" }
       responses:
         "202": { description: Verification email queued. }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -384,8 +507,8 @@ paths:
     post:
       tags: [Users]
       summary: Verify an email change with the emailed token.
+      description: Requires an active session (same user who requested the change).
       operationId: verifyEmailChange
-      security: []
       requestBody:
         required: true
         content:
@@ -394,10 +517,11 @@ paths:
               type: object
               required: [token]
               properties:
-                token: { type: string }
+                token: { type: string, minLength: 1, example: "vrf_abc123" }
       responses:
-        "200": { description: Email updated. }
+        "200": { description: Email updated., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "410": { $ref: "#/components/responses/Gone" }
   /users/me/phone-number:
@@ -417,9 +541,11 @@ paths:
                   type: string
                   pattern: '^\+[1-9]\d{1,14}$'
                   description: E.164 format.
-                password: { type: string }
+                  example: "+14155552672"
+                password: { type: string, example: "S3cure!Pass" }
       responses:
         "202": { description: OTP dispatched. }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -427,39 +553,49 @@ paths:
     post:
       tags: [Users]
       summary: Verify a phone-number change with the OTP code.
+      description: Requires an active session; the pending phone number is taken from the prior request.
       operationId: verifyPhoneChange
-      security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [new_phone_number, otp, password]
+              required: [otp]
               properties:
-                new_phone_number: { type: string }
-                otp: { type: string }
-                password: { type: string }
+                otp:
+                  type: string
+                  pattern: '^\d{6}$'
+                  description: 6-digit OTP code.
+                  example: "123456"
       responses:
-        "200": { description: Phone number updated. }
+        "200": { description: Phone number updated., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "410": { $ref: "#/components/responses/Gone" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /users/me/addresses:
     get:
       tags: [Addresses]
       summary: List addresses (paginated, newest first).
       operationId: listAddresses
       parameters:
-        - name: page
-          in: query
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
           description: Paginated address list.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Address" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
         "401": { $ref: "#/components/responses/Unauthorized" }
     post:
       tags: [Addresses]
@@ -469,11 +605,28 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/AddressInput"
+            schema: { $ref: "#/components/schemas/AddressInput" }
+            examples:
+              default:
+                value:
+                  recipient_name: "Jane Doe"
+                  phone_number: "+14155552671"
+                  country: "USA"
+                  state: "CA"
+                  city: "San Francisco"
+                  address_1: "123 Market St"
+                  is_default_shipping: true
       responses:
         "201":
           description: Created address.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Address" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
@@ -485,7 +638,16 @@ paths:
       parameters:
         - $ref: "#/components/parameters/AddressPublicId"
       responses:
-        "200": { description: The address. }
+        "200":
+          description: The address.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Address" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
@@ -497,10 +659,19 @@ paths:
       requestBody:
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/AddressInput"
+            schema: { $ref: "#/components/schemas/AddressInput" }
       responses:
-        "200": { description: Updated address. }
+        "200":
+          description: Updated address.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Address" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
@@ -522,28 +693,37 @@ paths:
       operationId: listProducts
       security: []
       parameters:
-        - name: page
-          in: query
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
-        - name: search
-          in: query
-          schema: { type: string }
-          description: Case-insensitive match on name, brand or description.
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
         - name: brand
           in: query
-          schema: { type: string }
+          required: false
+          schema: { type: string, maxLength: 255 }
+          description: Filter by brand (trimmed, exact match).
+          example: "Nike"
         - name: sort
           in: query
+          required: false
+          description: Sort field. Prefix with `-` for descending.
           schema:
             type: string
-            enum: [created_at, -created_at, name, -name]
+            enum: [name, -name, created_at, -created_at, updated_at, -updated_at]
             default: "-created_at"
       responses:
         "200":
           description: Paginated products; each carries a primary_image thumbnail.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/ProductSummary" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
   /products/{product_public_id}:
     get:
@@ -559,6 +739,14 @@ paths:
             Product with `images` (ordered by display_order, includes
             is_primary) and `variants` (ACTIVE only) each carrying their own
             images and computed final_price.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ProductDetail" }
         "404": { $ref: "#/components/responses/NotFound" }
   /categories:
     get:
@@ -566,8 +754,33 @@ paths:
       summary: List categories.
       operationId: listCategories
       security: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: sort
+          in: query
+          required: false
+          description: Sort field. Prefix with `-` for descending.
+          schema:
+            type: string
+            enum: [name, -name, created_at, -created_at, updated_at, -updated_at]
+            default: "name"
       responses:
-        "200": { description: Paginated categories. }
+        "200":
+          description: Paginated categories.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Category" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
   /categories/{category_public_id}:
     get:
       tags: [Catalog]
@@ -577,7 +790,16 @@ paths:
       parameters:
         - $ref: "#/components/parameters/CategoryPublicId"
       responses:
-        "200": { description: The category. }
+        "200":
+          description: The category.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Category" }
         "404": { $ref: "#/components/responses/NotFound" }
   /categories/{category_public_id}/products:
     get:
@@ -587,14 +809,32 @@ paths:
       security: []
       parameters:
         - $ref: "#/components/parameters/CategoryPublicId"
-        - name: page
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: sort
           in: query
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+          required: false
+          description: Sort field. Prefix with `-` for descending.
+          schema:
+            type: string
+            enum: [name, -name, created_at, -created_at, updated_at, -updated_at]
+            default: "-created_at"
       responses:
-        "200": { description: Paginated products in the category. }
+        "200":
+          description: Paginated products in the category.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/ProductSummary" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /cart:
@@ -603,7 +843,16 @@ paths:
       summary: Get the current cart (created lazily on first add).
       operationId: getCart
       responses:
-        "200": { description: The cart with line items and totals. }
+        "200":
+          description: The cart with line items and totals.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Cart" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404":
           description: Cart not found for this user (no cart created yet).
@@ -615,7 +864,16 @@ paths:
       summary: Clear all cart lines.
       operationId: clearCart
       responses:
-        "200": { description: Emptied cart. }
+        "200":
+          description: Emptied cart.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Cart" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /cart/items:
@@ -631,10 +889,22 @@ paths:
               type: object
               required: [variant_public_id, quantity]
               properties:
-                variant_public_id: { type: string, pattern: "^var_" }
-                quantity: { type: integer, minimum: 1 }
+                variant_public_id: { type: string, minLength: 1, pattern: "^var_", example: "var_01H" }
+                quantity: { type: integer, minimum: 1, maximum: 999, default: 1, example: 2 }
+            examples:
+              default:
+                value: { variant_public_id: "var_01H", quantity: 2 }
       responses:
-        "201": { description: Line added or quantity merged. }
+        "201":
+          description: Line added or quantity merged.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Cart" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -648,7 +918,7 @@ paths:
         - name: variant_public_id
           in: path
           required: true
-          schema: { type: string, pattern: "^var_" }
+          schema: { type: string, minLength: 1, pattern: "^var_", example: "var_01H" }
       requestBody:
         required: true
         content:
@@ -657,9 +927,20 @@ paths:
               type: object
               required: [quantity]
               properties:
-                quantity: { type: integer, minimum: 1 }
+                quantity: { type: integer, minimum: 1, maximum: 999, example: 3 }
       responses:
-        "200": { description: Updated line. }
+        "200":
+          description: Updated line.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Cart" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Insufficient stock.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
     delete:
@@ -670,9 +951,10 @@ paths:
         - name: variant_public_id
           in: path
           required: true
-          schema: { type: string, pattern: "^var_" }
+          schema: { type: string, minLength: 1, pattern: "^var_", example: "var_01H" }
       responses:
         "204": { description: Line removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /orders:
     post:
@@ -687,16 +969,33 @@ paths:
               type: object
               required: [address_public_id, payment_method]
               properties:
-                address_public_id: { type: string, pattern: "^adr_" }
+                address_public_id: { type: string, minLength: 1, pattern: "^adr_", example: "adr_01H" }
                 payment_method:
                   type: string
                   enum: [mock]
                   description: Only the mock gateway in v1.
-                coupon_code: { type: string, maxLength: 50 }
-                notes: { type: string, maxLength: 1000 }
+                  example: "mock"
+                coupon_code:
+                  type: string
+                  minLength: 1
+                  maxLength: 50
+                  description: Uppercased automatically.
+                  example: "SAVE10"
+                notes: { type: string, maxLength: 1000, example: "Leave at door" }
+            examples:
+              default:
+                value: { address_public_id: "adr_01H", payment_method: "mock" }
       responses:
         "201":
           description: Order placed and confirmed; cart cleared.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/OrderDetail" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -711,22 +1010,38 @@ paths:
       summary: List the customer's orders (paginated).
       operationId: listMyOrders
       parameters:
-        - name: page
-          in: query
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
         - name: status
           in: query
+          required: false
           schema:
             type: string
             enum: [pending, confirmed, processing, shipped, delivered, cancelled, returned, refunded]
+          description: Filter by order status.
         - name: sort
           in: query
-          schema: { type: string, enum: [placed_at, "-placed_at", total_amount, "-total_amount"] }
+          required: false
+          description: Sort field. Prefix with `-` for descending.
+          schema:
+            type: string
+            enum: [placed_at, "-placed_at", order_number, "-order_number", total_amount, "-total_amount"]
+            default: "-placed_at"
       responses:
-        "200": { description: Paginated order summaries. }
+        "200":
+          description: Paginated order summaries.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/OrderSummary" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
   /orders/{order_public_id}:
     get:
@@ -737,9 +1052,18 @@ paths:
         - name: order_public_id
           in: path
           required: true
-          schema: { type: string, pattern: "^ord_" }
+          schema: { type: string, minLength: 1, pattern: "^ord_", example: "ord_01H" }
       responses:
-        "200": { description: Full order detail. }
+        "200":
+          description: Full order detail.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/OrderDetail" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -751,23 +1075,46 @@ paths:
       security: []
       parameters:
         - $ref: "#/components/parameters/ProductPublicId"
-        - name: page
-          in: query
-          schema: { type: integer, minimum: 1, default: 1 }
+        - $ref: "#/components/parameters/PageParam"
         - name: limit
           in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+          description: Items per page (default 20, max 100).
         - name: rating
           in: query
+          required: false
           schema: { type: integer, minimum: 1, maximum: 5 }
+          description: Filter by exact rating.
         - name: sort
           in: query
-          schema: { type: string, enum: [created_at, "-created_at", rating, "-rating"] }
+          required: false
+          description: Sort field. Prefix with `-` for descending.
+          schema: { type: string, enum: [created_at, "-created_at", rating, "-rating"], default: "-created_at" }
       responses:
         "200":
           description: |
             Rating summary (`average_rating`, `total_count`) plus paginated
             approved reviews. Customer projection hides `is_approved`.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          summary:
+                            type: object
+                            properties:
+                              average_rating: { type: number, example: 4.2 }
+                              total_count: { type: integer, example: 42 }
+                          reviews:
+                            type: array
+                            items: { $ref: "#/components/schemas/Review" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
   /reviews:
@@ -783,20 +1130,37 @@ paths:
               type: object
               required: [product_public_id, rating]
               properties:
-                product_public_id: { type: string, pattern: "^prd_" }
-                rating: { type: integer, minimum: 1, maximum: 5 }
-                title: { type: string }
-                comment: { type: string }
+                product_public_id: { type: string, minLength: 1, pattern: "^prd_", example: "prd_01H" }
+                rating: { type: integer, minimum: 1, maximum: 5, example: 5 }
+                title: { type: string, maxLength: 255, example: "Great product!" }
+                comment: { type: string, maxLength: 5000, example: "Loved it, will buy again." }
                 images:
                   type: array
+                  maxItems: 5
                   items:
                     type: object
                     required: [image_url]
                     properties:
-                      image_url: { type: string }
-                      alt_text: { type: string }
+                      image_url:
+                        type: string
+                        format: uri
+                        maxLength: 2048
+                        example: "https://ik.imagekit.io/demo/reviews/rv1.jpg"
+                      alt_text: { type: string, maxLength: 255 }
+            examples:
+              default:
+                value: { product_public_id: "prd_01H", rating: 5, title: "Great!", comment: "Loved it" }
       responses:
-        "201": { description: Review created (auto-approved). }
+        "201":
+          description: Review created (auto-approved).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Review" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -811,9 +1175,18 @@ paths:
         - name: review_public_id
           in: path
           required: true
-          schema: { type: string, pattern: "^rev_" }
+          schema: { type: string, minLength: 1, pattern: "^rev_", example: "rev_01H" }
       responses:
-        "200": { description: The review. }
+        "200":
+          description: The review.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Review" }
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Reviews]
@@ -823,26 +1196,30 @@ paths:
         - name: review_public_id
           in: path
           required: true
-          schema: { type: string, pattern: "^rev_" }
+          schema: { type: string, minLength: 1, pattern: "^rev_", example: "rev_01H" }
       requestBody:
         content:
           application/json:
             schema:
               type: object
+              minProperties: 1
               properties:
                 rating: { type: integer, minimum: 1, maximum: 5 }
-                title: { type: string }
-                comment: { type: string }
+                title: { type: [string, "null"], maxLength: 255, description: "Null clears the title." }
+                comment: { type: [string, "null"], maxLength: 5000, description: "Null clears the comment." }
                 images:
                   type: array
+                  maxItems: 5
                   items:
                     type: object
                     required: [image_url]
                     properties:
-                      image_url: { type: string }
-                      alt_text: { type: string }
+                      image_url: { type: string, format: uri, maxLength: 2048 }
+                      alt_text: { type: string, maxLength: 255 }
+              description: At least one field is required; image set is replaced when provided.
       responses:
-        "200": { description: Updated review; image set replaced when provided. }
+        "200": { description: Updated review; image set replaced when provided., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -854,7 +1231,7 @@ paths:
         - name: review_public_id
           in: path
           required: true
-          schema: { type: string, pattern: "^rev_" }
+          schema: { type: string, minLength: 1, pattern: "^rev_", example: "rev_01H" }
       responses:
         "204": { description: Review soft-deleted; the pair becomes reviewable again. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -866,18 +1243,28 @@ paths:
       summary: List the authenticated user's own reviews (includes unapproved).
       operationId: listMyReviews
       parameters:
-        - name: page
-          in: query
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
         - name: sort
           in: query
-          schema: { type: string, enum: [created_at, "-created_at", rating, "-rating"] }
+          required: false
+          description: Sort field. Prefix with `-` for descending.
+          schema: { type: string, enum: [created_at, "-created_at", rating, "-rating"], default: "-created_at" }
       responses:
         "200":
           description: Own reviews with `is_approved` visible.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Review" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /uploads/imagekit-auth:
@@ -893,16 +1280,65 @@ paths:
       parameters:
         - name: context
           in: query
+          required: false
           schema: { type: string, enum: [products, reviews], default: reviews }
       responses:
         "200":
           description: "token/expire/signature/publicKey/urlEndpoint/folder."
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ImageKitAuth" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
 
   # ---- Admin: products / variants / images ----
   /admin/products:
-    get: { tags: [Admin — Products], summary: "List products (admin projection, optional include_deleted).", operationId: adminListProducts, responses: { "200": { description: "Paginated." } } }
+    get:
+      tags: [Admin — Products]
+      summary: List products (admin projection, optional include_deleted).
+      operationId: adminListProducts
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: brand
+          in: query
+          required: false
+          schema: { type: string, maxLength: 255 }
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [name, -name, created_at, -created_at, updated_at, -updated_at]
+            default: "-created_at"
+        - name: include_deleted
+          in: query
+          required: false
+          schema: { type: string, enum: ["true", "false"], default: "false" }
+          description: Include soft-deleted products. Must be "true" or "false" (string).
+      responses:
+        "200":
+          description: Paginated.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/ProductSummary" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Admin — Products]
       summary: Create a product.
@@ -915,27 +1351,141 @@ paths:
               type: object
               required: [name]
               properties:
-                name: { type: string }
-                slug: { type: string }
-                description: { type: string }
-                brand: { type: string }
+                name: { type: string, minLength: 1, maxLength: 255, example: "Runner Sneaker" }
+                slug: { type: string, pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$", maxLength: 255, description: "URL slug; auto-generated if omitted.", example: "runner-sneaker" }
+                description: { type: string, maxLength: 10000 }
+                brand: { type: string, maxLength: 255, example: "Nike" }
       responses:
-        "201": { description: Created. }
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ProductDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
   /admin/products/uploads/imagekit-auth:
     get:
       tags: [Admin — Products]
-      summary: Signed auth params for direct browser uploads to ImageKit.
+      summary: Signed auth params for direct browser uploads to ImageKit (admin product folder).
       operationId: adminImageKitAuth
       responses:
-        "200": { description: "token/expire/signature/publicKey/urlEndpoint/folder." }
+        "200":
+          description: "token/expire/signature/publicKey/urlEndpoint/folder."
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ImageKitAuth" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/products/{product_public_id}:
-    get: { tags: [Admin — Products], summary: Product detail incl. variants and images (admin projection)., operationId: adminGetProduct, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
-    patch: { tags: [Admin — Products], summary: Update product fields., operationId: adminUpdateProduct, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } } }
-    delete: { tags: [Admin — Products], summary: Soft-delete a product and its variants., operationId: adminDeleteProduct, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Products]
+      summary: Product detail incl. variants and images (admin projection).
+      operationId: adminGetProduct
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: include_deleted_variants
+          in: query
+          required: false
+          schema: { type: string, enum: ["true", "false"], default: "false" }
+          description: Include soft-deleted variants.
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ProductDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Admin — Products]
+      summary: Update product fields.
+      operationId: adminUpdateProduct
+      parameters: [{ $ref: "#/components/parameters/ProductPublicId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 255 }
+                slug: { type: string, pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$", maxLength: 255 }
+                description: { type: [string, "null"], maxLength: 10000, description: "Null clears the description." }
+                brand: { type: [string, "null"], maxLength: 255 }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Admin — Products]
+      summary: Soft-delete a product and its variants.
+      operationId: adminDeleteProduct
+      parameters: [{ $ref: "#/components/parameters/ProductPublicId" }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/products/{product_public_id}/variants:
-    get: { tags: [Admin — Products], summary: List variants (admin projection)., operationId: adminListVariants, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Products]
+      summary: List variants (admin projection).
+      operationId: adminListVariants
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [ACTIVE, DRAFT, INACTIVE, ARCHIVED] }
+        - name: include_deleted
+          in: query
+          required: false
+          schema: { type: string, enum: ["true", "false"], default: "false" }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [sku, -sku, price, -price, created_at, -created_at, updated_at, -updated_at], default: "created_at" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Variant" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Admin — Products]
       summary: Create a variant.
@@ -949,43 +1499,341 @@ paths:
               type: object
               required: [sku, price]
               properties:
-                sku: { type: string }
-                barcode: { type: string }
-                color: { type: string }
-                size: { type: string }
-                price: { type: string, description: Decimal string. }
-                cost_price: { type: string }
-                discount_percentage: { type: string }
-                weight: { type: string }
-                length: { type: string }
-                width: { type: string }
-                height: { type: string }
+                sku: { type: string, minLength: 1, maxLength: 80, example: "RUN-001-BLK-42" }
+                barcode: { type: string, maxLength: 255 }
+                color: { type: string, maxLength: 50, example: "Black" }
+                size: { type: string, maxLength: 50, example: "42" }
+                price: { $ref: "#/components/schemas/MoneyString", example: "99.99" }
+                cost_price: { $ref: "#/components/schemas/MoneyString" }
+                discount_percentage: { $ref: "#/components/schemas/DiscountString", example: "10.00" }
+                weight: { $ref: "#/components/schemas/DecimalString" }
+                length: { $ref: "#/components/schemas/DecimalString" }
+                width: { $ref: "#/components/schemas/DecimalString" }
+                height: { $ref: "#/components/schemas/DecimalString" }
                 status: { type: string, enum: [ACTIVE, DRAFT, INACTIVE, ARCHIVED] }
       responses:
-        "201": { description: Created. }
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
   /admin/products/{product_public_id}/variants/{variant_public_id}:
-    get: { tags: [Admin — Products], summary: Get one variant., operationId: adminGetVariant, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string, pattern: "^var_" } }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
-    patch: { tags: [Admin — Products], summary: Update one variant., operationId: adminUpdateVariant, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
-    delete: { tags: [Admin — Products], summary: Soft-delete one variant., operationId: adminDeleteVariant, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Products]
+      summary: Get one variant.
+      operationId: adminGetVariant
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: variant_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, pattern: "^var_", example: "var_01H" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Admin — Products]
+      summary: Update one variant.
+      operationId: adminUpdateVariant
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: variant_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "var_01H" }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                sku: { type: string, minLength: 1, maxLength: 80 }
+                barcode: { type: [string, "null"], maxLength: 255 }
+                color: { type: [string, "null"], maxLength: 50 }
+                size: { type: [string, "null"], maxLength: 50 }
+                price: { $ref: "#/components/schemas/MoneyString" }
+                cost_price: { type: [string, "null"], pattern: "^\\d{1,10}(\\.\\d{1,2})?$" }
+                discount_percentage: { $ref: "#/components/schemas/DiscountString" }
+                weight: { type: [string, "null"], pattern: "^\\d{1,10}(\\.\\d{1,2})?$" }
+                length: { type: [string, "null"], pattern: "^\\d{1,10}(\\.\\d{1,2})?$" }
+                width: { type: [string, "null"], pattern: "^\\d{1,10}(\\.\\d{1,2})?$" }
+                height: { type: [string, "null"], pattern: "^\\d{1,10}(\\.\\d{1,2})?$" }
+                status: { type: string, enum: [ACTIVE, DRAFT, INACTIVE, ARCHIVED] }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Admin — Products]
+      summary: Soft-delete one variant.
+      operationId: adminDeleteVariant
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: variant_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "var_01H" }
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/products/{product_public_id}/images:
-    get: { tags: [Admin — Products], summary: List product images., operationId: adminListProductImages, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], responses: { "200": { description: OK } } }
-    post: { tags: [Admin — Products], summary: Attach an uploaded ImageKit URL as a product image., operationId: adminCreateProductImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [image_url], properties: { image_url: { type: string }, alt_text: { type: string }, display_order: { type: integer }, is_primary: { type: boolean } } } } } }, responses: { "201": { description: Created }, "400": { $ref: "#/components/responses/BadRequest" }, "409": { $ref: "#/components/responses/Conflict" } } }
+    get:
+      tags: [Admin — Products]
+      summary: List product images.
+      operationId: adminListProductImages
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin — Products]
+      summary: Attach an uploaded ImageKit URL as a product image.
+      operationId: adminCreateProductImage
+      parameters: [{ $ref: "#/components/parameters/ProductPublicId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image_url]
+              properties:
+                image_url: { type: string, format: uri, maxLength: 2048, example: "https://ik.imagekit.io/demo/products/p1.jpg" }
+                alt_text: { type: string, maxLength: 255 }
+                display_order: { type: integer, minimum: 0, example: 0 }
+                is_primary: { type: boolean }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /admin/products/{product_public_id}/images/{image_public_id}:
-    get: { tags: [Admin — Products], summary: Get one product image., operationId: adminGetProductImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: image_public_id, in: path, required: true, schema: { type: string, pattern: "^pimg_" } }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
-    patch: { tags: [Admin — Products], summary: Update one product image (promotion maps P2002 races to 409)., operationId: adminUpdateProductImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: image_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } } }
-    delete: { tags: [Admin — Products], summary: Delete one product image; promotes the lowest-order survivor if it was primary., operationId: adminDeleteProductImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: image_public_id, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Products]
+      summary: Get one product image.
+      operationId: adminGetProductImage
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: image_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, pattern: "^pimg_", example: "pimg_01H" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Admin — Products]
+      summary: Update one product image (promotion maps P2002 races to 409).
+      operationId: adminUpdateProductImage
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: image_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "pimg_01H" }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                image_url: { type: string, format: uri, maxLength: 2048 }
+                alt_text: { type: [string, "null"], maxLength: 255 }
+                display_order: { type: integer, minimum: 0 }
+                is_primary: { type: boolean }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Admin — Products]
+      summary: Delete one product image; promotes the lowest-order survivor if it was primary.
+      operationId: adminDeleteProductImage
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: image_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "pimg_01H" }
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/products/{product_public_id}/variants/{variant_public_id}/images:
-    get: { tags: [Admin — Products], summary: List variant images., operationId: adminListVariantImages, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: OK } } }
-    post: { tags: [Admin — Products], summary: Attach an image URL to a variant., operationId: adminCreateVariantImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }], responses: { "201": { description: Created }, "400": { $ref: "#/components/responses/BadRequest" } } }
+    get:
+      tags: [Admin — Products]
+      summary: List variant images.
+      operationId: adminListVariantImages
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: variant_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "var_01H" }
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin — Products]
+      summary: Attach an image URL to a variant.
+      operationId: adminCreateVariantImage
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: variant_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "var_01H" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image_url]
+              properties:
+                image_url: { type: string, format: uri, maxLength: 2048, example: "https://ik.imagekit.io/demo/variants/v1.jpg" }
+                alt_text: { type: string, maxLength: 255 }
+                display_order: { type: integer, minimum: 0 }
+            examples:
+              default:
+                value: { image_url: "https://ik.imagekit.io/demo/variants/v1.jpg", alt_text: "Front view" }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/products/{product_public_id}/variants/{variant_public_id}/images/{variant_image_public_id}:
-    get: { tags: [Admin — Products], summary: Get one variant image., operationId: adminGetVariantImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }, { name: variant_image_public_id, in: path, required: true, schema: { type: string, pattern: "^vimg_" } }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
-    patch: { tags: [Admin — Products], summary: Update one variant image., operationId: adminUpdateVariantImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }, { name: variant_image_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
-    delete: { tags: [Admin — Products], summary: Delete one variant image., operationId: adminDeleteVariantImage, parameters: [{ $ref: "#/components/parameters/ProductPublicId" }, { name: variant_public_id, in: path, required: true, schema: { type: string } }, { name: variant_image_public_id, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Products]
+      summary: Get one variant image.
+      operationId: adminGetVariantImage
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: variant_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "var_01H" }
+        - name: variant_image_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, pattern: "^vimg_", example: "vimg_01H" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Admin — Products]
+      summary: Update one variant image.
+      operationId: adminUpdateVariantImage
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: variant_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "var_01H" }
+        - name: variant_image_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "vimg_01H" }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                image_url: { type: string, format: uri, maxLength: 2048 }
+                alt_text: { type: [string, "null"], maxLength: 255 }
+                display_order: { type: integer, minimum: 0 }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin — Products]
+      summary: Delete one variant image.
+      operationId: adminDeleteVariantImage
+      parameters:
+        - $ref: "#/components/parameters/ProductPublicId"
+        - name: variant_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "var_01H" }
+        - name: variant_image_public_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, example: "vimg_01H" }
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   # ---- Admin: categories ----
   /admin/categories:
-    get: { tags: [Admin — Categories], summary: List categories including inactive ones., operationId: adminListCategories, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Categories]
+      summary: List categories including inactive ones.
+      operationId: adminListCategories
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [name, -name, created_at, -created_at, updated_at, -updated_at], default: "name" }
+        - name: is_active
+          in: query
+          required: false
+          schema: { type: string, enum: ["true", "false"] }
+          description: Filter by active flag. Must be "true" or "false" (string).
+        - name: include_deleted
+          in: query
+          required: false
+          schema: { type: string, enum: ["true", "false"], default: "false" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Category" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Admin — Categories]
       summary: Create a category.
@@ -998,24 +1846,128 @@ paths:
               type: object
               required: [name]
               properties:
-                name: { type: string }
-                slug: { type: string }
-                description: { type: string }
-                is_active: { type: boolean }
+                name: { type: string, minLength: 1, maxLength: 255, example: "Sneakers" }
+                slug: { type: string, pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$", maxLength: 255 }
+                description: { type: string, maxLength: 10000 }
+                is_active: { type: boolean, example: true }
       responses:
-        "201": { description: Created. }
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
   /admin/categories/{category_public_id}:
-    get: { tags: [Admin — Categories], summary: Category detail., operationId: adminGetCategory, parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
-    patch: { tags: [Admin — Categories], summary: Update category., operationId: adminUpdateCategory, parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
-    delete: { tags: [Admin — Categories], summary: Soft-delete category., operationId: adminDeleteCategory, parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Categories]
+      summary: Category detail.
+      operationId: adminGetCategory
+      parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Admin — Categories]
+      summary: Update category.
+      operationId: adminUpdateCategory
+      parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 255 }
+                slug: { type: string, pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$", maxLength: 255 }
+                description: { type: [string, "null"], maxLength: 10000 }
+                is_active: { type: boolean }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Admin — Categories]
+      summary: Soft-delete category.
+      operationId: adminDeleteCategory
+      parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/categories/{category_public_id}/products/{product_public_id}:
-    put: { tags: [Admin — Categories], summary: Assign a product to the category (idempotent)., operationId: adminAssignCategoryProduct, parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }, { $ref: "#/components/parameters/ProductPublicId" }], responses: { "204": { description: Assigned or already assigned. }, "404": { $ref: "#/components/responses/NotFound" } } }
-    delete: { tags: [Admin — Categories], summary: Remove a product from the category., operationId: adminRemoveCategoryProduct, parameters: [{ $ref: "#/components/parameters/CategoryPublicId" }, { $ref: "#/components/parameters/ProductPublicId" }], responses: { "204": { description: Removed. }, "404": { $ref: "#/components/responses/NotFound" } } }
+    put:
+      tags: [Admin — Categories]
+      summary: Assign a product to the category (idempotent).
+      operationId: adminAssignCategoryProduct
+      parameters:
+        - $ref: "#/components/parameters/CategoryPublicId"
+        - $ref: "#/components/parameters/ProductPublicId"
+      responses:
+        "204": { description: Assigned or already assigned. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin — Categories]
+      summary: Remove a product from the category.
+      operationId: adminRemoveCategoryProduct
+      parameters:
+        - $ref: "#/components/parameters/CategoryPublicId"
+        - $ref: "#/components/parameters/ProductPublicId"
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   # ---- Admin: inventory ----
   /admin/inventory:
-    get: { tags: [Admin — Inventory], summary: Inventory dashboard with stock-status filters and search., operationId: adminListInventory, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Inventory]
+      summary: Inventory dashboard with stock-status filters and search.
+      operationId: adminListInventory
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: stock_status
+          in: query
+          required: false
+          schema: { type: string, enum: [IN_STOCK, LOW_STOCK, OUT_OF_STOCK] }
+        - name: include_deleted
+          in: query
+          required: false
+          schema: { type: string, enum: ["true", "false"], default: "false" }
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [product_name, -product_name, sku, -sku, quantity_on_hand, -quantity_on_hand, quantity_available, -quantity_available, last_stock_update, -last_stock_update]
+            default: "product_name"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/InventoryRecord" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Admin — Inventory]
       summary: Create an inventory record for a variant.
@@ -1026,71 +1978,268 @@ paths:
           application/json:
             schema:
               type: object
-              required: [quantity_on_hand]
+              required: [variant_public_id, quantity_on_hand]
               properties:
-                quantity_on_hand: { type: integer, minimum: 0 }
-                reorder_level: { type: integer, minimum: 0 }
+                variant_public_id: { type: string, minLength: 1, example: "var_01H" }
+                quantity_on_hand: { type: integer, minimum: 0, example: 100 }
+                reorder_level: { type: integer, minimum: 0, example: 10 }
+            examples:
+              default:
+                value: { variant_public_id: "var_01H", quantity_on_hand: 100, reorder_level: 10 }
       responses:
-        "201": { description: Created. }
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
   /admin/inventory/{variant_public_id}:
-    get: { tags: [Admin — Inventory], summary: Inventory for one variant., operationId: adminGetInventory, parameters: [{ name: variant_public_id, in: path, required: true, schema: { type: string, pattern: "^var_" } }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Inventory]
+      summary: Inventory for one variant.
+      operationId: adminGetInventory
+      parameters: [{ name: variant_public_id, in: path, required: true, schema: { type: string, minLength: 1, pattern: "^var_", example: "var_01H" } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Admin — Inventory]
-      summary: Set absolute stock levels (mutually exclusive with adjust).
+      summary: Set absolute stock levels or apply a delta (mutually exclusive).
+      description: |
+        Provide **either** `quantity_on_hand` (absolute) **or** `quantity_change`
+        (delta, non-zero). `quantity_on_hand` and `quantity_change` are mutually
+        exclusive. At least one field is required.
       operationId: adminSetInventory
-      parameters: [{ name: variant_public_id, in: path, required: true, schema: { type: string } }]
+      parameters: [{ name: variant_public_id, in: path, required: true, schema: { type: string, minLength: 1, example: "var_01H" } }]
       requestBody:
         content:
           application/json:
             schema:
               type: object
+              minProperties: 1
               properties:
-                quantity_on_hand: { type: integer, minimum: 0 }
-                reorder_level: { type: integer, minimum: 0 }
+                quantity_on_hand: { type: integer, minimum: 0, example: 100 }
+                quantity_change: { type: integer, description: "Delta; non-zero. Mutually exclusive with quantity_on_hand.", example: -5 }
+                reorder_level: { type: [integer, "null"], minimum: 0, description: "Null clears the reorder level." }
+                reason: { type: string, maxLength: 255, example: "Cycle count correction" }
+            examples:
+              absolute:
+                value: { quantity_on_hand: 100, reason: "Manual set" }
+              delta:
+                value: { quantity_change: -5, reason: "Damaged" }
       responses:
-        "200": { description: Updated. }
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /admin/inventory/{variant_public_id}/reserve:
     patch:
       tags: [Admin — Inventory]
       summary: Manually reserve or release reserved quantity (delta-based).
       operationId: adminReserveInventory
-      parameters: [{ name: variant_public_id, in: path, required: true, schema: { type: string } }]
+      parameters: [{ name: variant_public_id, in: path, required: true, schema: { type: string, minLength: 1, example: "var_01H" } }]
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [quantity_reserved]
+              required: [change]
               properties:
-                quantity_reserved: { type: integer, description: Delta; negative releases. }
-                reason: { type: string }
+                change:
+                  type: integer
+                  description: Delta; negative releases. Non-zero.
+                  example: 5
+                reason: { type: string, maxLength: 255, example: "Manual hold for photoshoot" }
+            examples:
+              default:
+                value: { change: 5, reason: "Manual hold" }
       responses:
-        "200": { description: Adjusted. }
+        "200": { description: Adjusted., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ---- Admin: users ----
   /admin/users:
-    get: { tags: [Admin — Users], summary: Search/paginate customer and admin accounts., operationId: adminListUsers, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Users]
+      summary: Search/paginate customer and admin accounts.
+      operationId: adminListUsers
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [ACTIVE, SUSPENDED, DELETED] }
+        - name: include_deleted
+          in: query
+          required: false
+          schema: { type: string, enum: ["true", "false"], default: "false" }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [name, -name, email, -email, created_at, -created_at], default: "-created_at" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { type: object }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/users/{user_public_id}:
-    get: { tags: [Admin — Users], summary: Account detail with verification state., operationId: adminGetUser, parameters: [{ $ref: "#/components/parameters/UserPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
-    patch: { tags: [Admin — Users], summary: Update contact details (triggers reverification + audit)., operationId: adminUpdateUser, parameters: [{ $ref: "#/components/parameters/UserPublicId" }], responses: { "200": { description: Updated }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Users]
+      summary: Account detail with verification state.
+      operationId: adminGetUser
+      parameters: [{ $ref: "#/components/parameters/UserPublicId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Admin — Users]
+      summary: Update contact details (triggers reverification + audit).
+      operationId: adminUpdateUser
+      parameters: [{ $ref: "#/components/parameters/UserPublicId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                first_name: { type: string, minLength: 1, maxLength: 100 }
+                last_name: { type: string, minLength: 1, maxLength: 100 }
+                email: { type: string, format: email }
+                phone_number: { type: string, pattern: '^\+[1-9]\d{1,14}$', description: "E.164 format." }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /admin/users/{user_public_id}/role:
-    patch: { tags: [Admin — Users], summary: Change role between CUSTOMER and ADMIN (SUPER_ADMIN changes are CLI-only)., operationId: adminChangeUserRole, parameters: [{ $ref: "#/components/parameters/UserPublicId" }], responses: { "200": { description: Updated }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch:
+      tags: [Admin — Users]
+      summary: Change role between CUSTOMER and ADMIN (SUPER_ADMIN changes are CLI-only).
+      operationId: adminChangeUserRole
+      parameters: [{ $ref: "#/components/parameters/UserPublicId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [CUSTOMER, ADMIN], example: "ADMIN" }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/users/{user_public_id}/suspend:
-    patch: { tags: [Admin — Users], summary: Suspend an account (sessions revoked)., operationId: adminSuspendUser, parameters: [{ $ref: "#/components/parameters/UserPublicId" }], responses: { "200": { description: Suspended }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch:
+      tags: [Admin — Users]
+      summary: Suspend an account (sessions revoked).
+      operationId: adminSuspendUser
+      parameters: [{ $ref: "#/components/parameters/UserPublicId" }]
+      responses:
+        "200": { description: Suspended, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /admin/users/{user_public_id}/activate:
-    patch: { tags: [Admin — Users], summary: Reactivate a suspended account., operationId: adminActivateUser, parameters: [{ $ref: "#/components/parameters/UserPublicId" }], responses: { "200": { description: Activated }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch:
+      tags: [Admin — Users]
+      summary: Reactivate a suspended account.
+      operationId: adminActivateUser
+      parameters: [{ $ref: "#/components/parameters/UserPublicId" }]
+      responses:
+        "200": { description: Activated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   # ---- Admin: orders ----
   /admin/orders:
-    get: { tags: [Admin — Orders], summary: "Search/filter all orders (status, date range, search).", operationId: adminListOrders, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Orders]
+      summary: "Search/filter all orders (status, date range, search)."
+      operationId: adminListOrders
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [pending, confirmed, processing, shipped, delivered, cancelled, returned, refunded] }
+        - $ref: "#/components/parameters/SearchParam"
+        - name: placed_from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: ISO 8601 datetime with offset, inclusive lower bound.
+          example: "2024-01-01T00:00:00.000Z"
+        - name: placed_to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: ISO 8601 datetime with offset, inclusive upper bound. Must be >= placed_from.
+          example: "2024-12-31T23:59:59.000Z"
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [placed_at, -placed_at, order_number, -order_number, total_amount, -total_amount, customer_name, -customer_name], default: "-placed_at" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/OrderSummary" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/orders/{order_public_id}:
-    get: { tags: [Admin — Orders], summary: "Full order detail with items, payment and shipment.", operationId: adminGetOrder, parameters: [{ $ref: "#/components/parameters/OrderPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Orders]
+      summary: "Full order detail with items, payment and shipment."
+      operationId: adminGetOrder
+      parameters: [{ $ref: "#/components/parameters/OrderPublicId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Admin — Orders]
       summary: Status transition (legal matrix enforced server-side with stock/payment side effects).
@@ -1107,25 +2256,153 @@ paths:
                 status:
                   type: string
                   enum: [confirmed, processing, shipped, delivered, cancelled, returned, refunded]
-                carrier: { type: string, description: Required when transitioning to shipped. }
-                tracking_number: { type: string }
+                  example: "shipped"
+                carrier: { type: string, minLength: 1, maxLength: 100, description: Required when transitioning to shipped., example: "DHL" }
+                tracking_number: { type: string, maxLength: 100, example: "TRK123456" }
+            examples:
+              ship:
+                value: { status: "shipped", carrier: "DHL", tracking_number: "TRK123456" }
+              cancel:
+                value: { status: "cancelled" }
       responses:
-        "200": { description: Transitioned. }
+        "200": { description: Transitioned., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Illegal transition, row-lock loss or nothing to refund.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
 
   # ---- Admin: reviews ----
   /admin/reviews:
-    get: { tags: [Admin — Reviews], summary: "Moderation queue with filters (rating, is_approved, include_deleted, search).", operationId: adminListReviews, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Reviews]
+      summary: "Moderation queue with filters (rating, is_approved, include_deleted, search)."
+      operationId: adminListReviews
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: rating
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 5 }
+        - name: is_approved
+          in: query
+          required: false
+          schema: { type: string, enum: ["true", "false", "all"] }
+          description: Filter by approval state; `all` returns both.
+        - name: include_deleted
+          in: query
+          required: false
+          schema: { type: string, enum: ["true", "false"], default: "false" }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [created_at, -created_at, rating, -rating], default: "-created_at" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Review" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/reviews/{review_public_id}:
-    get: { tags: [Admin — Reviews], summary: Review detail in any state with images., operationId: adminGetReview, parameters: [{ $ref: "#/components/parameters/ReviewPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
-    patch: { tags: [Admin — Reviews], summary: Moderate (is_approved) and edit title/comment., operationId: adminModerateReview, parameters: [{ $ref: "#/components/parameters/ReviewPublicId" }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
-    delete: { tags: [Admin — Reviews], summary: Hard-delete a review and its images., operationId: adminDeleteReview, parameters: [{ $ref: "#/components/parameters/ReviewPublicId" }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Reviews]
+      summary: Review detail in any state with images.
+      operationId: adminGetReview
+      parameters: [{ $ref: "#/components/parameters/ReviewPublicId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Admin — Reviews]
+      summary: Moderate (is_approved) and edit title/comment.
+      operationId: adminModerateReview
+      parameters: [{ $ref: "#/components/parameters/ReviewPublicId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                is_approved: { type: boolean, example: true }
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                title: { type: [string, "null"], maxLength: 255 }
+                comment: { type: [string, "null"], maxLength: 5000 }
+              description: At least one field must be provided.
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin — Reviews]
+      summary: Hard-delete a review and its images.
+      operationId: adminDeleteReview
+      parameters: [{ $ref: "#/components/parameters/ReviewPublicId" }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   # ---- Admin: coupons ----
   /admin/coupons:
-    get: { tags: [Admin — Coupons], summary: List coupons with status/search filters., operationId: adminListCoupons, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Coupons]
+      summary: List coupons with status/search filters.
+      operationId: adminListCoupons
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [ACTIVE, INACTIVE, EXPIRED, USAGE_LIMIT_REACHED] }
+        - name: include_deleted
+          in: query
+          required: false
+          schema: { type: string, enum: ["true", "false"], default: "false" }
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [code, -code, discount_value, -discount_value, usage_count, -usage_count, starts_at, -starts_at, expires_at, -expires_at, created_at, -created_at]
+            default: "-created_at"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Coupon" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Admin — Coupons]
       summary: Create a coupon.
@@ -1136,34 +2413,222 @@ paths:
           application/json:
             schema:
               type: object
-              required: [code, discount_type, discount_value]
+              required: [code, discount_type, discount_value, usage_limit, usage_limit_per_user]
               properties:
-                code: { type: string }
-                discount_type: { type: string, enum: [FIXED_AMOUNT, PERCENTAGE] }
-                discount_value: { type: string }
-                usage_limit: { type: integer }
-                minimum_order_amount: { type: string }
-                maximum_discount_amount: { type: string }
-                expires_at: { type: string, format: date-time }
+                code:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                  pattern: "^[A-Za-z0-9_-]+$"
+                  description: Uppercased automatically; letters, numbers, dashes or underscores.
+                  example: "SAVE10"
+                discount_type: { type: string, enum: [FIXED_AMOUNT, PERCENTAGE], example: "FIXED_AMOUNT" }
+                discount_value:
+                  type: number
+                  exclusiveMinimum: 0
+                  maximum: 100
+                  description: For PERCENTAGE, cannot exceed 100.
+                  example: 10
+                usage_limit: { type: integer, minimum: 1, description: "Total usage limit.", example: 100 }
+                usage_limit_per_user: { type: integer, minimum: 1, description: "Per-user usage limit.", example: 1 }
+                minimum_order_amount: { type: number, minimum: 0, example: 50 }
+                maximum_discount_amount: { type: number, exclusiveMinimum: 0, example: 20 }
+                starts_at: { type: string, format: date-time, example: "2024-01-01T00:00:00.000Z" }
+                expires_at: { type: string, format: date-time, example: "2024-12-31T23:59:59.000Z" }
+                is_active: { type: boolean, default: true, example: true }
+            examples:
+              fixed:
+                value: { code: "SAVE10", discount_type: "FIXED_AMOUNT", discount_value: 10, usage_limit: 100, usage_limit_per_user: 1 }
+              percentage:
+                value: { code: "PCT20", discount_type: "PERCENTAGE", discount_value: 20, usage_limit: 50, usage_limit_per_user: 1, maximum_discount_amount: 30 }
       responses:
-        "201": { description: Created. }
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
   /admin/coupons/{coupon_public_id}:
-    get: { tags: [Admin — Coupons], summary: Coupon detail., operationId: adminGetCoupon, parameters: [{ $ref: "#/components/parameters/CouponPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
-    patch: { tags: [Admin — Coupons], summary: Update coupon., operationId: adminUpdateCoupon, parameters: [{ $ref: "#/components/parameters/CouponPublicId" }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
-    delete: { tags: [Admin — Coupons], summary: Soft-delete coupon., operationId: adminDeleteCoupon, parameters: [{ $ref: "#/components/parameters/CouponPublicId" }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Coupons]
+      summary: Coupon detail.
+      operationId: adminGetCoupon
+      parameters: [{ $ref: "#/components/parameters/CouponPublicId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Admin — Coupons]
+      summary: Update coupon.
+      operationId: adminUpdateCoupon
+      parameters: [{ $ref: "#/components/parameters/CouponPublicId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                code: { type: string, minLength: 3, maxLength: 50, pattern: "^[A-Za-z0-9_-]+$" }
+                discount_type: { type: string, enum: [FIXED_AMOUNT, PERCENTAGE] }
+                discount_value: { type: number, exclusiveMinimum: 0, maximum: 100 }
+                minimum_order_amount: { type: [number, "null"], minimum: 0 }
+                maximum_discount_amount: { type: [number, "null"], exclusiveMinimum: 0 }
+                usage_limit: { type: integer, minimum: 1 }
+                usage_limit_per_user: { type: integer, minimum: 1 }
+                starts_at: { type: [string, "null"], format: date-time }
+                expires_at: { type: [string, "null"], format: date-time }
+                is_active: { type: boolean }
+              description: At least one field must be provided; expires_at must be after starts_at when both present.
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Admin — Coupons]
+      summary: Soft-delete coupon.
+      operationId: adminDeleteCoupon
+      parameters: [{ $ref: "#/components/parameters/CouponPublicId" }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/coupons/{coupon_public_id}/usages:
-    get: { tags: [Admin — Coupons], summary: Usage history drawer data., operationId: adminListCouponUsages, parameters: [{ $ref: "#/components/parameters/CouponPublicId" }], responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Coupons]
+      summary: Usage history drawer data.
+      operationId: adminListCouponUsages
+      parameters:
+        - $ref: "#/components/parameters/CouponPublicId"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/CouponUsage" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   # ---- Admin: stats / analytics / audit / admins ----
   /admin/stats:
-    get: { tags: [Admin — Stats & Analytics], summary: Dashboard KPI aggregate., operationId: adminStats, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Stats & Analytics]
+      summary: Dashboard KPI aggregate.
+      operationId: adminStats
+      parameters:
+        - name: period
+          in: query
+          required: false
+          schema: { type: string, enum: [today, 7d, 30d], default: "7d" }
+          description: Time window preset.
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Stats" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/analytics/overview:
-    get: { tags: [Admin — Stats & Analytics], summary: "P&L overview (revenue, costs, profit trend).", operationId: adminAnalyticsOverview, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Stats & Analytics]
+      summary: "P&L overview (revenue, costs, profit trend)."
+      operationId: adminAnalyticsOverview
+      parameters:
+        - name: date_from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          example: "2024-01-01T00:00:00.000Z"
+        - name: date_to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          example: "2024-12-31T23:59:59.000Z"
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/analytics/coupons:
-    get: { tags: [Admin — Stats & Analytics], summary: "Coupon insights (status counts, trends, most-used, revenue impact).", operationId: adminAnalyticsCoupons, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Stats & Analytics]
+      summary: "Coupon insights (status counts, trends, most-used, revenue impact)."
+      operationId: adminAnalyticsCoupons
+      parameters:
+        - name: date_from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: date_to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/analytics/expenses:
-    get: { tags: [Admin — Stats & Analytics], summary: Operating expense ledger (paginated)., operationId: adminListExpenses, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Stats & Analytics]
+      summary: Operating expense ledger (paginated).
+      operationId: adminListExpenses
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: category
+          in: query
+          required: false
+          schema: { type: string, enum: [RENT, SALARIES, MARKETING, UTILITIES, SHIPPING, SOFTWARE, OTHER] }
+        - name: date_from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: date_to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Expense" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Admin — Stats & Analytics]
       summary: Record an operating expense.
@@ -1176,27 +2641,178 @@ paths:
               type: object
               required: [description, category, amount, spent_at]
               properties:
-                description: { type: string }
-                category: { type: string }
-                amount: { type: string }
-                spent_at: { type: string, format: date }
+                description: { type: string, minLength: 1, maxLength: 255, example: "Office rent - January" }
+                category: { type: string, enum: [RENT, SALARIES, MARKETING, UTILITIES, SHIPPING, SOFTWARE, OTHER], example: "RENT" }
+                amount: { type: number, minimum: 0.01, maximum: 99999999, example: 1200.5 }
+                spent_at: { type: string, format: date-time, example: "2024-01-15T00:00:00.000Z" }
+            examples:
+              default:
+                value: { description: "Office rent - January", category: "RENT", amount: 1200.5, spent_at: "2024-01-15T00:00:00.000Z" }
       responses:
-        "201": { description: Created. }
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/analytics/expenses/{expense_public_id}:
-    patch: { tags: [Admin — Stats & Analytics], summary: Update an expense., operationId: adminUpdateExpense, parameters: [{ name: expense_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Updated }, "404": { $ref: "#/components/responses/NotFound" } } }
-    delete: { tags: [Admin — Stats & Analytics], summary: Delete an expense., operationId: adminDeleteExpense, parameters: [{ name: expense_public_id, in: path, required: true, schema: { type: string } }], responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch:
+      tags: [Admin — Stats & Analytics]
+      summary: Update an expense.
+      operationId: adminUpdateExpense
+      parameters: [{ name: expense_public_id, in: path, required: true, schema: { type: string, minLength: 1, example: "exp_01H" } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                description: { type: string, minLength: 1, maxLength: 255 }
+                category: { type: string, enum: [RENT, SALARIES, MARKETING, UTILITIES, SHIPPING, SOFTWARE, OTHER] }
+                amount: { type: number, minimum: 0.01, maximum: 99999999 }
+                spent_at: { type: string, format: date-time }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin — Stats & Analytics]
+      summary: Delete an expense.
+      operationId: adminDeleteExpense
+      parameters: [{ name: expense_public_id, in: path, required: true, schema: { type: string, minLength: 1, example: "exp_01H" } }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/audit:
-    get: { tags: [Admin — Audit], summary: "Append-only audit trail with filters (actor, action prefix, entity).", operationId: adminListAuditLogs, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Audit]
+      summary: "Append-only audit trail with filters (actor, action prefix, entity)."
+      operationId: adminListAuditLogs
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: actor
+          in: query
+          required: false
+          schema: { type: string, maxLength: 50 }
+        - name: action
+          in: query
+          required: false
+          schema: { type: string, maxLength: 100 }
+          description: Action prefix filter.
+        - name: entity_type
+          in: query
+          required: false
+          schema: { type: string, maxLength: 50 }
+        - name: entity_public_id
+          in: query
+          required: false
+          schema: { type: string, maxLength: 50 }
+        - name: date_from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: date_to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [created_at, -created_at], default: "-created_at" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/AuditLog" }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/admins:
-    get: { tags: [Admin — Admins], summary: "List admin accounts with activity aggregates (super_admin).", operationId: adminListAdmins, responses: { "200": { description: OK } } }
+    get:
+      tags: [Admin — Admins]
+      summary: "List admin accounts with activity aggregates (super_admin)."
+      operationId: adminListAdmins
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [ACTIVE, SUSPENDED] }
+        - name: activity
+          in: query
+          required: false
+          schema: { type: string, enum: [ACTIVE, INACTIVE], description: "ACTIVE means recent login/audit activity within 2 days." }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [name, -name, created_at, -created_at, last_login_at, -last_login_at], default: "-last_login_at" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { type: object }
+                      meta: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /admin/admins/{admin_public_id}:
-    get: { tags: [Admin — Admins], summary: Admin activity detail (super_admin)., operationId: adminGetAdmin, parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: OK }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
-    patch: { tags: [Admin — Admins], summary: Suspend/activate or manage an admin account (super_admin)., operationId: adminManageAdmin, parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Updated }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get:
+      tags: [Admin — Admins]
+      summary: Admin activity detail (super_admin).
+      operationId: adminGetAdmin
+      parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string, minLength: 1, example: "usr_01H" } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/admins/{admin_public_id}/suspend:
-    patch: { tags: [Admin — Admins], summary: Suspend an admin account (super_admin)., operationId: adminSuspendAdmin, parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Suspended }, "403": { $ref: "#/components/responses/Forbidden" } } }
+    patch:
+      tags: [Admin — Admins]
+      summary: Suspend an admin account (super_admin).
+      operationId: adminSuspendAdmin
+      parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string, minLength: 1, example: "usr_01H" } }]
+      responses:
+        "200": { description: Suspended, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /admin/admins/{admin_public_id}/activate:
-    patch: { tags: [Admin — Admins], summary: Reactivate an admin account (super_admin)., operationId: adminActivateAdmin, parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string } }], responses: { "200": { description: Activated }, "403": { $ref: "#/components/responses/Forbidden" } } }
+    patch:
+      tags: [Admin — Admins]
+      summary: Reactivate an admin account (super_admin).
+      operationId: adminActivateAdmin
+      parameters: [{ name: admin_public_id, in: path, required: true, schema: { type: string, minLength: 1, example: "usr_01H" } }]
+      responses:
+        "200": { description: Activated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
 components:
   securitySchemes:
@@ -1209,130 +2825,420 @@ components:
     UserPublicId:
       type: string
       pattern: "^usr_"
+      example: "usr_01HXYZ"
+    MoneyString:
+      type: string
+      pattern: "^(\\d{1,10}(\\.\\d{1,2})?)$"
+      description: Decimal string with up to 10 integer and 2 decimal digits, >= 0.
+      example: "99.99"
+    DiscountString:
+      type: string
+      pattern: "^(\\d{1,5}(\\.\\d{1,2})?)$"
+      description: Decimal string 0–100 with up to 2 decimal places.
+      example: "10.00"
+    DecimalString:
+      type: string
+      pattern: "^(\\d{1,10}(\\.\\d{1,2})?)$"
+      description: Decimal string > 0 with up to 10 integer and 2 decimal digits.
+      example: "1.50"
     SuccessEnvelope:
       type: object
       required: [success]
       properties:
-        success: { type: boolean, const: true }
+        success: { type: boolean, const: true, example: true }
+      description: Base success envelope; extended via allOf with `data` and `meta`.
     ErrorEnvelope:
       type: object
       required: [success, message]
       properties:
-        success: { type: boolean, const: false }
-        message: { type: string }
+        success: { type: boolean, const: false, example: false }
+        message: { type: string, example: "Invalid request" }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string, example: "email" }
+              message: { type: string, example: "Invalid email" }
+        requestId: { type: string, example: "req_01H" }
     PaginationMeta:
       type: object
       required: [page, limit, total]
       properties:
-        page: { type: integer, minimum: 1 }
-        limit: { type: integer, minimum: 1 }
-        total: { type: integer, minimum: 0 }
-        totalPages: { type: integer, minimum: 0 }
-        hasNext: { type: boolean }
-        hasPrev: { type: boolean }
+        page: { type: integer, minimum: 1, example: 1 }
+        limit: { type: integer, minimum: 1, example: 20 }
+        total: { type: integer, minimum: 0, example: 42 }
+        totalPages: { type: integer, minimum: 0, example: 3 }
+        hasNext: { type: boolean, example: true }
+        hasPrev: { type: boolean, example: false }
     AddressInput:
       type: object
       required: [recipient_name, phone_number, country, state, city, address_1]
       properties:
-        recipient_name: { type: string, minLength: 1, maxLength: 100 }
-        phone_number: { type: string, maxLength: 20 }
-        label: { type: string, maxLength: 50 }
-        country: { type: string, minLength: 1, maxLength: 100 }
-        state: { type: string, minLength: 1, maxLength: 100 }
-        city: { type: string, minLength: 1, maxLength: 100 }
-        address_1: { type: string, minLength: 1 }
-        address_2: { type: string }
-        zip_code: { type: string, maxLength: 20 }
-        is_default_shipping: { type: boolean }
-        is_default_billing: { type: boolean }
+        recipient_name: { type: string, minLength: 1, maxLength: 100, example: "Jane Doe" }
+        phone_number: { type: string, maxLength: 20, example: "+14155552671" }
+        label: { type: string, maxLength: 50, example: "Home" }
+        country: { type: string, minLength: 1, maxLength: 100, example: "USA" }
+        state: { type: string, minLength: 1, maxLength: 100, example: "CA" }
+        city: { type: string, minLength: 1, maxLength: 100, example: "San Francisco" }
+        address_1: { type: string, minLength: 1, example: "123 Market St" }
+        address_2: { type: [string, "null"], example: "Apt 4B" }
+        zip_code: { type: string, maxLength: 20, example: "94105" }
+        is_default_shipping: { type: boolean, example: false }
+        is_default_billing: { type: boolean, example: false }
+    Address:
+      allOf:
+        - $ref: "#/components/schemas/AddressInput"
+        - type: object
+          properties:
+            public_id: { type: string, pattern: "^adr_", example: "adr_01H" }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
     ProductPrimaryImage:
       type: object
       required: [image_url]
       properties:
-        image_url: { type: string }
+        image_url: { type: string, format: uri, example: "https://ik.imagekit.io/demo/products/p1.jpg" }
         alt_text: { type: [string, "null"] }
+    ProductSummary:
+      type: object
+      properties:
+        public_id: { type: string, pattern: "^prd_", example: "prd_01H" }
+        name: { type: string, example: "Runner Sneaker" }
+        slug: { type: string, example: "runner-sneaker" }
+        brand: { type: [string, "null"] }
+        primary_image: { $ref: "#/components/schemas/ProductPrimaryImage" }
+        created_at: { type: string, format: date-time }
+    ProductDetail:
+      type: object
+      properties:
+        public_id: { type: string, pattern: "^prd_" }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: [string, "null"] }
+        brand: { type: [string, "null"] }
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              public_id: { type: string, pattern: "^pimg_" }
+              image_url: { type: string, format: uri }
+              alt_text: { type: [string, "null"] }
+              display_order: { type: integer }
+              is_primary: { type: boolean }
+        variants:
+          type: array
+          items: { $ref: "#/components/schemas/Variant" }
+    Variant:
+      type: object
+      properties:
+        public_id: { type: string, pattern: "^var_", example: "var_01H" }
+        sku: { type: string, example: "RUN-001-BLK-42" }
+        price: { $ref: "#/components/schemas/MoneyString" }
+        final_price: { $ref: "#/components/schemas/MoneyString" }
+        status: { type: string, enum: [ACTIVE, DRAFT, INACTIVE, ARCHIVED] }
+    Category:
+      type: object
+      properties:
+        public_id: { type: string, pattern: "^cat_", example: "cat_01H" }
+        name: { type: string, example: "Sneakers" }
+        slug: { type: string, example: "sneakers" }
+        description: { type: [string, "null"] }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+    Cart:
+      type: object
+      properties:
+        public_id: { type: string, pattern: "^crt_" }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              variant_public_id: { type: string, pattern: "^var_" }
+              quantity: { type: integer, minimum: 1, maximum: 999 }
+              unit_price: { $ref: "#/components/schemas/MoneyString" }
+              line_total: { $ref: "#/components/schemas/MoneyString" }
+        subtotal: { $ref: "#/components/schemas/MoneyString" }
+        total: { $ref: "#/components/schemas/MoneyString" }
+    OrderSummary:
+      type: object
+      properties:
+        public_id: { type: string, pattern: "^ord_", example: "ord_01H" }
+        order_number: { type: string, example: "ORD-0001" }
+        status: { type: string, enum: [pending, confirmed, processing, shipped, delivered, cancelled, returned, refunded] }
+        total_amount: { $ref: "#/components/schemas/MoneyString" }
+        placed_at: { type: string, format: date-time }
+    OrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/OrderSummary"
+        - type: object
+          properties:
+            address: { $ref: "#/components/schemas/Address" }
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  variant_public_id: { type: string, pattern: "^var_" }
+                  quantity: { type: integer }
+                  unit_price: { $ref: "#/components/schemas/MoneyString" }
+                  line_total: { $ref: "#/components/schemas/MoneyString" }
+            payment:
+              type: object
+              properties:
+                status: { type: string }
+                method: { type: string }
+            shipment:
+              type: [object, "null"]
+              properties:
+                carrier: { type: [string, "null"] }
+                tracking_number: { type: [string, "null"] }
+    Review:
+      type: object
+      properties:
+        public_id: { type: string, pattern: "^rev_", example: "rev_01H" }
+        product_public_id: { type: string, pattern: "^prd_" }
+        user_public_id: { type: string, pattern: "^usr_" }
+        rating: { type: integer, minimum: 1, maximum: 5, example: 5 }
+        title: { type: [string, "null"], maxLength: 255 }
+        comment: { type: [string, "null"], maxLength: 5000 }
+        is_approved: { type: boolean }
+        images:
+          type: array
+          maxItems: 5
+          items:
+            type: object
+            properties:
+              image_url: { type: string, format: uri }
+              alt_text: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+    Coupon:
+      type: object
+      properties:
+        public_id: { type: string, pattern: "^cpn_", example: "cpn_01H" }
+        code: { type: string, example: "SAVE10" }
+        discount_type: { type: string, enum: [FIXED_AMOUNT, PERCENTAGE] }
+        discount_value: { type: number, example: 10 }
+        usage_limit: { type: integer, example: 100 }
+        usage_limit_per_user: { type: integer, example: 1 }
+        usage_count: { type: integer }
+        status: { type: string, enum: [ACTIVE, INACTIVE, EXPIRED, USAGE_LIMIT_REACHED] }
+        is_active: { type: boolean }
+        starts_at: { type: [string, "null"], format: date-time }
+        expires_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+    CouponUsage:
+      type: object
+      properties:
+        public_id: { type: string }
+        coupon_public_id: { type: string, pattern: "^cpn_" }
+        user_public_id: { type: string, pattern: "^usr_" }
+        order_public_id: { type: string, pattern: "^ord_" }
+        discount_applied: { $ref: "#/components/schemas/MoneyString" }
+        used_at: { type: string, format: date-time }
+    Expense:
+      type: object
+      properties:
+        public_id: { type: string, pattern: "^exp_", example: "exp_01H" }
+        description: { type: string, maxLength: 255 }
+        category: { type: string, enum: [RENT, SALARIES, MARKETING, UTILITIES, SHIPPING, SOFTWARE, OTHER] }
+        amount: { type: number, example: 1200.5 }
+        spent_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+    InventoryRecord:
+      type: object
+      properties:
+        variant_public_id: { type: string, pattern: "^var_" }
+        sku: { type: string }
+        product_name: { type: string }
+        quantity_on_hand: { type: integer, minimum: 0 }
+        quantity_reserved: { type: integer, minimum: 0 }
+        quantity_available: { type: integer, minimum: 0 }
+        reorder_level: { type: [integer, "null"] }
+        stock_status: { type: string, enum: [IN_STOCK, LOW_STOCK, OUT_OF_STOCK] }
+        last_stock_update: { type: [string, "null"], format: date-time }
+    Stats:
+      type: object
+      properties:
+        total_revenue: { $ref: "#/components/schemas/MoneyString" }
+        total_orders: { type: integer }
+        total_customers: { type: integer }
+        period: { type: string, enum: [today, 7d, 30d] }
+    AuditLog:
+      type: object
+      properties:
+        public_id: { type: string, pattern: "^aud_" }
+        actor: { type: string, maxLength: 50 }
+        action: { type: string, maxLength: 100 }
+        entity_type: { type: string, maxLength: 50 }
+        entity_public_id: { type: string, maxLength: 50 }
+        created_at: { type: string, format: date-time }
+    ImageKitAuth:
+      type: object
+      required: [token, expire, signature, publicKey, urlEndpoint, folder]
+      properties:
+        token: { type: string, example: "abc123" }
+        expire: { type: integer, example: 1714000000 }
+        signature: { type: string, example: "sig_abc" }
+        publicKey: { type: string, example: "public_xxx" }
+        urlEndpoint: { type: string, format: uri, example: "https://ik.imagekit.io/demo" }
+        folder: { type: string, example: "/ecommerce/reviews" }
   parameters:
+    PageParam:
+      name: page
+      in: query
+      required: false
+      description: Page number (1-based).
+      schema: { type: integer, minimum: 1, default: 1, example: 1 }
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: Items per page (1–100).
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20, example: 20 }
+    SearchParam:
+      name: search
+      in: query
+      required: false
+      description: Free-text search (trimmed).
+      schema: { type: string, maxLength: 100, example: "sneaker" }
     OrderPublicId:
       name: order_public_id
       in: path
       required: true
       schema:
         type: string
+        minLength: 1
         pattern: "^ord_"
+        example: "ord_01H"
     ReviewPublicId:
       name: review_public_id
       in: path
       required: true
       schema:
         type: string
+        minLength: 1
         pattern: "^rev_"
+        example: "rev_01H"
     CouponPublicId:
       name: coupon_public_id
       in: path
       required: true
       schema:
         type: string
+        minLength: 1
+        pattern: "^cpn_"
+        example: "cpn_01H"
     UserPublicId:
       name: user_public_id
       in: path
       required: true
       schema:
         type: string
+        minLength: 1
         pattern: "^usr_"
+        example: "usr_01H"
     ProductPublicId:
       name: product_public_id
       in: path
       required: true
       schema:
         type: string
+        minLength: 1
         pattern: "^prd_"
+        example: "prd_01H"
     CategoryPublicId:
       name: category_public_id
       in: path
       required: true
       schema:
         type: string
+        minLength: 1
         pattern: "^cat_"
+        example: "cat_01H"
     AddressPublicId:
       name: address_public_id
       in: path
       required: true
       schema:
         type: string
+        minLength: 1
         pattern: "^adr_"
+        example: "adr_01H"
   responses:
     BadRequest:
       description: Invalid body, query or path parameter.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Validation failed"
+            errors: [{ field: "email", message: "Invalid email" }]
+            requestId: "req_01H"
     Unauthorized:
       description: Missing, invalid or expired session.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Authentication required"
+            requestId: "req_01H"
     Forbidden:
       description: Authenticated but insufficient role, or account suspended.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Forbidden"
+            requestId: "req_01H"
     NotFound:
       description: Resource does not exist (or is deliberately hidden).
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Resource not found"
+            requestId: "req_01H"
     Conflict:
       description: State conflict or unique-constraint violation.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Conflict"
+            requestId: "req_01H"
     Gone:
       description: Token used or expired.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Token expired"
+            requestId: "req_01H"
     TooManyRequests:
       description: Rate limit exceeded.
+      headers:
+        Retry-After:
+          description: Seconds until rate limit resets.
+          schema: { type: integer }
+        X-RateLimit-Limit:
+          description: Request limit per window.
+          schema: { type: integer }
+        X-RateLimit-Remaining:
+          description: Remaining requests in window.
+          schema: { type: integer }
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            success: false
+            message: "Too many requests"
+            requestId: "req_01H"

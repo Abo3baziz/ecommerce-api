@@ -25,6 +25,12 @@
       "skillPath": "skills/mcp-preflight/SKILL.md",
       "computedHash": "4e3e1dbe05615aa3ae42d0fe694da8695fb0b3efa6829c50ecf66dc743aa5b42"
     },
+    "openapi-spec-generation": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/documentation-generation/skills/openapi-spec-generation/SKILL.md",
+      "computedHash": "b5b0d413a66bedc6f4590856f5584cc90b62cb20e7fd60ce1e2f67abb4a73cd8"
+    },
     "prisma-cli": {
       "source": "prisma/skills",
       "sourceType": "github",
