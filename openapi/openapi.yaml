@@ -88,6 +88,8 @@ tags:
   description: Dashboard statistics, coupon insights and P&L expenses (super_admin unless noted).
 - name: Admin — Audit
   description: Append-only audit trail (super_admin).
+- name: Admin — Reports
+  description: Financial PDF reports (P&L, expenses, revenue) by period — month/quarter/year/custom with configurable currency (super_admin, downloadable PDF or JSON preview).
 - name: Admin — Admins
   description: Admin account administration (super_admin).
 security:
@@ -4442,6 +4444,535 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+  /admin/reports/pnl:
+    get:
+      tags:
+      - Admin — Reports
+      summary: Get P&L PDF report
+      description: Returns a Profit & Loss PDF (or JSON preview when `format=json`). Supports `month` (`year+month`), `quarter` (`year+quarter`), `year` (`year`) and `custom` (`date_from`/`date_to`). Granularity `auto` maps to `day` for ≤31 days else `month`; `currency` selects formatting (`USD`,`EUR`,`GBP`,`EGP`,`SAR`,`AED`). Requires SUPER_ADMIN. Response is `application/pdf` with `Content-Disposition: attachment|inline; filename="pnl-*.pdf"` or `application/json` when previewing.
+      operationId: adminReportPnl
+      parameters:
+      - name: period
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [month, quarter, year, custom]
+          default: custom
+      - name: year
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 2000
+          maximum: 2100
+      - name: month
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: quarter
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 4
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: granularity
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [auto, day, month]
+          default: auto
+      - name: currency
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [USD, EUR, GBP, EGP, SAR, AED]
+          default: USD
+      - name: disposition
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [attachment, inline]
+          default: attachment
+      - name: format
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [pdf, json]
+      responses:
+        '200':
+          description: PDF binary or JSON preview.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/reports/pnl.pdf:
+    get:
+      tags:
+      - Admin — Reports
+      summary: Get P&L PDF report (alias)
+      description: Alias for `GET /admin/reports/pnl` that always favors `application/pdf`. Same query params and auth.
+      operationId: adminReportPnlPdf
+      parameters:
+      - name: period
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [month, quarter, year, custom]
+          default: custom
+      - name: year
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 2000
+          maximum: 2100
+      - name: month
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: quarter
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 4
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: granularity
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [auto, day, month]
+          default: auto
+      - name: currency
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [USD, EUR, GBP, EGP, SAR, AED]
+          default: USD
+      - name: disposition
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [attachment, inline]
+          default: attachment
+      - name: format
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [pdf, json]
+      responses:
+        '200':
+          description: PDF binary.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/reports/expenses:
+    get:
+      tags:
+      - Admin — Reports
+      summary: Get expenses PDF report
+      description: Returns an Expenses PDF (or JSON preview). Same period/currency params as P&L plus optional `category` filter. Requires SUPER_ADMIN.
+      operationId: adminReportExpenses
+      parameters:
+      - name: period
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [month, quarter, year, custom]
+          default: custom
+      - name: year
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 2000
+          maximum: 2100
+      - name: month
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: quarter
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 4
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [RENT, SALARIES, MARKETING, UTILITIES, SHIPPING, SOFTWARE, OTHER]
+      - name: granularity
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [auto, day, month]
+          default: auto
+      - name: currency
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [USD, EUR, GBP, EGP, SAR, AED]
+          default: USD
+      - name: disposition
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [attachment, inline]
+          default: attachment
+      - name: format
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [pdf, json]
+      responses:
+        '200':
+          description: PDF binary or JSON preview.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/reports/expenses.pdf:
+    get:
+      tags:
+      - Admin — Reports
+      summary: Get expenses PDF report (alias)
+      description: Alias for `GET /admin/reports/expenses`.
+      operationId: adminReportExpensesPdf
+      parameters:
+      - name: period
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [month, quarter, year, custom]
+          default: custom
+      - name: year
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 2000
+          maximum: 2100
+      - name: month
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: quarter
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 4
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [RENT, SALARIES, MARKETING, UTILITIES, SHIPPING, SOFTWARE, OTHER]
+      - name: currency
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [USD, EUR, GBP, EGP, SAR, AED]
+          default: USD
+      - name: disposition
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [attachment, inline]
+          default: attachment
+      responses:
+        '200':
+          description: PDF binary.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/reports/revenue:
+    get:
+      tags:
+      - Admin — Reports
+      summary: Get revenue PDF report
+      description: Returns a Revenue PDF (or JSON preview) with series, top products and category share. Same period/currency controls as P&L. Requires SUPER_ADMIN.
+      operationId: adminReportRevenue
+      parameters:
+      - name: period
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [month, quarter, year, custom]
+          default: custom
+      - name: year
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 2000
+          maximum: 2100
+      - name: month
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: quarter
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 4
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: granularity
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [auto, day, month]
+          default: auto
+      - name: currency
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [USD, EUR, GBP, EGP, SAR, AED]
+          default: USD
+      - name: disposition
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [attachment, inline]
+          default: attachment
+      - name: format
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [pdf, json]
+      responses:
+        '200':
+          description: PDF binary or JSON preview.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/reports/revenue.pdf:
+    get:
+      tags:
+      - Admin — Reports
+      summary: Get revenue PDF report (alias)
+      description: Alias for `GET /admin/reports/revenue`.
+      operationId: adminReportRevenuePdf
+      parameters:
+      - name: period
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [month, quarter, year, custom]
+          default: custom
+      - name: year
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 2000
+          maximum: 2100
+      - name: month
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: quarter
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 4
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: currency
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [USD, EUR, GBP, EGP, SAR, AED]
+          default: USD
+      - name: disposition
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [attachment, inline]
+          default: attachment
+      responses:
+        '200':
+          description: PDF binary.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /admin/audit:
     get:
       tags:
