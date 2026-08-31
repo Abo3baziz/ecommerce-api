@@ -23,7 +23,7 @@ describe("reports API", () => {
       const { cookie } = await createAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=month&year=2026&month=8")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(403);
     });
 
@@ -31,7 +31,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=month&year=2026")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(400);
     });
 
@@ -39,7 +39,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=custom")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(400);
     });
 
@@ -47,7 +47,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=custom&date_from=2026-08-10T00:00:00.000Z&date_to=2026-08-01T00:00:00.000Z")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(400);
     });
 
@@ -55,7 +55,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=custom&date_from=2025-01-01T00:00:00.000Z&date_to=2026-02-01T00:00:00.000Z")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(400);
     });
 
@@ -63,7 +63,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=month&year=2026&month=8&currency=XYZ")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(400);
     });
 
@@ -71,7 +71,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=year&year=2026&date_from=2026-01-01T00:00:00.000Z")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(400);
     });
 
@@ -79,7 +79,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=month&year=2026&month=8")
-        .set("Cookie", cookie)
+        .set("Cookie", cookie!)
         .buffer(true)
         .parse((r, cb) => {
           const chunks: Buffer[] = [];
@@ -99,7 +99,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=month&year=2026&month=8&disposition=inline")
-        .set("Cookie", cookie)
+        .set("Cookie", cookie!)
         .buffer(true)
         .parse((r, cb) => {
           const chunks: Buffer[] = [];
@@ -114,7 +114,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=month&year=2026&month=8&currency=EGP")
-        .set("Cookie", cookie)
+        .set("Cookie", cookie!)
         .buffer(true)
         .parse((r, cb) => {
           const chunks: Buffer[] = [];
@@ -129,7 +129,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=quarter&year=2026&quarter=2")
-        .set("Cookie", cookie)
+        .set("Cookie", cookie!)
         .buffer(true)
         .parse((r, cb) => {
           const chunks: Buffer[] = [];
@@ -146,7 +146,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=year&year=2026")
-        .set("Cookie", cookie)
+        .set("Cookie", cookie!)
         .buffer(true)
         .parse((r, cb) => {
           const chunks: Buffer[] = [];
@@ -161,7 +161,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl.pdf?period=custom&date_from=2026-01-01T00:00:00.000Z&date_to=2026-01-10T00:00:00.000Z")
-        .set("Cookie", cookie)
+        .set("Cookie", cookie!)
         .buffer(true)
         .parse((r, cb) => {
           const chunks: Buffer[] = [];
@@ -177,7 +177,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl?period=month&year=2026&month=8&format=json")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data).toHaveProperty("revenue");
@@ -189,7 +189,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/pnl?period=month&year=2026&month=8")
-        .set("Cookie", cookie)
+        .set("Cookie", cookie!)
         .buffer(true)
         .parse((r, cb) => {
           const chunks: Buffer[] = [];
@@ -206,7 +206,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/expenses.pdf?period=month&year=2026&month=8")
-        .set("Cookie", cookie)
+        .set("Cookie", cookie!)
         .buffer(true)
         .parse((r, cb) => {
           const chunks: Buffer[] = [];
@@ -223,7 +223,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/expenses?period=month&year=2026&month=8&format=json")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data).toHaveProperty("totals");
@@ -234,7 +234,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/expenses.pdf?period=month&year=2026&month=8&category=INVALID")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(400);
     });
   });
@@ -244,7 +244,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/revenue.pdf?period=month&year=2026&month=8")
-        .set("Cookie", cookie)
+        .set("Cookie", cookie!)
         .buffer(true)
         .parse((r, cb) => {
           const chunks: Buffer[] = [];
@@ -261,7 +261,7 @@ describe("reports API", () => {
       const { cookie } = await createSuperAdminUser(app);
       const res = await request(app)
         .get("/api/v1/admin/reports/revenue?period=custom&date_from=2026-01-01T00:00:00.000Z&date_to=2026-02-01T00:00:00.000Z&format=json")
-        .set("Cookie", cookie);
+        .set("Cookie", cookie!);
       expect(res.status).toBe(200);
       expect(res.body.data).toHaveProperty("series");
     });
