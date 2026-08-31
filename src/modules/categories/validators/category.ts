@@ -97,3 +97,18 @@ export const listCategoryProductsSchema = z.object({
 export type ListCategoryProductsQuery = z.infer<
   typeof listCategoryProductsSchema.shape.query
 >;
+
+export const listAdminCategoryProductsSchema = z.object({
+  params: z.object({
+    category_public_id: publicIdParam,
+  }),
+  query: z.object({
+    ...paginationQuery,
+    search: searchQuery,
+    sort: sortQuery(CATEGORY_SORT_FIELDS, "-created_at"),
+  }),
+});
+
+export type ListAdminCategoryProductsQuery = z.infer<
+  typeof listAdminCategoryProductsSchema.shape.query
+>;
