@@ -97,6 +97,18 @@ Task backlog derived from two audits:
 | T-052 | [T-052-health-readiness.md](./T-052-health-readiness.md) | Health/readiness endpoint with DB probe, above limiter | done |
 | T-053 | [T-053-graceful-shutdown.md](./T-053-graceful-shutdown.md) | Complete graceful shutdown (sockets, Prisma, log flush) | todo |
 | T-054 | [T-054-docs-contract-drift.md](./T-054-docs-contract-drift.md) | Fix documented-vs-implemented contract drift (API_ENDPOINTS.md) | done |
+| T-088 | [T-088-report-deps-build.md](./T-088-report-deps-build.md) | Reports deps & build wiring (pdfkit + charts) | done |
+| T-089 | [T-089-shared-pdf-infra.md](./T-089-shared-pdf-infra.md) | Shared PDF infra (builder/styles/charts/format) | done |
+| T-090 | [T-090-report-validators-dtos.md](./T-090-report-validators-dtos.md) | Report validators & DTOs (period/currency) | done |
+| T-091 | [T-091-report-repository.md](./T-091-report-repository.md) | Report repository + opex by category | done |
+| T-092 | [T-092-report-service-window.md](./T-092-report-service-window.md) | Report service window resolver + data fetch | done |
+| T-093 | [T-093-pnl-pdf-renderer.md](./T-093-pnl-pdf-renderer.md) | P&L PDF renderer (KPIs + charts + tables) | done |
+| T-094 | [T-094-expenses-revenue-renderers.md](./T-094-expenses-revenue-renderers.md) | Expenses & Revenue PDF renderers | done |
+| T-095 | [T-095-report-controllers-routes.md](./T-095-report-controllers-routes.md) | Report controllers & routes (SUPER_ADMIN) | done |
+| T-096 | [T-096-reports-openapi-docs.md](./T-096-reports-openapi-docs.md) | Reports OpenAPI + docs | done |
+| T-097 | [T-097-reports-unit-tests.md](./T-097-reports-unit-tests.md) | Reports unit tests | done |
+| T-098 | [T-098-reports-integration-tests.md](./T-098-reports-integration-tests.md) | Reports integration tests (pdf headers/auth) | done |
+| T-099 | [T-099-reports-smoke-ops.md](./T-099-reports-smoke-ops.md) | Reports smoke & ops + PROJECT_PROGRESS | done |
 
 ### P3 — Quality / hardening / future product
 
@@ -149,6 +161,7 @@ Wave 2 (data integrity):       T-035 → T-040 → T-041 → T-042 → T-043 →
 Wave 3 (ops/platform):         T-032 → T-033 → T-034 → T-047 → T-048 → T-049 → T-050 → T-051 → T-052 → T-053
 Wave 4 (quality/docs):         T-010 → T-011 → T-013 … T-023, T-044, T-054 … T-063 as capacity allows
 Wave 5 (product/hardening):    T-024 … T-027, T-064 … T-080 when product needs them
+Reports epic:                  T-088 → (T-089,T-090) → T-091 → T-092 → (T-093,T-094) → T-095 → T-096 → (T-097,T-098) → T-099  [branch: feature/reports-pdf]
 ```
 
 Legacy waves from the 2026-08-16 review (security+money T-001→T-002→T-003; session/orders T-004…T-008) are already resolved or superseded by the waves above.

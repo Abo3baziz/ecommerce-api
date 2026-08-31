@@ -84,3 +84,7 @@ Example:
 ## Reviews
 
 - docs/api/reviews/reviews.md
+
+## Reports (PDF)
+
+- docs/api/admin/reports.md — P&L / Expenses / Revenue PDFs by `month|quarter|year|custom` with `currency` and `disposition` (SUPER_ADMIN, `application/pdf` or `?format=json`)
