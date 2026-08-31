@@ -157,6 +157,37 @@ export async function listCategoryProducts(
   };
 }
 
+export async function listAdminCategoryProducts(
+  categoryPublicId: string,
+  page: number,
+  limit: number,
+  search: string | undefined,
+  sort: string,
+): Promise<ListCategoryProductsResult> {
+  const category = await categoryRepository.findAdminDetailByPublicId(categoryPublicId);
+
+  if (!category) {
+    throw new NotFoundError("Category not found");
+  }
+
+  const { field, direction } = parseSort(sort);
+  const orderBy: Prisma.productsOrderByWithRelationInput[] = [
+    { [field]: direction },
+    { id: direction },
+  ];
+  const filters: CategoryProductFilters = { search, customerVisible: false };
+
+  const [rows, total] = await Promise.all([
+    categoryRepository.listCategoryProducts(category.id, filters, orderBy, (page - 1) * limit, limit),
+    categoryRepository.countCategoryProducts(category.id, filters),
+  ]);
+
+  return {
+    products: rows.map(toCategoryProductResult),
+    pagination: formatPaginationMeta(page, limit, total),
+  };
+}
+
 export async function listAdminCategories(
   page: number,
   limit: number,

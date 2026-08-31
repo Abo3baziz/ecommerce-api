@@ -6,6 +6,7 @@ import {
   getAdminCategory,
   getCategory,
   listAdminCategories,
+  listAdminCategoryProducts,
   listCategories,
   listCategoryProducts,
   unassignProductFromCategory,
@@ -16,6 +17,7 @@ import type {
   CategoryProductParams,
   CreateCategoryBody,
   ListAdminCategoriesQuery,
+  ListAdminCategoryProductsQuery,
   ListCategoriesQuery,
   ListCategoryProductsQuery,
   UpdateCategoryBody,
@@ -66,6 +68,32 @@ export async function listCategoryProductsController(
     const { page, limit, search, sort } =
       req.query as unknown as ListCategoryProductsQuery;
     const result = await listCategoryProducts(
+      category_public_id,
+      page,
+      limit,
+      search,
+      sort,
+    );
+    res.status(200).json({
+      success: true,
+      data: result.products,
+      pagination: result.pagination,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listAdminCategoryProductsController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { category_public_id } = req.params as CategoryParams;
+    const { page, limit, search, sort } =
+      req.query as unknown as ListAdminCategoryProductsQuery;
+    const result = await listAdminCategoryProducts(
       category_public_id,
       page,
       limit,

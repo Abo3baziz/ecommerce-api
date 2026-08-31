@@ -8,6 +8,7 @@ import {
   categoryProductParamsSchema,
   createCategorySchema,
   listAdminCategoriesSchema,
+  listAdminCategoryProductsSchema,
   updateCategorySchema,
 } from "../validators/category.js";
 import {
@@ -16,6 +17,7 @@ import {
   deleteCategoryController,
   getAdminCategoryController,
   listAdminCategoriesController,
+  listAdminCategoryProductsController,
   unassignProductController,
   updateCategoryController,
 } from "../controller/category.controller.js";
@@ -34,6 +36,11 @@ adminCategoriesRouter.post(
   "/",
   validate(createCategorySchema),
   createCategoryController,
+);
+adminCategoriesRouter.get(
+  "/:category_public_id/products",
+  validate(listAdminCategoryProductsSchema),
+  listAdminCategoryProductsController,
 );
 adminCategoriesRouter.get(
   "/:category_public_id",
