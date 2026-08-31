@@ -4449,7 +4449,7 @@ paths:
       tags:
       - Admin — Reports
       summary: Get P&L PDF report
-      description: Returns a Profit & Loss PDF (or JSON preview when `format=json`). Supports `month` (`year+month`), `quarter` (`year+quarter`), `year` (`year`) and `custom` (`date_from`/`date_to`). Granularity `auto` maps to `day` for ≤31 days else `month`; `currency` selects formatting (`USD`,`EUR`,`GBP`,`EGP`,`SAR`,`AED`). Requires SUPER_ADMIN. Response is `application/pdf` with `Content-Disposition: attachment|inline; filename="pnl-*.pdf"` or `application/json` when previewing.
+      description: 'Returns a Profit & Loss PDF (or JSON preview when `format=json`). Supports `month` (`year+month`), `quarter` (`year+quarter`), `year` (`year`) and `custom` (`date_from`/`date_to`). Granularity `auto` maps to `day` for ≤31 days else `month`; `currency` selects formatting (`USD`,`EUR`,`GBP`,`EGP`,`SAR`,`AED`). Requires SUPER_ADMIN. Response is `application/pdf` with `Content-Disposition: attachment|inline; filename="pnl-*.pdf"` or `application/json` when previewing.'
       operationId: adminReportPnl
       parameters:
       - name: period
@@ -4541,7 +4541,7 @@ paths:
       tags:
       - Admin — Reports
       summary: Get P&L PDF report (alias)
-      description: Alias for `GET /admin/reports/pnl` that always favors `application/pdf`. Same query params and auth.
+      description: 'Alias for `GET /admin/reports/pnl` that always favors `application/pdf`. Same query params and auth.'
       operationId: adminReportPnlPdf
       parameters:
       - name: period
@@ -4630,7 +4630,7 @@ paths:
       tags:
       - Admin — Reports
       summary: Get expenses PDF report
-      description: Returns an Expenses PDF (or JSON preview). Same period/currency params as P&L plus optional `category` filter. Requires SUPER_ADMIN.
+      description: 'Returns an Expenses PDF (or JSON preview). Same period/currency params as P&L plus optional `category` filter. Requires SUPER_ADMIN.'
       operationId: adminReportExpenses
       parameters:
       - name: period
@@ -4728,7 +4728,7 @@ paths:
       tags:
       - Admin — Reports
       summary: Get expenses PDF report (alias)
-      description: Alias for `GET /admin/reports/expenses`.
+      description: 'Alias for `GET /admin/reports/expenses`.'
       operationId: adminReportExpensesPdf
       parameters:
       - name: period
@@ -4810,7 +4810,7 @@ paths:
       tags:
       - Admin — Reports
       summary: Get revenue PDF report
-      description: Returns a Revenue PDF (or JSON preview) with series, top products and category share. Same period/currency controls as P&L. Requires SUPER_ADMIN.
+      description: 'Returns a Revenue PDF (or JSON preview) with series, top products and category share. Same period/currency controls as P&L. Requires SUPER_ADMIN.'
       operationId: adminReportRevenue
       parameters:
       - name: period
@@ -4902,7 +4902,7 @@ paths:
       tags:
       - Admin — Reports
       summary: Get revenue PDF report (alias)
-      description: Alias for `GET /admin/reports/revenue`.
+      description: 'Alias for `GET /admin/reports/revenue`.'
       operationId: adminReportRevenuePdf
       parameters:
       - name: period
