@@ -109,6 +109,7 @@ Task backlog derived from two audits:
 | T-052 | [T-052-health-readiness.md](./T-052-health-readiness.md) | Health/readiness endpoint with DB probe, above limiter | done |
 | T-053 | [T-053-graceful-shutdown.md](./T-053-graceful-shutdown.md) | Complete graceful shutdown (sockets, Prisma, log flush) | todo |
 | T-054 | [T-054-docs-contract-drift.md](./T-054-docs-contract-drift.md) | Fix documented-vs-implemented contract drift (API_ENDPOINTS.md) | done |
+| T-107 | [T-107-pagination-envelope-reconciliation.md](./T-107-pagination-envelope-reconciliation.md) | Pagination envelope reconciliation (`meta` vs `pagination`) | todo |
 | T-088 | [T-088-report-deps-build.md](./T-088-report-deps-build.md) | Reports deps & build wiring (pdfkit + charts) | done |
 | T-089 | [T-089-shared-pdf-infra.md](./T-089-shared-pdf-infra.md) | Shared PDF infra (builder/styles/charts/format) | done |
 | T-090 | [T-090-report-validators-dtos.md](./T-090-report-validators-dtos.md) | Report validators & DTOs (period/currency) | done |
