@@ -3,8 +3,9 @@
 A production-deployed REST API powering a full e-commerce platform — customer
 accounts, catalog with variants and images, inventory, carts, transactional
 checkout, orders with a status-transition state machine, reviews, coupons,
-analytics, financial PDF reports and an append-only audit trail — plus the
-administration surface behind it all.
+analytics, financial PDF reports, an append-only audit trail, and
+SUPER_ADMIN-persisted system settings with encrypted secrets and storefront
+maintenance gating — plus the administration surface behind it all.
 
 **Part of a full-stack app** · [View Portfolio](https://codebyahmed.online)
 
@@ -12,10 +13,10 @@ administration surface behind it all.
 |---|---|
 | **Live API** | [ecommerce-api-l3a4.onrender.com](https://ecommerce-api-l3a4.onrender.com/health) |
 | **Storefront (frontend repo)** | [github.com/Abo3baziz/ecommerce-client](https://github.com/Abo3baziz/ecommerce-client) · [live](https://ecommerce-storefront-ashy.vercel.app) |
-| **API contract** | [openapi/openapi.yaml](openapi/openapi.yaml) (OpenAPI 3.1, 77 paths) · human-readable specs in [`docs/api/**`](docs/api) |
+| **API contract** | [openapi/openapi.yaml](openapi/openapi.yaml) (OpenAPI 3.1, 80 paths) · human-readable specs in [`docs/api/**`](docs/api) |
 | **Portfolio** | [codebyahmed.online](https://codebyahmed.online) |
 
-## Feature surface (~77 endpoints under `/api/v1`)
+## Feature surface (~98 endpoints under `/api/v1`)
 
 | Module | Highlights |
 |---|---|
@@ -27,6 +28,7 @@ administration surface behind it all.
 | **Reviews** | Purchase-gated, one live review per user per product, image provenance validated against the ImageKit host, rating summaries |
 | **Reports** | Financial PDFs — P&L Statement, Expenses and Revenue by `month|quarter|year|custom` (≤366d) with configurable currency (`USD|EUR|GBP|EGP|SAR|AED`), vector charts (line/bar/pie via `pdfkit`), `SUPER_ADMIN`-only `attachment|inline` download or `?format=json` preview |
 | **Admin** | Role matrix (`CUSTOMER`/`ADMIN`/`SUPER_ADMIN`), dashboard stats, P&L analytics with expenses ledger, coupon management, moderation queue, customer account administration, append-only audit log |
+| **System settings** | Nine persisted configuration sections (general, commerce, payment, shipping, email, customer, security, admin_permissions, financial) editable by `SUPER_ADMIN` with per-field Zod validation, a transactional per-change audit diff, email test-send, and storefront maintenance gating (503 with admin/auth bypass) |
 
 ## Architecture decisions worth noting
 
@@ -44,6 +46,10 @@ administration surface behind it all.
 - **PDFs without native deps** — financial reports stream `application/pdf`
   via pure `pdfkit` vector drawing (tables + line/bar/pie), `Cache-Control: no-store`,
   `Content-Disposition: attachment|inline` and `X-Report-Currency`; no Chromium/`canvas` required.
+- **Secrets are never plaintext** — payment/email credentials saved in system
+  settings are encrypted at rest with AES-256-GCM (`SETTINGS_ENCRYPTION_KEY`),
+  always returned masked as `[redacted]` (a `__REDACTED__` sentinel preserves
+  the stored cipher), and redacted before reaching the audit trail.
 - **Documented like a public API** — every module has a hand-maintained
   contract in `docs/api/**` (the source of truth), mirrored into OpenAPI 3.1
   for Apidog/Postman import and client generation.
@@ -72,7 +78,8 @@ npm run build        # esbuild bundle -> dist/index.js
 ```
 
 Copy [`.env.example`](.env.example) → `.env` and fill in Postgres, Resend and
-ImageKit credentials. Migrations:
+ImageKit credentials, then generate the settings encryption key (see the
+comment in the template). Migrations:
 
 ```bash
 npm run db:migrate           # dev
@@ -93,6 +100,9 @@ npm run admin:create         # prompts for email, promotes to SUPER_ADMIN
 Render (API) → Neon PostgreSQL, with the Vercel-hosted storefront proxying
 browser traffic same-origin so session cookies stay first-party. Release
 command applies migrations before boot; `/health/ready` is the platform probe.
+`SETTINGS_ENCRYPTION_KEY` (64 hex chars) is **required in production** — the
+service refuses to boot without it, and rotating it makes previously stored
+settings secrets undecryptable.
 Full runbook: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ---
