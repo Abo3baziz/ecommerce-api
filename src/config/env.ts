@@ -37,6 +37,13 @@ const envSchema = z.object({
       }
       return raw.split(",").map((entry) => entry.trim()).filter(Boolean);
     }),
+  // AES-256-GCM hex key (64 hex chars = 32 bytes) for system_settings secrets.
+  // Optional in dev (secrets fall back to redacted), required in production —
+  // payment/email secrets would otherwise be persisted as plaintext.
+  SETTINGS_ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/, "SETTINGS_ENCRYPTION_KEY must be 64 hex chars")
+    .optional(),
   // Strict enum parse (NOT coerce.boolean — "false" would become true).
   // Defaults to enabled; production boot fails when disabled (see index.ts).
   ENABLE_CSRF: z
@@ -45,7 +52,15 @@ const envSchema = z.object({
     .transform((value) => value === "true"),
 });
 
-const parsed = envSchema.safeParse(process.env);
+const parsed = envSchema
+  .refine(
+    (data) => data.NODE_ENV !== "production" || Boolean(data.SETTINGS_ENCRYPTION_KEY),
+    {
+      path: ["SETTINGS_ENCRYPTION_KEY"],
+      message: "SETTINGS_ENCRYPTION_KEY is required in production (system settings secrets are encrypted at rest)",
+    },
+  )
+  .safeParse(process.env);
 
 if (!parsed.success) {
   console.error("Invalid environment variables:", parsed.error.flatten().fieldErrors);
