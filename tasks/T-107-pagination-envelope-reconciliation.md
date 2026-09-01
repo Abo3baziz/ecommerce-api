@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | T-107 |
 | **Priority** | P2 |
-| **Status** | todo |
+| **Status** | done |
 | **Type** | `docs` (contract reconciliation; code changes only if option A is chosen) |
 | **Branch** | `docs/pagination-envelope` |
 | **Depends on** | — |
@@ -64,10 +64,10 @@ Either way:
 
 ## Acceptance criteria
 
-- [ ] One canonical pagination key documented in `docs/api/**`, `docs/API_ENDPOINTS.md` and `openapi/openapi.yaml`.
-- [ ] No list endpoint in the spec references the removed key.
-- [ ] Client `hasPagination()` guard matches the canonical key (Option B: no change needed).
-- [ ] `npx @redocly/cli lint openapi/openapi.yaml` green.
+- [x] One canonical pagination key documented in `docs/api/**`, `docs/API_ENDPOINTS.md` and `openapi/openapi.yaml`.
+- [x] No list endpoint in the spec references the removed key.
+- [x] Client `hasPagination()` guard matches the canonical key (Option B: no change needed).
+- [x] `npx @redocly/cli lint openapi/openapi.yaml` green.
 
 ## References
 
@@ -76,3 +76,14 @@ Either way:
 - `ecommerce-client/src/types/envelopes.ts:73` (hasPagination guard)
 - `openapi/openapi.yaml` (PaginationMeta usages under `meta`)
 - Discovered during the openapi sync commit `2e29e25` (System settings epic, PR #22)
+
+## Resolution (2026-09-01)
+
+**Option B implemented** (docs/spec-only): all 19 paginated list responses in
+openapi/openapi.yaml now reference PaginationMeta under pagination, the
+info description and SuccessEnvelope description were updated, and
+openapi/README.md documents the canonical key. Markdown docs
+(docs/API_ENDPOINTS.md, docs/api/**) already described pagination — no
+changes were needed there. Drift guard added:
+	ests/unit/docs/openapi-pagination.test.ts. Redocly lint green; client
+hasPagination() guard needed no change.

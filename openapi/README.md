@@ -29,3 +29,11 @@ reversed (decision recorded in `tasks/T-011-openapi-spec.md`).
 
 Common shapes are defined once under `components`: `SuccessEnvelope`,
 `ErrorEnvelope`, `PaginationMeta`, and reusable error responses.
+
+## Pagination envelope key
+
+Paginated list responses use a **top-level `pagination` key**
+(`{ success, data, pagination }`) — matching every list controller and the
+client's `hasPagination()` guard. `PaginationMeta` is always referenced as
+`pagination:` in this spec; `tests/unit/docs/openapi-pagination.test.ts`
+guards against regressing to the previously documented `meta` key.

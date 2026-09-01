@@ -24,7 +24,7 @@ info:
 
     **Pagination:** `page` (1-based, default 1) + `limit` (1â€“100, default 20).
 
-    Response `meta` carries `total`, `totalPages`, `hasNext`, `hasPrev`.
+    Response `pagination` carries `total`, `totalPages`, `hasNext`, `hasPrev`.
 
 
     **Source of truth:** the hand-maintained contracts in `docs/api/**` remain
@@ -860,7 +860,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/Address'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1024,7 +1024,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/ProductSummary'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1098,7 +1098,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/Category'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1167,7 +1167,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/ProductSummary'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1477,7 +1477,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/OrderSummary'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1584,7 +1584,7 @@ paths:
                           type: array
                           items:
                             $ref: '#/components/schemas/Review'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1833,7 +1833,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/Review'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1924,7 +1924,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/ProductSummary'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -2174,7 +2174,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/Variant'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -2837,7 +2837,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/Category'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -3073,7 +3073,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/InventoryRecord'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -3330,7 +3330,7 @@ paths:
                       type: array
                       items:
                         type: object
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -3564,7 +3564,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/OrderSummary'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -3724,7 +3724,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/Review'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -3882,7 +3882,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/Coupon'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -4128,7 +4128,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/CouponUsage'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -4292,7 +4292,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/Expense'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -4976,7 +4976,7 @@ paths:
   /admin/settings:
     get:
       tags:
-      - Admin — System Settings
+      - Admin ï¿½ System Settings
       summary: List system settings sections
       description: 'Returns persisted system settings sections with secrets masked as "[redacted]". When `section` is given, returns a single object instead of an array. `updated_by` is the acting user''s usr_ public_id. Requires SUPER_ADMIN.'
       operationId: adminGetSettings
@@ -5023,7 +5023,7 @@ paths:
   /admin/settings/{section}:
     patch:
       tags:
-      - Admin — System Settings
+      - Admin ï¿½ System Settings
       summary: Update a system settings section
       description: 'Validates and persists the full section object (defaults applied for omitted optional fields; `general` requires store_name/contact_email, `email` requires sender fields + notifications). Secret fields sent as "__REDACTED__" or "[redacted]" preserve the stored cipher; other values are re-encrypted with AES-256-GCM. Writes one redacted transactional audit row (action admin.settings.{section}_update, entity_type system_settings). Money values are MoneyString decimals. Requires SUPER_ADMIN.'
       operationId: adminPatchSettingsSection
@@ -5072,7 +5072,7 @@ paths:
   /admin/settings/email/test:
     post:
       tags:
-      - Admin — System Settings
+      - Admin ï¿½ System Settings
       summary: Send a test email using the configured provider
       description: Acknowledges a test send to the given address. Requires SUPER_ADMIN.
       operationId: adminTestSettingsEmail
@@ -5180,7 +5180,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/AuditLog'
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -5243,7 +5243,7 @@ paths:
                       type: array
                       items:
                         type: object
-                    meta:
+                    pagination:
                       $ref: '#/components/schemas/PaginationMeta'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -5403,7 +5403,7 @@ components:
           type: boolean
           const: true
           example: true
-      description: Base success envelope; extended via allOf with `data` and `meta`.
+      description: Base success envelope; extended via allOf with `data` and, on list endpoints, `pagination`.
     ErrorEnvelope:
       type: object
       required:
