@@ -12,6 +12,7 @@ import { errorHandler } from "../middleware/errorHandler.js";
 import { logger } from "../shared/logger/index.js";
 import { stripUrlQuery } from "../shared/logger/redact.js";
 import { router } from "../routes/index.js";
+import { maintenanceGuard } from "../middleware/maintenance.js";
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../public");
 
@@ -84,6 +85,8 @@ app.get("/health/ready", async (_req, res) => {
 if (env.NODE_ENV !== "test") {
   app.use(rateLimiter);
 }
+
+app.use(maintenanceGuard);
 
 app.use("/api", router);
 
