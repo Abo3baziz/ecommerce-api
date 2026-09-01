@@ -3413,9 +3413,75 @@ curl -H "Cookie: session=<SESSION_TOKEN>" "https://api.example.com/api/v1/upload
 
 ---
 
+## 21. System Settings — SUPER_ADMIN
+
+All settings endpoints require a session and the `super_admin` role (regular admins receive `403`). Full per-section field contracts live in `docs/api/admin/settings.md`. Secrets are stored encrypted (AES-256-GCM) and always returned masked as `"[redacted]"`; send `"__REDACTED__"` on PATCH to preserve a stored cipher. Every PATCH writes one redacted, transactional audit row (`admin.settings.{section}_update`).
+
+### GET /api/v1/admin/settings
+
+**Authentication:** Session required · **Authorization:** super_admin
+
+- Method: `GET` · URL: `/api/v1/admin/settings`
+- Query params: `section` (optional enum: `general`, `commerce`, `payment`, `shipping`, `email`, `customer`, `security`, `admin_permissions`, `financial`)
+- Success: `200 OK` — enveloped array of `{ key, value, updated_at, updated_by }` (or a single object when `section` is given); `updated_by` is the actor's `usr_…` public_id
+- Errors: `400` unknown section · `401` missing/invalid session · `403` not super_admin · `404` section row missing
+
+### PATCH /api/v1/admin/settings/general
+
+**Authentication:** Session required · **Authorization:** super_admin
+
+- Method: `PATCH` · URL: `/api/v1/admin/settings/general`
+- Body: full `general` object (`store_name` and `contact_email` required; `maintenance_mode`, `store_active`, locale/currency defaults, `logo_url`)
+- Success: `200 OK` — updated section (masked) + audit row
+- Errors: `400` validation · `401`/`403` auth
+
+### PATCH /api/v1/admin/settings/commerce
+
+- Body: `vat_enabled`, `default_tax_rate`, `tax_mode`, `min_order_amount`/`max_order_amount`/`free_shipping_threshold` (money strings; `min ≤ max` enforced), guest/registration/multi-address flags, cancellation/return/refund windows, `low_stock_threshold`
+
+### PATCH /api/v1/admin/settings/payment
+
+- Body: `enabled_methods`, `cod_enabled`/`card_enabled`, `provider`, `provider_config`, `provider_secret_key`/`webhook_secret` (encrypted; `"__REDACTED__"` preserves), `test_mode`, `currency_restrictions`, `payment_failure_behavior`, `min_transaction`/`max_transaction`
+
+### PATCH /api/v1/admin/settings/shipping
+
+- Body: `enabled_methods`, `zones[]`, `rates[]` (money `price`), `free_shipping_rules`, `estimated_delivery {min_days,max_days}`, `default_method`, `provider_config`
+
+### PATCH /api/v1/admin/settings/email
+
+- Body: `sender_name`/`sender_email` (required), `provider`, `provider_config` (`smtp_password` encrypted), `notifications` (11 boolean toggles, required)
+
+### PATCH /api/v1/admin/settings/customer
+
+- Body: registration/verification flags, `password_min_length` (8–128), `password_requirements`, `session_duration_ms`, `max_active_sessions` (1–10), review flags and moderation mode
+
+### PATCH /api/v1/admin/settings/security
+
+- Body: `session_timeout_ms`, `admin_session_duration_ms`, `max_login_attempts` (3–20), `lockout_duration_ms`, `rate_limit`, `password_policy`, 2FA/notification flags
+
+### PATCH /api/v1/admin/settings/admin_permissions
+
+- Body: `invite_enabled`, `require_2fa`, `force_password_reset`, `max_admins` (1–100), tracking flags, `permissions_matrix`
+
+### PATCH /api/v1/admin/settings/financial
+
+- Body: `default_currency`, `tax_config`, `payment_fee`, `refund_accounting`, `coupon_cost_attribution`, `default_reporting_period`, `fiscal_year_start` (1–12), `report_preferences`, `expense_categories`
+
+All PATCH errors: `400` validation (incl. cross-field `min > max`) · `401` missing/invalid session · `403` not super_admin.
+
+### POST /api/v1/admin/settings/email/test
+
+**Authentication:** Session required · **Authorization:** super_admin
+
+- Body: `{ "to": "email" }`
+- Success: `200 OK` — `{ success: true, data: { sent_to } }`
+- Errors: `400` missing/invalid `to` · `401`/`403` auth
+
+---
+
 ## Endpoint Index
 
-**87 implemented endpoints + 2 documented-but-not-implemented.**
+**98 implemented endpoints + 2 documented-but-not-implemented.**
 - **Authentication (9):** `POST /auth/register` · `POST /auth/login` · `GET /auth/session` · `GET /auth/sessions` · `DELETE /auth/session` · `DELETE /auth/sessions` · `DELETE /auth/sessions/{session_public_id}` · `POST /auth/email-verification/verify` · `POST /auth/email-verification/resend`
 - **Users (8):** `GET /users/me` · `PATCH /users/me` · `DELETE /users/me` · `PATCH /users/me/password` · `POST /users/me/email` · `POST /users/me/email/verify` · `POST /users/me/phone-number` · `POST /users/me/phone-number/verify`
 - **Addresses (5):** `GET|POST /users/me/addresses` · `GET|PATCH|DELETE /users/me/addresses/{address_public_id}`
@@ -3435,3 +3501,4 @@ curl -H "Cookie: session=<SESSION_TOKEN>" "https://api.example.com/api/v1/upload
 - **Reviews — admin (4):** `GET /admin/reviews` · `GET /admin/reviews/{review_public_id}` · `PATCH /admin/reviews/{review_public_id}` · `DELETE /admin/reviews/{review_public_id}`
 - **Users — admin (6):** `GET /admin/users` · `GET /admin/users/{user_public_id}` · `PATCH /admin/users/{user_public_id}` · `PATCH /admin/users/{user_public_id}/suspend` · `PATCH /admin/users/{user_public_id}/activate` · `PATCH /admin/users/{user_public_id}/role`
 - **Uploads (1):** `GET /uploads/imagekit-auth`
+- **System settings — super_admin (11):** `GET /admin/settings` · `PATCH /admin/settings/general|commerce|payment|shipping|email|customer|security|admin_permissions|financial` · `POST /admin/settings/email/test`

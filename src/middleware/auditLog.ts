@@ -3,7 +3,7 @@ import type { users } from "../generated/prisma/client.js";
 import { recordAuditEvent } from "../modules/audit/service/audit.service.js";
 
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
-const SENSITIVE_KEY_PATTERN = /password|secret|token|otp/i;
+const SENSITIVE_KEY_PATTERN = /password|secret|token|otp|key|private|webhook|api_key/i;
 const MAX_BODY_DEPTH = 6;
 
 const SEGMENT_TO_ENTITY: Record<string, string> = {
@@ -116,10 +116,10 @@ function redact(value: unknown, depth = 0): unknown {
   return value;
 }
 
-// Coupons emit their own richer transactional audit rows (per-field diffs,
-// previous values) inside the coupons module — the generic middleware must
+// Coupons and settings emit their own richer transactional audit rows (per-field diffs,
+// previous values) inside their modules — the generic middleware must
 // skip them to avoid duplicate entries.
-const AUDIT_EXCLUDED_PREFIXES = ["/api/v1/admin/coupons"];
+const AUDIT_EXCLUDED_PREFIXES = ["/api/v1/admin/coupons", "/api/v1/admin/settings"];
 
 /**
  * Records one audit row for every authenticated mutating request under

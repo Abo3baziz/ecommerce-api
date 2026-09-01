@@ -463,6 +463,7 @@ model users {
   verification_tokens   verification_tokens[]
   audit_logs            audit_logs[]
   operating_expenses    operating_expenses[]
+  system_settings       system_settings[]
 
   @@index([email], map: "idx_users_email")
   @@index([public_id], map: "idx_users_public_id")
@@ -601,4 +602,18 @@ model operating_expenses {
   @@index([spent_at], map: "idx_operating_expenses_spent_at")
   @@index([category], map: "idx_operating_expenses_category")
   @@index([created_by_users_id], map: "idx_operating_expenses_created_by_user_id")
+}
+
+/// Persisted system settings — one row per section (general, commerce, payment, shipping, email, customer, security, admin_permissions, financial).
+/// Secrets inside `value` are encrypted at rest via SETTINGS_ENCRYPTION_KEY.
+model system_settings {
+  id         Int      @id(map: "system_settings_pk") @default(autoincrement())
+  key        String   @unique(map: "system_settings_key_unique_key") @db.VarChar(100)
+  value      Json     @db.JsonB
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
+  updated_by Int?     @map("updated_by")
+  users      users?   @relation(fields: [updated_by], references: [id], map: "fk_system_settings_updated_by", onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([key], map: "idx_system_settings_key")
+  @@map("system_settings")
 }

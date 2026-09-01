@@ -7,11 +7,13 @@ export interface SendEmailInput {
   to: string;
   subject: string;
   html: string;
+  /** Optional sender override ("Name <email>"); defaults to RESEND_FROM_EMAIL. */
+  from?: string;
 }
 
 export async function sendEmail(input: SendEmailInput): Promise<void> {
   await resend.emails.send({
-    from: env.RESEND_FROM_EMAIL,
+    from: input.from ?? env.RESEND_FROM_EMAIL,
     to: input.to,
     subject: input.subject,
     html: input.html,

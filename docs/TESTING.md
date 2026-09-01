@@ -294,6 +294,7 @@ When a secret is required in GitHub Actions, it must be configured as a **GitHub
 - `DATABASE_URL` — set inline to the CI Postgres service connection string (a throwaway DB created per run; no secret).
 - `CORS_ORIGIN` — inline (`http://localhost:3000`).
 - `NODE_ENV` — set to `test` in the generated `.env.test`.
+- `SETTINGS_ENCRYPTION_KEY` — generated per run with `crypto.randomBytes(32)` (not a secret): required by the encryption unit tests and by the production smoke-boot step (the boot guard requires it when `NODE_ENV=production`). Nothing persisted in CI needs to be decryptable across runs.
 
 CI writes these into a generated `.env.test` file (never committed) before running `npm test`. Local developers reproduce the same environment by copying `.env.test.example` to `.env.test` and filling in values. Reporting requirement: if you change which secrets CI needs, update the lists above and the `Create test environment file` step together — and tell the maintainer which GitHub secrets must be configured.
 

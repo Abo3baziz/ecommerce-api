@@ -60,6 +60,18 @@ Task backlog derived from two audits:
 | T-033 | [T-033-trust-proxy-config.md](./T-033-trust-proxy-config.md) | Configure trust proxy for correct client IPs | done |
 | T-034 | [T-034-logger-architecture-redaction.md](./T-034-logger-architecture-redaction.md) | Logger: O(n²) rewrite, rotation, token redaction | done |
 
+### System — SUPER_ADMIN System settings (9 sections)
+
+| ID | File | Title | Status |
+|----|------|-------|--------|
+| T-100 | [T-100-system-settings-db.md](./T-100-system-settings-db.md) | System settings DB (model, migration, seed, encryption) | done |
+| T-101 | [T-101-system-settings-api-general-commerce.md](./T-101-system-settings-api-general-commerce.md) | System API: General & Commerce (SUPER_ADMIN) | done |
+| T-102 | [T-102-system-settings-api-payment-shipping.md](./T-102-system-settings-api-payment-shipping.md) | System API: Payment & Shipping (encrypted) | done |
+| T-103 | [T-103-system-settings-api-email-customer-security.md](./T-103-system-settings-api-email-customer-security.md) | System API: Email, Customer, Security | done |
+| T-104 | [T-104-system-settings-api-admin-financial-maintenance.md](./T-104-system-settings-api-admin-financial-maintenance.md) | System API: Admin & Permissions, Financial, Maintenance | done |
+| T-105 | [T-105-system-settings-audit.md](./T-105-system-settings-audit.md) | System audit trail (transactional, redacted) | done |
+| T-106 | [T-106-system-settings-docs-qa.md](./T-106-system-settings-docs-qa.md) | System docs & QA (OpenAPI, smoke) | done |
+
 ### P2 — Correctness / invariants / platform
 
 | ID | File | Title | Status |
@@ -162,6 +174,8 @@ Wave 3 (ops/platform):         T-032 → T-033 → T-034 → T-047 → T-048 →
 Wave 4 (quality/docs):         T-010 → T-011 → T-013 … T-023, T-044, T-054 … T-063 as capacity allows
 Wave 5 (product/hardening):    T-024 … T-027, T-064 … T-080 when product needs them
 Reports epic:                  T-088 → (T-089,T-090) → T-091 → T-092 → (T-093,T-094) → T-095 → T-096 → (T-097,T-098) → T-099  [branch: feature/reports-pdf]
+System epic:                   T-100 → (T-101,T-102,T-103,T-104) → T-105 → T-106  [branch: feature/system-settings]
+
 ```
 
 Legacy waves from the 2026-08-16 review (security+money T-001→T-002→T-003; session/orders T-004…T-008) are already resolved or superseded by the waves above.

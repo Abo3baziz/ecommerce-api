@@ -4973,6 +4973,143 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /admin/settings:
+    get:
+      tags:
+      - Admin — System Settings
+      summary: List system settings sections
+      description: 'Returns persisted system settings sections with secrets masked as "[redacted]". When `section` is given, returns a single object instead of an array. `updated_by` is the acting user''s usr_ public_id. Requires SUPER_ADMIN.'
+      operationId: adminGetSettings
+      parameters:
+      - name: section
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - general
+          - commerce
+          - payment
+          - shipping
+          - email
+          - customer
+          - security
+          - admin_permissions
+          - financial
+      responses:
+        '200':
+          description: OK. Array of sections, or a single section when `section` is provided.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/SuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      oneOf:
+                      - type: array
+                        items:
+                          $ref: '#/components/schemas/SystemSettingsSection'
+                      - $ref: '#/components/schemas/SystemSettingsSection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/settings/{section}:
+    patch:
+      tags:
+      - Admin — System Settings
+      summary: Update a system settings section
+      description: 'Validates and persists the full section object (defaults applied for omitted optional fields; `general` requires store_name/contact_email, `email` requires sender fields + notifications). Secret fields sent as "__REDACTED__" or "[redacted]" preserve the stored cipher; other values are re-encrypted with AES-256-GCM. Writes one redacted transactional audit row (action admin.settings.{section}_update, entity_type system_settings). Money values are MoneyString decimals. Requires SUPER_ADMIN.'
+      operationId: adminPatchSettingsSection
+      parameters:
+      - name: section
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - general
+          - commerce
+          - payment
+          - shipping
+          - email
+          - customer
+          - security
+          - admin_permissions
+          - financial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: 'Section-specific object; see docs/api/admin/settings.md for the authoritative per-section field contract.'
+      responses:
+        '200':
+          description: Updated section (secrets masked).
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/SuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/SystemSettingsSection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/settings/email/test:
+    post:
+      tags:
+      - Admin — System Settings
+      summary: Send a test email using the configured provider
+      description: Acknowledges a test send to the given address. Requires SUPER_ADMIN.
+      operationId: adminTestSettingsEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - to
+              properties:
+                to:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Test email acknowledged.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/SuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        sent_to:
+                          type: string
+                          format: email
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /admin/audit:
     get:
       tags:
@@ -5214,6 +5351,34 @@ components:
       type: string
       pattern: ^usr_
       example: usr_01HXYZ
+    SystemSettingsSection:
+      type: object
+      description: 'One persisted settings section. Value shape is section-specific (see docs/api/admin/settings.md); money values are MoneyString decimals, secrets are always "[redacted]" in responses.'
+      required:
+      - key
+      - value
+      - updated_at
+      properties:
+        key:
+          type: string
+          enum:
+          - general
+          - commerce
+          - payment
+          - shipping
+          - email
+          - customer
+          - security
+          - admin_permissions
+          - financial
+        value:
+          type: object
+          additionalProperties: true
+        updated_at:
+          type: string
+          format: date-time
+        updated_by:
+          $ref: '#/components/schemas/UserPublicId'
     MoneyString:
       type: string
       pattern: ^(\d{1,10}(\.\d{1,2})?)$

@@ -31,6 +31,7 @@ import { adminAnalyticsRouter } from "../../modules/analytics/index.js";
 import { adminCouponsRouter } from "../../modules/coupons/index.js";
 import { adminAccountsRouter } from "../../modules/admins/index.js";
 import { adminReportsRouter } from "../../modules/reports/index.js";
+import { adminSettingsRouter } from "../../modules/settings/index.js";
 import { auditAdminMutations } from "../../middleware/auditLog.js";
 
 const v1Router = Router();
@@ -67,6 +68,7 @@ v1Router.use("/admin/analytics", adminAnalyticsRouter);
 v1Router.use("/admin/coupons", adminCouponsRouter);
 v1Router.use("/admin/admins", adminAccountsRouter);
 v1Router.use("/admin/reports", adminReportsRouter);
+v1Router.use("/admin/settings", adminSettingsRouter);
 v1Router.use("/uploads", uploadsRouter);
 
 export { v1Router };
