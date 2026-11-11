@@ -2,13 +2,13 @@
 
 Task backlog derived from two audits:
 
-- **2026-08-16 review** → T-001…T-027 (orders design-review §2.x, `PROJECT_PROGRESS.md` pending items, `docs/REQUIREMENTS.md`).
-- **2026-08-21 full audit** → T-028…T-080. Full report with evidence: [AUDIT-2026-08-21.md](./AUDIT-2026-08-21.md).
+- **2026-08-16 review** â†’ T-001â€¦T-027 (orders design-review آ§2.x, `PROJECT_PROGRESS.md` pending items, `docs/REQUIREMENTS.md`).
+- **2026-08-21 full audit** â†’ T-028â€¦T-080. Full report with evidence: [AUDIT-2026-08-21.md](./AUDIT-2026-08-21.md).
 
 ## How to use
 
 1. Pick the next **P0** task (or the highest open priority).
-2. Create a branch per `AGENTS.md` (`bugfix/…`, `feature/…`, `chore/…`, `docs/…`).
+2. Create a branch per `AGENTS.md` (`bugfix/â€¦`, `feature/â€¦`, `chore/â€¦`, `docs/â€¦`).
 3. Implement, test, update docs + `PROJECT_PROGRESS.md`.
 4. Mark the task file status `done` and move its summary into `PROJECT_PROGRESS.md`.
 
@@ -33,7 +33,7 @@ Task backlog derived from two audits:
 
 ## Index
 
-### P0 — Production blockers
+### P0 â€” Production blockers
 
 | ID | File | Title | Status |
 |----|------|-------|--------|
@@ -42,14 +42,14 @@ Task backlog derived from two audits:
 | T-003 | [T-003-payment-webhooks-reconciliation.md](./T-003-payment-webhooks-reconciliation.md) | Payment webhooks + reconciliation | todo |
 | T-028 | [T-028-build-boot-broken.md](./T-028-build-boot-broken.md) | Fix production build boot failure (ESM import extensions) | done |
 
-### P1 — Pre-traffic hardening
+### P1 â€” Pre-traffic hardening
 
 | ID | File | Title | Status |
 |----|------|-------|--------|
 | T-004 | [T-004-session-idle-timeout.md](./T-004-session-idle-timeout.md) | Session idle-timeout via `last_activity_at` | done |
 | T-005 | [T-005-expired-session-cleanup.md](./T-005-expired-session-cleanup.md) | Expired-session cleanup job | done |
-| T-006 | [T-006-orders-admin-row-lock.md](./T-006-orders-admin-row-lock.md) | Orders §2.4 — row-lock admin status transitions | done |
-| T-007 | [T-007-orders-updateMany-counts.md](./T-007-orders-updateMany-counts.md) | Orders §2.5 — check `updateMany` affected-row counts | done |
+| T-006 | [T-006-orders-admin-row-lock.md](./T-006-orders-admin-row-lock.md) | Orders آ§2.4 â€” row-lock admin status transitions | done |
+| T-007 | [T-007-orders-updateMany-counts.md](./T-007-orders-updateMany-counts.md) | Orders آ§2.5 â€” check `updateMany` affected-row counts | done |
 | T-008 | [T-008-auto-restock-on-cancel.md](./T-008-auto-restock-on-cancel.md) | Auto-restock inventory on cancel/refund | done |
 | T-009 | [T-009-real-sms-provider.md](./T-009-real-sms-provider.md) | Real SMS provider for phone OTP | wontfix |
 | T-010 | [T-010-deploy-ops-checklist.md](./T-010-deploy-ops-checklist.md) | Deploy & ops checklist (secrets, monitoring, backups) | done |
@@ -58,9 +58,9 @@ Task backlog derived from two audits:
 | T-031 | [T-031-reset-password-page-missing.md](./T-031-reset-password-page-missing.md) | Build the missing reset-password page | done |
 | T-032 | [T-032-test-db-isolation-guard.md](./T-032-test-db-isolation-guard.md) | Test/dev DB isolation + destructive-cleanup guard | done |
 | T-033 | [T-033-trust-proxy-config.md](./T-033-trust-proxy-config.md) | Configure trust proxy for correct client IPs | done |
-| T-034 | [T-034-logger-architecture-redaction.md](./T-034-logger-architecture-redaction.md) | Logger: O(n²) rewrite, rotation, token redaction | done |
+| T-034 | [T-034-logger-architecture-redaction.md](./T-034-logger-architecture-redaction.md) | Logger: O(nآ²) rewrite, rotation, token redaction | done |
 
-### System — SUPER_ADMIN System settings (9 sections)
+### System â€” SUPER_ADMIN System settings (9 sections)
 
 | ID | File | Title | Status |
 |----|------|-------|--------|
@@ -72,13 +72,13 @@ Task backlog derived from two audits:
 | T-105 | [T-105-system-settings-audit.md](./T-105-system-settings-audit.md) | System audit trail (transactional, redacted) | done |
 | T-106 | [T-106-system-settings-docs-qa.md](./T-106-system-settings-docs-qa.md) | System docs & QA (OpenAPI, smoke) | done |
 
-### P2 — Correctness / invariants / platform
+### P2 â€” Correctness / invariants / platform
 
 | ID | File | Title | Status |
 |----|------|-------|--------|
 | T-011 | [T-011-openapi-spec.md](./T-011-openapi-spec.md) | Generate OpenAPI 3.1 from `docs/api/**` | done |
-| T-012 | [T-012-coupon-code-case.md](./T-012-coupon-code-case.md) | Orders §2.6 — coupon code case-insensitivity | done |
-| T-013 | [T-013-orders-search-like-escape.md](./T-013-orders-search-like-escape.md) | Orders §2.7 — escape LIKE wildcards in search | done |
+| T-012 | [T-012-coupon-code-case.md](./T-012-coupon-code-case.md) | Orders آ§2.6 â€” coupon code case-insensitivity | done |
+| T-013 | [T-013-orders-search-like-escape.md](./T-013-orders-search-like-escape.md) | Orders آ§2.7 â€” escape LIKE wildcards in search | done |
 | T-014 | [T-014-checkout-audit-log.md](./T-014-checkout-audit-log.md) | Audit-log order placement | done |
 | T-015 | [T-015-admin-audit-table.md](./T-015-admin-audit-table.md) | Dedicated admin audit-log table | todo |
 | T-016 | [T-016-typecheck-tests.md](./T-016-typecheck-tests.md) | Typecheck `tests/` in CI | todo |
@@ -89,7 +89,7 @@ Task backlog derived from two audits:
 | T-021 | [T-021-orders-composite-index.md](./T-021-orders-composite-index.md) | Composite index `(users_id, placed_at)` on orders | done |
 | T-022 | [T-022-imagekit-live-upload-verify.md](./T-022-imagekit-live-upload-verify.md) | Live ImageKit client-side upload verification | todo |
 | T-023 | [T-023-stale-progress-cleanup.md](./T-023-stale-progress-cleanup.md) | Clean stale Next Step entries in PROJECT_PROGRESS | done |
-| T-035 | [T-035-prisma-error-mapping.md](./T-035-prisma-error-mapping.md) | Global Prisma error mapping (P2002/P2025 → 4xx) | done |
+| T-035 | [T-035-prisma-error-mapping.md](./T-035-prisma-error-mapping.md) | Global Prisma error mapping (P2002/P2025 â†’ 4xx) | done |
 | T-036 | [T-036-token-invalidation-on-password-change.md](./T-036-token-invalidation-on-password-change.md) | Invalidate pending tokens on credential rotation | done |
 | T-037 | [T-037-last-admin-race.md](./T-037-last-admin-race.md) | Fix last-admin demotion TOCTOU race | done |
 | T-038 | [T-038-phone-otp-attempt-limit.md](./T-038-phone-otp-attempt-limit.md) | Phone OTP attempt limiting + failure counter | wontfix |
@@ -123,7 +123,7 @@ Task backlog derived from two audits:
 | T-098 | [T-098-reports-integration-tests.md](./T-098-reports-integration-tests.md) | Reports integration tests (pdf headers/auth) | done |
 | T-099 | [T-099-reports-smoke-ops.md](./T-099-reports-smoke-ops.md) | Reports smoke & ops + PROJECT_PROGRESS | done |
 
-### P3 — Quality / hardening / future product
+### P3 â€” Quality / hardening / future product
 
 | ID | File | Title | Status |
 |----|------|-------|--------|
@@ -168,23 +168,24 @@ Task backlog derived from two audits:
 ## Suggested execution order
 
 ```text
-Wave 0 (unblock production):   T-028 → T-030 → T-031
-Wave 1 (security):             T-029 → T-036 → T-037 → T-039 → T-046
-Wave 2 (data integrity):       T-035 → T-040 → T-041 → T-042 → T-043 → T-045
-Wave 3 (ops/platform):         T-032 → T-033 → T-034 → T-047 → T-048 → T-049 → T-050 → T-051 → T-052 → T-053
-Wave 4 (quality/docs):         T-010 → T-011 → T-013 … T-023, T-044, T-054 … T-063 as capacity allows
-Wave 5 (product/hardening):    T-024 … T-027, T-064 … T-080 when product needs them
-Reports epic:                  T-088 → (T-089,T-090) → T-091 → T-092 → (T-093,T-094) → T-095 → T-096 → (T-097,T-098) → T-099  [branch: feature/reports-pdf]
-System epic:                   T-100 → (T-101,T-102,T-103,T-104) → T-105 → T-106  [branch: feature/system-settings]
+Wave 0 (unblock production):   T-028 â†’ T-030 â†’ T-031
+Wave 1 (security):             T-029 â†’ T-036 â†’ T-037 â†’ T-039 â†’ T-046
+Wave 2 (data integrity):       T-035 â†’ T-040 â†’ T-041 â†’ T-042 â†’ T-043 â†’ T-045
+Wave 3 (ops/platform):         T-032 â†’ T-033 â†’ T-034 â†’ T-047 â†’ T-048 â†’ T-049 â†’ T-050 â†’ T-051 â†’ T-052 â†’ T-053
+Wave 4 (quality/docs):         T-010 â†’ T-011 â†’ T-013 â€¦ T-023, T-044, T-054 â€¦ T-063 as capacity allows
+Wave 5 (product/hardening):    T-024 â€¦ T-027, T-064 â€¦ T-080 when product needs them
+Reports epic:                  T-088 â†’ (T-089,T-090) â†’ T-091 â†’ T-092 â†’ (T-093,T-094) â†’ T-095 â†’ T-096 â†’ (T-097,T-098) â†’ T-099  [branch: feature/reports-pdf]
+System epic:                   T-100 â†’ (T-101,T-102,T-103,T-104) â†’ T-105 â†’ T-106  [branch: feature/system-settings]
+Demo mode epic:                T-108 (backend enforcement) + client build flag  [branch: feature/public-demo-mode]
 
 ```
 
-Legacy waves from the 2026-08-16 review (security+money T-001→T-002→T-003; session/orders T-004…T-008) are already resolved or superseded by the waves above.
+Legacy waves from the 2026-08-16 review (security+money T-001â†’T-002â†’T-003; session/orders T-004â€¦T-008) are already resolved or superseded by the waves above.
 
 ## Notes
 
 - Real payment gateway is listed in `docs/REQUIREMENTS.md` **Out of Scope** for the initial version; T-002/T-003 are still production blockers if real money is the goal.
-- **2026-08-25:** Paymob integration dropped by product decision — T-081…T-087 (P0 Paymob epic) and frontend T19 marked `wontfix` / won't do; checkout stays on the `mock` provider. T-002/T-003 remain superseded by that decision.
+- **2026-08-25:** Paymob integration dropped by product decision â€” T-081â€¦T-087 (P0 Paymob epic) and frontend T19 marked `wontfix` / won't do; checkout stays on the `mock` provider. T-002/T-003 remain superseded by that decision.
 - Prefer small, focused branches. Do not mix P0 security work with P3 product work.
 - Each task file is the source of truth for that item until marked `done`.
-- T-047 (migrations baseline) unblocks several schema tasks (T-041/T-042/T-043/T-064/T-065/T-069/T-071/T-076) — do it early in Wave 3.
+- T-047 (migrations baseline) unblocks several schema tasks (T-041/T-042/T-043/T-064/T-065/T-069/T-071/T-076) â€” do it early in Wave 3.

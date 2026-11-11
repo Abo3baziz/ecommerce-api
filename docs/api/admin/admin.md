@@ -12,6 +12,11 @@ All endpoints require:
 
 Regular customers cannot access these endpoints. `super_admin` has full access to every admin module (users, products, categories) and is additionally the only role allowed to manage other users' roles.
 
+> **Public demo mode:** when `ENABLE_DEMO_MODE=true`, unauthenticated visitors
+> can `GET` most admin endpoints read-only with masked customer PII; mutations
+> and sensitive sections (settings/admins/audit/signed upload auth) stay
+> authenticated-only. See [demo-mode.md](./demo-mode.md).
+
 ---
 
 # Authentication

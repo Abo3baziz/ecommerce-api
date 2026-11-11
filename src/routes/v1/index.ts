@@ -33,6 +33,10 @@ import { adminAccountsRouter } from "../../modules/admins/index.js";
 import { adminReportsRouter } from "../../modules/reports/index.js";
 import { adminSettingsRouter } from "../../modules/settings/index.js";
 import { auditAdminMutations } from "../../middleware/auditLog.js";
+import {
+  demoAdminAccess,
+  demoResponseSanitizer,
+} from "../../middleware/demoMode.js";
 
 const v1Router = Router();
 
@@ -42,9 +46,18 @@ const v1Router = Router();
 if (env.ENABLE_CSRF) {
   v1Router.use(csrfProtection);
 }
-// Mounted before the admin routers: snapshots the request body pre-validation
-// and writes one audit row per authenticated mutating /admin/* request.
-v1Router.use("/admin", auditAdminMutations);
+// Mounted before the admin routers:
+// - demoAdminAccess: public demo-mode admission (env-toggled) — rejects
+//   unauthenticated writes/sensitive reads before anything else runs
+// - demoResponseSanitizer: masks customer PII on demo-public reads
+// - auditAdminMutations: snapshots the request body pre-validation and writes
+//   one audit row per authenticated mutating /admin/* request.
+v1Router.use(
+  "/admin",
+  demoAdminAccess,
+  demoResponseSanitizer,
+  auditAdminMutations,
+);
 
 v1Router.use("/auth", authRouter);
 v1Router.use("/users", usersRouter);

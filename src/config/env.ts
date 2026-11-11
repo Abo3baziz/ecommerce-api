@@ -50,6 +50,14 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((value) => value === "true"),
+  // Public read-only demo mode (recruiter showcase, T-108). When enabled,
+  // unauthenticated GET requests to /admin/* are served with a synthetic
+  // read-only principal (mutations still require a real admin session) and
+  // customer PII is masked in demo responses. See middleware/demoMode.ts.
+  ENABLE_DEMO_MODE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
 });
 
 const parsed = envSchema
