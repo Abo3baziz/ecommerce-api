@@ -1,109 +1,96 @@
-# Ecommerce Backend API
+# ⚙️ Ecommerce Backend API
 
-A production-deployed REST API powering a full e-commerce platform — customer
-accounts, catalog with variants and images, inventory, carts, transactional
-checkout, orders with a status-transition state machine, reviews, coupons,
-analytics, financial PDF reports, an append-only audit trail, and
-SUPER_ADMIN-persisted system settings with encrypted secrets and storefront
-maintenance gating — plus the administration surface behind it all.
+The engine behind an online store. It handles everything the website needs:
+customer accounts, products, stock, shopping carts, checkout, orders,
+reviews, coupons, sales reports, store settings and the admin dashboard's
+data. The website itself lives in a separate repo.
 
 **Part of a full-stack app** · [View Portfolio](https://codebyahmed.online)
 
 | | |
 |---|---|
-| **Live API** | [ecommerce-api-l3a4.onrender.com](https://ecommerce-api-l3a4.onrender.com/health) |
-| **Storefront (frontend repo)** | [github.com/Abo3baziz/ecommerce-client](https://github.com/Abo3baziz/ecommerce-client) · [live](https://ecommerce-storefront-ashy.vercel.app) |
-| **API contract** | [openapi/openapi.yaml](openapi/openapi.yaml) (OpenAPI 3.1, 80 paths) · human-readable specs in [`docs/api/**`](docs/api) |
-| **Portfolio** | [codebyahmed.online](https://codebyahmed.online) |
+| 🌐 **Live API** | [ecommerce-api-l3a4.onrender.com](https://ecommerce-api-l3a4.onrender.com/health) |
+| 🛍️ **Storefront (frontend repo)** | [github.com/Abo3baziz/ecommerce-client](https://github.com/Abo3baziz/ecommerce-client) · [live](https://ecommerce-storefront-ashy.vercel.app) |
+| 📚 **API docs** | [openapi/openapi.yaml](openapi/openapi.yaml) · plain-language specs in [`docs/api/**`](docs/api) |
+| 👤 **Portfolio** | [codebyahmed.online](https://codebyahmed.online) |
 
-## Feature surface (~98 endpoints under `/api/v1`)
+## 🧩 What it does
 
-| Module | Highlights |
+| Area | In plain terms |
 |---|---|
-| **Auth & sessions** | Opaque DB-backed session tokens (hashed with a server-side pepper), HttpOnly/SameSite cookies, CSRF double-submit on all writes, email verification, password reset via emailed OTP, brute-force lockout, per-device session revocation |
-| **Catalog** | Products with soft delete, variants (SKU/barcode/dimensions/discounts), images ordered by `display_order` with an exactly-one-primary invariant, category assignment |
-| **Inventory** | Per-variant stock ledger with reservation semantics (`reserveStock`/`commitStock`/`releaseStock` order operations), manual admin reserve/release |
-| **Cart & checkout** | Lazily created cart, live server-side pricing, single-transaction checkout guarded by a per-user advisory lock (stock reserve → payment → snapshot → cart clear) |
-| **Orders** | Immutable item snapshots (price/name/SKU frozen at checkout), strict legal status-transition matrix with asserted side effects (ship creates shipment, cancel restocks, refund marks payment refunded), coupon redemption inside the same transaction |
-| **Reviews** | Purchase-gated, one live review per user per product, image provenance validated against the ImageKit host, rating summaries |
-| **Reports** | Financial PDFs — P&L Statement, Expenses and Revenue by `month|quarter|year|custom` (≤366d) with configurable currency (`USD|EUR|GBP|EGP|SAR|AED`), vector charts (line/bar/pie via `pdfkit`), `SUPER_ADMIN`-only `attachment|inline` download or `?format=json` preview |
-| **Admin** | Role matrix (`CUSTOMER`/`ADMIN`/`SUPER_ADMIN`), dashboard stats, P&L analytics with expenses ledger, coupon management, moderation queue, customer account administration, append-only audit log |
-| **System settings** | Nine persisted configuration sections (general, commerce, payment, shipping, email, customer, security, admin_permissions, financial) editable by `SUPER_ADMIN` with per-field Zod validation, a transactional per-change audit diff, email test-send, and storefront maintenance gating (503 with admin/auth bypass) |
+| 🔐 **Accounts & security** | Sign-up and sign-in with secure cookies, verify your email, reset a forgotten password with a code sent by email, sign out of individual devices, and protection against repeated failed login attempts |
+| 🗂️ **Catalog** | Products with soft delete, size/color options (each with its own SKU, barcode and price), photos with one clearly marked main photo, and categories |
+| 📦 **Stock** | Tracks stock for every product option; sets stock aside while an order is being placed, and staff can manually hold or release stock |
+| 🛒 **Cart & checkout** | The cart is created on demand and always shows live prices; checkout happens as one all-or-nothing step — stock, payment and the order either all succeed or nothing changes |
+| 🚚 **Orders** | Once placed, an order's items are frozen (price and name can't drift), and it moves through clear statuses — confirm, ship, deliver, refund — with stock and payments updating automatically. Coupons apply safely inside that same step |
+| ⭐ **Reviews** | Only customers who bought a product can review it, one live review per person per product, photos included |
+| 📄 **Reports** | Download profit & loss, revenue or expense reports as PDFs, grouped by month, quarter or year, with charts |
+| 🧑‍💼 **Admin & settings** | Three roles (customer / staff / owner), a stats dashboard, review moderation, customer administration, a permanent log of every staff action, and store settings — where secrets like mail passwords are encrypted and never displayed |
+| 👀 **Demo mode** | Flip one switch and visitors can explore the admin dashboard read-only, without an account — personal details are partly hidden and nothing can be changed |
 
-## Architecture decisions worth noting
+## 💡 Choices worth knowing about
 
-- **Money is never a float** — every monetary value is a `Decimal(10,2)`
-  column serialized as a string end-to-end; arithmetic is decimal-based.
-- **Checkout correctness** — duplicate/concurrent checkouts can't double-charge
-  or oversell: per-user advisory lock + affected-row-count assertions inside the
-  transaction abort on any mismatched precondition.
-- **Provider-agnostic payments** — checkout depends on a `PaymentGateway`
-  interface; v1 ships a synchronous mock provider.
-- **Security posture** — helmet, global + endpoint-specific rate limiting
-  (proxy-aware via `TRUST_PROXY`), Zod validation at the route boundary,
-  structured logging with secret redaction, health/readiness probes outside
-  the limiter.
-- **PDFs without native deps** — financial reports stream `application/pdf`
-  via pure `pdfkit` vector drawing (tables + line/bar/pie), `Cache-Control: no-store`,
-  `Content-Disposition: attachment|inline` and `X-Report-Currency`; no Chromium/`canvas` required.
-- **Secrets are never plaintext** — payment/email credentials saved in system
-  settings are encrypted at rest with AES-256-GCM (`SETTINGS_ENCRYPTION_KEY`),
-  always returned masked as `[redacted]` (a `__REDACTED__` sentinel preserves
-  the stored cipher), and redacted before reaching the audit trail.
-- **Documented like a public API** — every module has a hand-maintained
-  contract in `docs/api/**` (the source of truth), mirrored into OpenAPI 3.1
-  for Apidog/Postman import and client generation.
+- 💰 **Money is exact.** Prices are stored and calculated as exact decimal
+  values — never the rough floating-point numbers computers usually use — so
+  totals are always correct to the cent.
+- 🛡️ **Checkout can't be cheated.** Two people paying at the same moment
+  can't oversell the last item or get charged twice; every step is checked
+  before anything is saved.
+- 🔌 **Payments are swappable.** The checkout talks to a payment provider
+  through a simple interface; today it ships with a built-in test provider,
+  and a real one can be added without touching checkout logic.
+- 🔒 **Secrets stay secret.** Sensitive settings (like email passwords) are
+  encrypted in the database, always shown masked, and never written to logs.
+- 🚦 **Hard to abuse.** Request limits, thorough input checking, and no
+  useful details leaked in error messages.
+- 📚 **Documented like a public API.** Every endpoint has hand-written docs,
+  plus a machine-readable spec for tools like Postman.
 
-## Tech stack
+## 🧰 Tech stack
 
 | Concern | Choice |
 |---|---|
-| Runtime | Node.js, TypeScript (strict), ESM |
-| HTTP | Express 5 |
-| ORM / DB | Prisma 7 + PostgreSQL (driver adapter `@prisma/adapter-pg`) |
-| Auth | Cookie sessions, `csrf-csrf`, bcrypt |
-| Email / Images | Resend · ImageKit (signed direct browser uploads) |
-| PDF Reports | `pdfkit` — vector tables + line/bar/pie charts, `Intl.NumberFormat` currency |
-| Validation | Zod schemas shared by route validators |
-| Logging | pino (structured, redacted) |
-| Testing | Vitest — unit, integration and e2e suites (~1,100 tests) |
+| Runtime | Node.js, TypeScript, Express |
+| Database | PostgreSQL with Prisma |
+| Auth | Cookie sessions, bcrypt, CSRF protection |
+| Email / Images | Resend · ImageKit (photos uploaded straight from the browser) |
+| Reports | pdfkit — PDFs with tables and charts |
+| Testing | Vitest — around 1,100 automated tests |
 
-## Local development
+## 🚀 Run it locally
 
 ```bash
-npm install          # postinstall runs prisma generate
-npm run dev          # http://localhost:3000 (frontend owns 3001)
-npm run typecheck    # tsc --noEmit
-npm run build        # esbuild bundle -> dist/index.js
+npm install
+npm run dev          # http://localhost:3000 (the frontend uses 3001)
+npm run typecheck
+npm run build
 ```
 
-Copy [`.env.example`](.env.example) → `.env` and fill in Postgres, Resend and
-ImageKit credentials, then generate the settings encryption key (see the
-comment in the template). Migrations:
+Copy [`.env.example`](.env.example) to `.env` and fill in the Postgres,
+email (Resend) and image (ImageKit) credentials — the template explains
+every field, including a key used to encrypt stored secrets. Then set up the
+database:
 
 ```bash
-npm run db:migrate           # dev
-npm run db:migrate:deploy    # production/release
+npm run db:migrate
 ```
 
-Bootstrap the first administrator after registering through the storefront:
+After registering through the storefront, promote yourself to store owner:
 
 ```bash
-npm run admin:create         # prompts for email, promotes to SUPER_ADMIN
+npm run admin:create    # asks for an email, makes it an admin account
 ```
 
-> ⚠️ Never run `npm test` against your development or production database —
-> integration suites clean up test data aggressively. Use `.env.test`.
+> ⚠️ Don't run the automated tests against your real database — they wipe
+> test data. They expect a separate `.env.test` database.
 
-## Deployment
+## ☁️ Deployment
 
-Render (API) → Neon PostgreSQL, with the Vercel-hosted storefront proxying
-browser traffic same-origin so session cookies stay first-party. Release
-command applies migrations before boot; `/health/ready` is the platform probe.
-`SETTINGS_ENCRYPTION_KEY` (64 hex chars) is **required in production** — the
-service refuses to boot without it, and rotating it makes previously stored
-settings secrets undecryptable.
-Full runbook: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+Runs on [Render](https://render.com) with a Postgres database; the Vercel
+storefront sends browser requests through itself so logins keep working
+smoothly. Database updates are applied automatically on release, and
+`/health/ready` is the uptime probe. Full details:
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ---
 
